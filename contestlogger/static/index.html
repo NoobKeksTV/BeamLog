@@ -27,6 +27,8 @@
   <div class="who">
     <span id="nick-badge" class="badge" title="Nickname ändern">–</span>
     <span id="conn" class="dot" title="Verbindung"></span>
+    <button id="sound-btn" class="ghost small" title="Töne an/aus">🔔</button>
+    <button id="qr-btn" class="ghost small" title="Adresse als QR-Code für Handy/Tablet">📱</button>
     <button id="theme-btn" class="ghost small" title="Hell/Dunkel umschalten">◐</button>
   </div>
 </header>
@@ -194,6 +196,13 @@
   <h3>Willkommen beim ContestLogger</h3>
   <p class="muted">Wie sollen dich die anderen im Chat und im Log sehen?</p>
   <form class="stack" id="nick-form"><input id="nick-input" placeholder="Nickname / Vorname" maxlength="24" required autofocus><button class="primary">Los geht’s</button></form>
+</template>
+
+<template id="tpl-qr">
+  <h3>Mit Handy oder Tablet verbinden</h3>
+  <p class="muted">QR-Code scannen oder die Adresse im Browser eingeben – gleiches WLAN vorausgesetzt.</p>
+  <div class="qr-box"><img id="qr-img" alt="QR-Code"><div class="qr-url" id="qr-url"></div></div>
+  <div class="row"><button type="button" class="ghost" data-close>Schließen</button></div>
 </template>
 
 <template id="tpl-setup">

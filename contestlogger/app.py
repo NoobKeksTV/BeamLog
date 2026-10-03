@@ -21,7 +21,7 @@ from .db import Database
 STATIC = Path(__file__).parent / "static"
 
 
-def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: float | None = None) -> FastAPI:
+def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: float | None = None, public_url: str = "") -> FastAPI:
     db = Database(db_path or os.environ.get("CONTESTLOGGER_DB", "data/contestlogger.db"))
     interval = backup_interval_min if backup_interval_min is not None else float(os.environ.get("CONTESTLOGGER_BACKUP_MIN", "15"))
 
@@ -81,8 +81,16 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             "app": __app_name__, "version": __version__, "copyright": __copyright__,
             "admin_configured": db.admin_configured(), "callbook_count": db.callbook_count(),
             "server_time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "public_url": public_url or os.environ.get("CONTESTLOGGER_URL", ""),
             "mdbtools": bool(__import__("shutil").which("mdb-tables")),
         }
+
+    @app.get("/api/qr.svg")
+    def qr_svg(text: str = Query(..., max_length=500)):
+        import qrcode
+        import qrcode.image.svg
+        img = qrcode.make(text, image_factory=qrcode.image.svg.SvgPathImage, box_size=12, border=2)
+        return Response(img.to_string(), media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
 
     @app.post("/api/setup")
     def setup(body: dict):

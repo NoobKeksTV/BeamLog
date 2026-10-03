@@ -192,3 +192,7 @@ table.compact td, table.compact th { padding: 5px 6px; font-size: 13.5px; }
 .footer { text-align: center; color: var(--muted); font-size: 12px; padding: 8px; border-top: 1px solid var(--line); }
 tr.total td { border-top: 2px solid var(--line); }
 #countdown:empty { display: none; }
+.qr-box { text-align: center; margin: 12px 0; }
+.qr-box img { width: min(320px, 80vw); background: #fff; padding: 8px; border-radius: 10px; }
+.qr-url { font-family: var(--mono); font-size: 20px; margin-top: 10px; word-break: break-all; }
+#sound-btn.off { opacity: .4; }

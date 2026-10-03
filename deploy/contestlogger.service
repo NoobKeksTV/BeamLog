@@ -11,7 +11,8 @@ Group=contestlogger
 WorkingDirectory=/opt/contestlogger
 Environment=PYTHONUNBUFFERED=1
 # Der Server lauscht nur lokal; nginx reicht die Anfragen auf Port 80 durch.
-ExecStart=/opt/contestlogger/.venv/bin/python run.py --host 127.0.0.1 --port 8000 --db /var/lib/contestlogger/contestlogger.db
+# --public-url: Adresse, die im QR-Code angezeigt wird (Hostname oder IP des Servers).
+ExecStart=/opt/contestlogger/.venv/bin/python run.py --host 127.0.0.1 --port 8000 --db /var/lib/contestlogger/contestlogger.db --public-url http://contest.local/
 Restart=always
 RestartSec=3
 

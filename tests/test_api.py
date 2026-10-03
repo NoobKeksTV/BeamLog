@@ -115,3 +115,8 @@ def test_summary_backup_rig(client):
     con = sqlite3.connect(os.path.join(lst["dir"], name))
     assert con.execute("SELECT COUNT(*) FROM qsos").fetchone()[0] == 3
     con.close()
+
+
+def test_qr(client):
+    r = client.get("/api/qr.svg", params={"text": "http://192.168.1.10:8000/"})
+    assert r.status_code == 200 and b"<svg" in r.content

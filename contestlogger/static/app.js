@@ -156,6 +156,43 @@
   }
   $("#nick-badge").addEventListener("click", askNick);
 
+  // ------------------------------------------------------------ Töne (WebAudio, keine Dateien nötig)
+  const Sound = {
+    on: localStorage.getItem("cl.sound") !== "off",
+    ctx: null,
+    ensure() { if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { return null; } } if (this.ctx.state === "suspended") this.ctx.resume(); return this.ctx; },
+    tone(freq, start, dur, type = "sine", gain = 0.18) {
+      const c = this.ensure(); if (!c) return;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.value = freq; o.connect(g); g.connect(c.destination);
+      const t = c.currentTime + start;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); o.stop(t + dur + 0.02);
+    },
+    play(kind) {
+      if (!this.on) return;
+      if (kind === "qso") { this.tone(880, 0, 0.12); this.tone(1320, 0.1, 0.18); }          // Pling – QSO geloggt
+      else if (kind === "dupe") { this.tone(220, 0, 0.18, "square", 0.12); this.tone(180, 0.2, 0.25, "square", 0.12); } // Brummen – Dupe
+      else if (kind === "chat") { this.tone(1046, 0, 0.08); this.tone(1568, 0.09, 0.12); }   // Ping – Chat
+      else if (kind === "other") { this.tone(660, 0, 0.06, "triangle", 0.08); }             // Tick – andere Station hat geloggt
+      else if (kind === "error") { this.tone(300, 0, 0.15, "sawtooth", 0.1); }
+    },
+  };
+  const renderSoundBtn = () => $("#sound-btn").classList.toggle("off", !Sound.on);
+  renderSoundBtn();
+  $("#sound-btn").addEventListener("click", () => { Sound.on = !Sound.on; localStorage.setItem("cl.sound", Sound.on ? "on" : "off"); renderSoundBtn(); if (Sound.on) Sound.play("chat"); });
+  document.addEventListener("pointerdown", () => Sound.ensure(), { once: true });
+  document.addEventListener("keydown", () => Sound.ensure(), { once: true });
+
+  // ------------------------------------------------------------ QR-Code
+  $("#qr-btn").addEventListener("click", () => {
+    const local = ["localhost", "127.0.0.1", "::1"].includes(location.hostname);
+    const url = local && S.info.public_url ? S.info.public_url : location.origin + "/";
+    const box = modal(fromTpl("tpl-qr"));
+    box.querySelector("#qr-img").src = `/api/qr.svg?text=${encodeURIComponent(url)}`;
+    box.querySelector("#qr-url").textContent = url;
+  });
+
   // ------------------------------------------------------------ Theme
   const applyTheme = () => { const t = localStorage.getItem("cl.theme"); if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; };
   applyTheme();
@@ -407,9 +444,10 @@
       } else {
         const q = await api("POST", `/api/stations/${S.stationId}/qsos`, body);
         toast(q.dupe ? `DUPE geloggt: ${q.call} (0 Punkte)` : `${q.call} ${q.locator} · ${q.km} km · ${q.points} Punkte`, q.dupe ? "err" : "ok");
+        Sound.play(q.dupe ? "dupe" : "qso");
       }
       clearForm();
-    } catch (err) { toast(err.message, "err"); }
+    } catch (err) { toast(err.message, "err"); Sound.play("error"); }
   }
 
   function editQso(q) {
@@ -480,13 +518,14 @@
     ws.onclose = () => { $("#conn").classList.remove("on"); setTimeout(connectWs, 2000); };
     ws.onmessage = async (ev) => {
       const m = JSON.parse(ev.data);
-      if (m.type === "chat") appendChat(m.msg);
+      if (m.type === "chat") { appendChat(m.msg); if (m.msg.nick !== S.nick) Sound.play("chat"); }
       else if (m.type === "rig") { S.rig[m.station_id] = { freq: m.freq, mode: m.mode, ts: m.ts }; if (m.station_id === S.stationId) renderStationBar(); renderScoreboard(); }
       else if (m.type === "presence") renderPresence(m.users);
       else if (m.type === "update") {
         if (m.scope === "contests") await loadContests();
         else if (m.scope === "qsos") {
-          if (m.station_id === S.stationId) { await loadQsos(); if (m.qso && m.by !== S.nick) toast(`${m.by || "API"}: ${m.qso.call} geloggt`); }
+          if (m.station_id === S.stationId) { await loadQsos(); if (m.qso && m.by !== S.nick) { toast(`${m.by || "API"}: ${m.qso.call} geloggt`); Sound.play("other"); } }
+          else if (m.qso && m.by !== S.nick) Sound.play("other");
           renderScoreboard();
           const st = S.contests.flatMap((c) => c.stations).find((s) => s.id === m.station_id);
           if (st && m.qso) { st.serial_next = Math.max(st.serial_next, m.qso.serial_sent + 1); if (st.id === S.stationId) renderStationBar(); }
