@@ -89,6 +89,23 @@ Hinweis: Die Datei `Contest.dat` von WinContest (Call-Datenbank) ist verschlüss
 nicht direkt gelesen werden. Das Call-Buch wird stattdessen aus den eigenen Logs aufgebaut
 und kann zusätzlich mit jeder Call/Locator-Liste (CSV) gefüttert werden.
 
+## Portable Version bauen (ohne Python auf dem Zielrechner)
+
+```bash
+build.bat          # Windows  → dist\ContestLogger-<version>-windows-x86_64.zip
+./build.sh         # Linux / macOS / Raspberry Pi
+```
+
+Das ZIP enthält `ContestLogger[.exe]` (Server + Oberfläche), `ContestLogger-CAT` (CAT-Bridge),
+`ContestLogger-Import` (WinContest-Import), `START.txt` und einen leeren `data/`-Ordner. Alles liegt
+in einem Ordner, der ganze Ordner ist umziehbar (USB-Stick, anderer Rechner). Doppelklick auf
+`ContestLogger.exe` startet den Server und öffnet den Browser; Datenbank, Backups und eigene
+Sprachen landen in `data/` neben dem Programm.
+
+Gebaut wird mit PyInstaller **auf dem jeweiligen Betriebssystem** (Windows-Build auf Windows usw.).
+Der GitHub-Workflow `.github/workflows/build.yml` baut bei einem Tag `v*` automatisch für
+Windows, Linux und macOS und hängt die ZIPs an das Release.
+
 ## Als Dienst auf einem Debian-Server (nginx + systemd)
 
 ```bash
