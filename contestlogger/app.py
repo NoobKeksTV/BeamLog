@@ -1,0 +1,383 @@
+"""HTTP-/WebSocket-Server (FastAPI). Zentraler Speicher, Live-Updates und Chat
+für alle im LAN angemeldeten Browser.
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, PlainTextResponse, Response
+from fastapi.staticfiles import StaticFiles
+
+from . import __app_name__, __copyright__, __version__, exporters, importers
+from .db import Database
+
+STATIC = Path(__file__).parent / "static"
+
+
+def create_app(db_path: str | os.PathLike | None = None) -> FastAPI:
+    db = Database(db_path or os.environ.get("CONTESTLOGGER_DB", "data/contestlogger.db"))
+    app = FastAPI(title=__app_name__, version=__version__)
+    app.state.db = db
+    hub = Hub()
+    app.state.hub = hub
+
+    # ------------------------------------------------------------ Auth-Helfer
+    def is_admin(token: str | None) -> bool:
+        return bool(token) and token == db.sign("admin")
+
+    def require_admin(x_admin_token: str | None = Header(default=None)) -> None:
+        if not is_admin(x_admin_token):
+            raise HTTPException(403, "Admin-Anmeldung erforderlich")
+
+    def require_station(sid: int, token: str | None, admin: str | None) -> dict:
+        station = db.get_station(sid)
+        if not station:
+            raise HTTPException(404, "Station nicht gefunden")
+        if is_admin(admin) or db.check_station_token(sid, token or ""):
+            return station
+        raise HTTPException(403, "Station ist nicht freigeschaltet")
+
+    def nick_of(x_nick: str | None) -> str:
+        return (x_nick or "").strip()[:24]
+
+    # ------------------------------------------------------------ Allgemein
+    @app.get("/api/info")
+    def info():
+        return {
+            "app": __app_name__, "version": __version__, "copyright": __copyright__,
+            "admin_configured": db.admin_configured(), "callbook_count": db.callbook_count(),
+            "server_time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "mdbtools": bool(__import__("shutil").which("mdb-tables")),
+        }
+
+    @app.post("/api/setup")
+    def setup(body: dict):
+        if db.admin_configured():
+            raise HTTPException(409, "Admin-Passwort ist bereits gesetzt")
+        pw = (body.get("password") or "").strip()
+        if len(pw) < 4:
+            raise HTTPException(400, "Passwort zu kurz (mind. 4 Zeichen)")
+        db.set_admin_password(pw)
+        return {"token": db.sign("admin")}
+
+    @app.post("/api/admin/login")
+    def admin_login(body: dict):
+        if not db.check_admin(body.get("password") or ""):
+            raise HTTPException(403, "Falsches Admin-Passwort")
+        return {"token": db.sign("admin")}
+
+    @app.post("/api/admin/password", dependencies=[Depends(require_admin)])
+    def admin_password(body: dict):
+        pw = (body.get("password") or "").strip()
+        if len(pw) < 4:
+            raise HTTPException(400, "Passwort zu kurz")
+        db.set_admin_password(pw)
+        return {"ok": True}
+
+    # ------------------------------------------------------------ Contests
+    @app.get("/api/contests")
+    def contests():
+        out = db.list_contests()
+        for c in out:
+            c["stations"] = db.list_stations(c["id"])
+        return out
+
+    @app.post("/api/contests", dependencies=[Depends(require_admin)])
+    async def create_contest(body: dict):
+        if not (body.get("name") or "").strip():
+            raise HTTPException(400, "Name fehlt")
+        cid = db.create_contest(body["name"], body.get("start_utc"), body.get("end_utc"), body.get("scoring", "km"), body.get("notes", ""))
+        await hub.broadcast({"type": "update", "scope": "contests"})
+        return db.get_contest(cid)
+
+    @app.patch("/api/contests/{cid}", dependencies=[Depends(require_admin)])
+    async def update_contest(cid: int, body: dict):
+        if not db.get_contest(cid):
+            raise HTTPException(404)
+        db.update_contest(cid, **body)
+        await hub.broadcast({"type": "update", "scope": "contests"})
+        return db.get_contest(cid)
+
+    @app.delete("/api/contests/{cid}", dependencies=[Depends(require_admin)])
+    async def delete_contest(cid: int):
+        db.delete_contest(cid)
+        await hub.broadcast({"type": "update", "scope": "contests"})
+        return {"ok": True}
+
+    @app.get("/api/contests/{cid}/scoreboard")
+    def scoreboard(cid: int):
+        return db.scoreboard(cid)
+
+    # ------------------------------------------------------------ Stationen
+    @app.post("/api/contests/{cid}/stations", dependencies=[Depends(require_admin)])
+    async def create_station(cid: int, body: dict):
+        if not db.get_contest(cid):
+            raise HTTPException(404, "Contest nicht gefunden")
+        try:
+            sid = db.create_station(cid, body.get("call", ""), body.get("locator", ""), body.get("band", "144MHz"),
+                                    body.get("mode", "SSB"), body.get("password", ""), body.get("info") or {})
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        await hub.broadcast({"type": "update", "scope": "contests"})
+        return db.get_station(sid)
+
+    @app.patch("/api/stations/{sid}")
+    async def update_station(sid: int, body: dict, x_station_token: str | None = Header(default=None), x_admin_token: str | None = Header(default=None)):
+        require_station(sid, x_station_token, x_admin_token)
+        if not is_admin(x_admin_token):
+            # Operator darf nur Stationsdaten (Antenne usw.) und Seriennummer ändern, nicht Call/Passwort
+            body = {k: v for k, v in body.items() if k in ("info", "serial_next", "mode")}
+        try:
+            db.update_station(sid, **body)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        await hub.broadcast({"type": "update", "scope": "contests"})
+        await hub.broadcast({"type": "update", "scope": "qsos", "station_id": sid})
+        return db.get_station(sid)
+
+    @app.delete("/api/stations/{sid}", dependencies=[Depends(require_admin)])
+    async def delete_station(sid: int):
+        db.delete_station(sid)
+        await hub.broadcast({"type": "update", "scope": "contests"})
+        return {"ok": True}
+
+    @app.post("/api/stations/{sid}/unlock")
+    def unlock(sid: int, body: dict, x_admin_token: str | None = Header(default=None)):
+        if not db.get_station(sid):
+            raise HTTPException(404)
+        if is_admin(x_admin_token) or db.check_station_password(sid, body.get("password") or ""):
+            return {"token": db.station_token(sid)}
+        raise HTTPException(403, "Falsches Stations-Passwort")
+
+    @app.post("/api/stations/{sid}/serial")
+    async def reset_serial(sid: int, body: dict, x_station_token: str | None = Header(default=None), x_admin_token: str | None = Header(default=None)):
+        require_station(sid, x_station_token, x_admin_token)
+        db.reset_serial(sid, int(body.get("start", 1)))
+        await hub.broadcast({"type": "update", "scope": "contests"})
+        return db.get_station(sid)
+
+    @app.get("/api/stations/{sid}/stats")
+    def stats(sid: int):
+        if not db.get_station(sid):
+            raise HTTPException(404)
+        return db.station_stats(sid)
+
+    # ------------------------------------------------------------ QSOs
+    @app.get("/api/stations/{sid}/qsos")
+    def qsos(sid: int, limit: int | None = Query(default=None), q: str = Query(default="")):
+        if not db.get_station(sid):
+            raise HTTPException(404)
+        return db.list_qsos(sid, limit=limit, search=q)
+
+    @app.post("/api/stations/{sid}/qsos")
+    async def add_qso(sid: int, body: dict, x_station_token: str | None = Header(default=None),
+                      x_admin_token: str | None = Header(default=None), x_nick: str | None = Header(default=None)):
+        require_station(sid, x_station_token, x_admin_token)
+        try:
+            qso = db.add_qso(sid, body, logged_by=nick_of(x_nick))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        await hub.broadcast({"type": "update", "scope": "qsos", "station_id": sid, "qso": qso, "by": nick_of(x_nick)})
+        return qso
+
+    @app.patch("/api/qsos/{qid}")
+    async def update_qso(qid: int, body: dict, x_station_token: str | None = Header(default=None), x_admin_token: str | None = Header(default=None)):
+        old = db.get_qso(qid)
+        if not old:
+            raise HTTPException(404)
+        require_station(old["station_id"], x_station_token, x_admin_token)
+        try:
+            qso = db.update_qso(qid, body)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        await hub.broadcast({"type": "update", "scope": "qsos", "station_id": old["station_id"]})
+        return qso
+
+    @app.delete("/api/qsos/{qid}")
+    async def delete_qso(qid: int, x_station_token: str | None = Header(default=None), x_admin_token: str | None = Header(default=None)):
+        old = db.get_qso(qid)
+        if not old:
+            raise HTTPException(404)
+        require_station(old["station_id"], x_station_token, x_admin_token)
+        db.delete_qso(qid)
+        await hub.broadcast({"type": "update", "scope": "qsos", "station_id": old["station_id"]})
+        return {"ok": True}
+
+    # ------------------------------------------------------------ Call-Buch
+    @app.get("/api/suggest")
+    def suggest(q: str = "", station: int | None = None):
+        return db.suggest(q, station_id=station)
+
+    @app.get("/api/call")
+    def call_lookup(call: str = ""):
+        return db.lookup_call(call) or {}
+
+    @app.get("/api/calc")
+    def calc(my: str, loc: str):
+        from . import geo
+        if not (geo.is_valid_locator(my) and geo.is_valid_locator(loc)):
+            return {"valid": False}
+        return {"valid": True, "km": geo.distance_km_int(my, loc), "bearing": round(geo.bearing_deg(my, loc)) % 360}
+
+    @app.get("/api/callbook/export.csv")
+    def callbook_export():
+        rows = db.rows("SELECT * FROM callbook ORDER BY call")
+        return PlainTextResponse(exporters.export_callbook_csv(rows), media_type="text/csv",
+                                 headers={"Content-Disposition": "attachment; filename=callbook.csv"})
+
+    @app.post("/api/callbook", dependencies=[Depends(require_admin)])
+    def callbook_edit(body: dict):
+        db.learn_call(body.get("call", ""), body.get("locator", ""), source="manual", name=body.get("name", ""))
+        return db.lookup_call(body.get("call", "")) or {}
+
+    # ------------------------------------------------------------ Import
+    @app.post("/api/import", dependencies=[Depends(require_admin)])
+    async def do_import(file: UploadFile = File(...), target: str = Form("auto"),
+                        station_id: int | None = Form(None), contest_id: int | None = Form(None),
+                        contest_name: str = Form(""), x_nick: str | None = Header(default=None)):
+        data = await file.read()
+        try:
+            res = importers.parse_file(file.filename or "import", data)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        report: dict[str, Any] = {"kind": res.kind, "warnings": res.warnings[:50], "qsos": 0, "callbook": 0}
+        # Call-Listen und – immer – die Rufzeichen/Locator aus den QSOs ins Call-Buch
+        for call, loc, name in res.callbook:
+            db.learn_call(call, loc, source="import", name=name)
+            report["callbook"] += 1
+        if target == "callbook" or (target == "auto" and not res.qsos):
+            for q in res.qsos:
+                db.learn_call(q.call, q.locator, source="import", when=q.ts_utc)
+                report["callbook"] += 1
+            return report
+        if not res.qsos:
+            return report
+        # QSOs in eine Station übernehmen
+        sid = station_id
+        if not sid:
+            cid = contest_id
+            if not cid:
+                name = contest_name.strip() or res.header.get("name") or f"Import {Path(file.filename or '').stem}"
+                dates = sorted(q.ts_utc for q in res.qsos)
+                cid = db.create_contest(name, dates[0], dates[-1])
+                report["contest_id"] = cid
+            band = res.header.get("band") or res.qsos[0].band or "144MHz"
+            if not res.header.get("locator"):
+                raise HTTPException(400, "Datei enthält keinen eigenen Locator – bitte Zielstation auswählen")
+            sid = db.create_station(cid, res.header.get("call") or "IMPORT", res.header["locator"], band, "SSB", "")
+            report["station_id"] = sid
+        station = db.get_station(sid)
+        if not station:
+            raise HTTPException(404, "Station nicht gefunden")
+        existing = {(q["core_call"], q["ts_utc"]) for q in db.list_qsos(sid)}
+        from . import prefixes
+        for q in sorted(res.qsos, key=lambda x: x.ts_utc):
+            if (prefixes.core_call(q.call), q.ts_utc) in existing:
+                continue
+            try:
+                d = q.__dict__.copy()
+                d["band"] = d["band"] or station["band"]
+                db.add_qso(sid, d, logged_by=nick_of(x_nick) or "import")
+                report["qsos"] += 1
+            except ValueError as e:
+                report["warnings"].append(f"{q.call}: {e}")
+        await hub.broadcast({"type": "update", "scope": "contests"})
+        await hub.broadcast({"type": "update", "scope": "qsos", "station_id": sid})
+        return report
+
+    # ------------------------------------------------------------ Export
+    @app.get("/api/stations/{sid}/export.{fmt}")
+    def export(sid: int, fmt: str):
+        station = db.get_station(sid)
+        if not station:
+            raise HTTPException(404)
+        contest = db.get_contest(station["contest_id"]) or {"name": ""}
+        qsos = db.list_qsos(sid)
+        base = f"{station['call'].replace('/', '-')}_{station['band']}"
+        if fmt == "edi":
+            return Response(exporters.export_edi(contest, station, qsos).encode("latin-1", "replace"),
+                            media_type="text/plain", headers={"Content-Disposition": f"attachment; filename={base}.edi"})
+        if fmt in ("adi", "adif"):
+            return PlainTextResponse(exporters.export_adif(contest, station, qsos), headers={"Content-Disposition": f"attachment; filename={base}.adi"})
+        if fmt == "csv":
+            return PlainTextResponse(exporters.export_csv(contest, station, qsos), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={base}.csv"})
+        raise HTTPException(404, "Unbekanntes Format")
+
+    # ------------------------------------------------------------ Chat / WS
+    @app.get("/api/chat")
+    def chat_history():
+        return db.recent_chat()
+
+    @app.websocket("/ws")
+    async def ws(socket: WebSocket, nick: str = Query(default="")):
+        nick = nick.strip()[:24] or "Gast"
+        await hub.connect(socket, nick)
+        try:
+            while True:
+                raw = await socket.receive_text()
+                try:
+                    msg = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if msg.get("type") == "chat" and (msg.get("text") or "").strip():
+                    entry = db.add_chat(nick, msg["text"].strip())
+                    await hub.broadcast({"type": "chat", "msg": entry})
+                elif msg.get("type") == "status":
+                    hub.set_status(socket, msg.get("station_id"))
+                    await hub.broadcast_presence()
+        except WebSocketDisconnect:
+            pass
+        finally:
+            await hub.disconnect(socket)
+
+    # ------------------------------------------------------------ Frontend
+    app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+    @app.get("/")
+    def index():
+        return FileResponse(STATIC / "index.html")
+
+    return app
+
+
+class Hub:
+    """Verwaltet alle offenen WebSockets und verteilt Ereignisse."""
+
+    def __init__(self) -> None:
+        self.clients: dict[WebSocket, dict] = {}
+        self.lock = asyncio.Lock()
+
+    async def connect(self, ws: WebSocket, nick: str) -> None:
+        await ws.accept()
+        async with self.lock:
+            self.clients[ws] = {"nick": nick, "station_id": None}
+        await self.broadcast_presence()
+
+    async def disconnect(self, ws: WebSocket) -> None:
+        async with self.lock:
+            self.clients.pop(ws, None)
+        await self.broadcast_presence()
+
+    def set_status(self, ws: WebSocket, station_id) -> None:
+        if ws in self.clients:
+            self.clients[ws]["station_id"] = station_id
+
+    async def broadcast_presence(self) -> None:
+        await self.broadcast({"type": "presence", "users": list(self.clients.values())})
+
+    async def broadcast(self, payload: dict) -> None:
+        data = json.dumps(payload, ensure_ascii=False)
+        dead = []
+        for ws in list(self.clients):
+            try:
+                await ws.send_text(data)
+            except Exception:  # noqa: BLE001
+                dead.append(ws)
+        for ws in dead:
+            self.clients.pop(ws, None)
