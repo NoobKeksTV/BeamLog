@@ -451,7 +451,12 @@
         else if (inp === F.call && ready) F.nr.focus();
         else (order[i + 1] || F.call).focus();
       }
-      if (e.key === " " && inp === F.call) { e.preventDefault(); (F.loc.value ? F.nr : F.loc).focus(); }
+      // Leertaste springt: Rufzeichen -> Nr erhalten -> Locator -> Kommentar -> Rufzeichen
+      if (e.key === " " && inp !== F.cmt) {
+        e.preventDefault();
+        const hop = { [F.call.id]: F.nr, [F.rs.id]: F.nr, [F.rr.id]: F.nr, [F.nr.id]: F.loc, [F.loc.id]: F.cmt };
+        (hop[inp.id] || F.call).focus();
+      }
     });
   });
   F.call.addEventListener("input", () => { F.call.value = F.call.value.toUpperCase(); fetchSuggest(); updateHints(); if (!$("#macro-bar").classList.contains("hidden")) renderMacroBar(); });

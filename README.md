@@ -66,8 +66,7 @@ ohne mdbtools die parallele `.txt` aus dem `Datenbank`-Ordner nehmen.
    Die Angaben für die EDI-Abgabe (Standort, Verantwortlicher, Antenne …) stehen dort pro Station.
 4. Im Reiter **Loggen** Station wählen, mit Stations-Passwort freischalten, loslegen.
 
-Tastatur: `Enter` springt zum nächsten Feld bzw. loggt, `Leertaste` im Rufzeichen springt
-zum Locator / zur Nr., `↑`/`↓` wählt Vorschläge, `Esc` leert die Eingabe, `F1`–`F8` Makros, `F9` Makro-Übersicht.
+Tastatur: `Enter` springt zum nächsten Feld bzw. loggt, `Leertaste` springt Rufzeichen → Nr. erhalten → Locator → Kommentar, `↑`/`↓` wählt Vorschläge, `Esc` leert die Eingabe, `F1`–`F8` Makros, `F9` Makro-Übersicht.
 
 ## Eigene Sprache hinzufügen
 
