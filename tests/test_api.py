@@ -85,3 +85,28 @@ def test_full_flow(client):
     assert client.get("/api/chat").json()[-1]["text"] == "hallo"
 
     assert client.get("/").status_code == 200
+
+
+def test_summary_backup_rig(client):
+    admin = client.post("/api/setup", json={"password": "admin1"}).json()["token"]
+    H = {"X-Admin-Token": admin}
+    cid = client.post("/api/contests", json={"name": "Multi"}, headers=H).json()["id"]
+    s1 = client.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH", "locator": "JO31AA", "band": "144MHz"}, headers=H).json()["id"]
+    s2 = client.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH", "locator": "JO31AA", "band": "432MHz"}, headers=H).json()["id"]
+    client.post(f"/api/stations/{s1}/qsos", json={"call": "DL8NAS", "locator": "JN59LE"}, headers=H)
+    client.post(f"/api/stations/{s2}/qsos", json={"call": "DL8NAS", "locator": "JN59LE", "freq": "432.200"}, headers=H)
+    client.post(f"/api/stations/{s2}/qsos", json={"call": "OL3Z", "locator": "JN79FX"}, headers=H)
+    sm = client.get(f"/api/contests/{cid}/summary").json()
+    assert sm["total_qsos"] == 3 and sm["total_points"] == 406 * 2 + 607
+    assert sm["unique_calls"] == 2 and [b["band"] for b in sm["bands"]] == ["144MHz", "432MHz"]
+    assert "<FREQ:7>432.200" in client.get(f"/api/stations/{s2}/export.adi").text
+
+    r = client.post(f"/api/stations/{s1}/rig", json={"freq": 144.3, "mode": "USB"}, headers=H).json()
+    assert r["freq"] == "144.300"
+    sb = {row["id"]: row for row in client.get(f"/api/contests/{cid}/scoreboard").json()}
+    assert sb[s1]["rig"]["freq"] == "144.300" and sb[s2]["rig"] is None
+    assert client.get(f"/api/stations/{s1}/rig").json()["mode"] == "USB"
+
+    assert client.get("/api/backup").status_code == 403
+    b = client.get("/api/backup", headers=H)
+    assert b.status_code == 200 and b.content[:15] == b"SQLite format 3"

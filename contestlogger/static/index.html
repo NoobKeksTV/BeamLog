@@ -39,6 +39,7 @@
     <select id="sel-station"></select>
   </label>
   <span id="station-state" class="muted"></span>
+  <span id="countdown" class="tag"></span>
   <span class="grow"></span>
   <span id="station-meta" class="meta"></span>
 </div>
@@ -116,7 +117,7 @@
       </div>
       <div class="table-wrap tall">
         <table id="full-table" class="qsos">
-          <thead><tr><th>#</th><th>Datum</th><th>UTC</th><th>Rufzeichen</th><th>RST g</th><th>Nr g</th><th>RST e</th><th>Nr e</th><th>Locator</th><th class="num">km</th><th class="num">°</th><th class="num">Pkt</th><th>Land</th><th>Mode</th><th>Kommentar</th><th>Op</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Datum</th><th>UTC</th><th>Rufzeichen</th><th>RST g</th><th>Nr g</th><th>RST e</th><th>Nr e</th><th>Locator</th><th class="num">km</th><th class="num">°</th><th class="num">Pkt</th><th>Land</th><th>Mode</th><th>MHz</th><th>Kommentar</th><th>Op</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -145,7 +146,7 @@
       </div>
       <div class="card">
         <div class="card-head"><h3>Stationen <span id="admin-contest-name" class="muted"></span></h3><button id="btn-new-station" class="primary small">+ Station</button></div>
-        <p class="muted small">Jede Station hat eigenes Rufzeichen, Locator, Band und Passwort. Operatoren schalten die Station mit dem Passwort frei und loggen darunter.</p>
+        <p class="muted small">Jede Station hat eigenes Rufzeichen, Locator, Band und Passwort. Operatoren schalten die Station mit dem Passwort frei und loggen darunter. Die Stations-ID (für die CAT-Bridge <code>tools/cat_bridge.py</code>) steht in der Tabelle.</p>
         <table id="admin-stations" class="compact"><tbody></tbody></table>
       </div>
       <div class="card">
@@ -173,6 +174,9 @@
           <input id="cb-call" placeholder="Rufzeichen" required><input id="cb-loc" placeholder="Locator" required><input id="cb-name" placeholder="Name"><button class="ghost">Speichern</button>
         </form>
         <p><a href="/api/callbook/export.csv" class="button ghost" download>Call-Buch als CSV exportieren</a></p>
+        <h3>Backup</h3>
+        <p class="muted small">Lädt eine konsistente Kopie der kompletten Datenbank (alle Contests, Logs, Call-Buch, Chat) herunter. Zum Wiederherstellen die Datei als <code>data/contestlogger.db</code> ablegen und den Server neu starten.</p>
+        <p><button id="btn-backup" class="ghost">Backup herunterladen</button></p>
         <h3>Admin-Passwort</h3>
         <form id="admin-pw-form" class="row"><input id="admin-pw-new" type="password" placeholder="Neues Passwort" required><button class="ghost">Ändern</button></form>
         <p><button id="btn-admin-logout" class="ghost small">Admin abmelden</button></p>

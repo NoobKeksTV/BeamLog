@@ -110,6 +110,7 @@ def export_adif(contest: dict, station: dict, qsos: list[dict]) -> str:
             _adif_field("RST_SENT", q["rst_sent"]), _adif_field("RST_RCVD", q["rst_rcvd"]),
             _adif_field("GRIDSQUARE", q["locator"]), _adif_field("STX", f"{int(q['serial_sent']):03d}"),
             _adif_field("SRX", q["serial_rcvd"]), _adif_field("BAND", ADIF_BAND.get(q["band"], q["band"])),
+            _adif_field("FREQ", q.get("freq") or ""),
             _adif_field("STATION_CALLSIGN", station["call"]), _adif_field("MY_GRIDSQUARE", station["locator"]),
             _adif_field("CONTEST_ID", contest["name"]), _adif_field("DISTANCE", q["km"]),
             _adif_field("COMMENT", q["comment"]), "<eor>",

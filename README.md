@@ -25,7 +25,11 @@ oder Handys im Browser. Kein Internet nötig, keine Accounts.
 - **Import**: WinContest `Datenbank/*.txt`, `*.mdb` (mit mdbtools), `DD3KU/*.EXP`, EDI/REG1TEST,
   ADIF, Call-Listen (`Call;Locator;Name`).
 - **Export**: EDI (REG1TEST für die Abgabe), ADIF, CSV, Call-Buch-CSV.
-- Responsives Layout (Fenster beliebig skalierbar, auch Handy), hell/dunkel.
+- **Multi-Band-Gesamtwertung** pro Contest (alle Stationen/Bänder zusammen), Countdown bis Contest-Ende.
+- **CAT-Anbindung**: `tools/cat_bridge.py` meldet die Frequenz des Funkgeräts (Hamlib rigctld oder flrig)
+  an den Server; sie wird bei der Station angezeigt und je QSO gespeichert (ADIF `FREQ`).
+- **Backup** der kompletten Datenbank per Knopf (Verwaltung) oder täglich per Cron auf dem Server.
+- Länderkennung weltweit (DXCC-Präfixe), responsives Layout (Fenster beliebig skalierbar, auch Handy), hell/dunkel.
 
 ## Installation und Start
 
@@ -66,6 +70,25 @@ landen im Call-Buch und erscheinen danach als Vorschläge.
 Hinweis: Die Datei `Contest.dat` von WinContest (Call-Datenbank) ist verschlüsselt und kann
 nicht direkt gelesen werden. Das Call-Buch wird stattdessen aus den eigenen Logs aufgebaut
 und kann zusätzlich mit jeder Call/Locator-Liste (CSV) gefüttert werden.
+
+## Als Dienst auf einem Debian-Server (nginx + systemd)
+
+```bash
+git clone https://github.com/NoobKeksTV/ContestLogger.git && cd ContestLogger
+sudo bash deploy/install.sh
+```
+
+Details, HTTPS-Variante, Update und Wiederherstellung: siehe [`deploy/README.md`](deploy/README.md).
+
+## CAT / Frequenz vom Funkgerät
+
+Auf dem Rechner mit dem Transceiver (Hamlib `rigctld` muss laufen, z. B. `rigctld -m 3081 -r COM5`):
+
+```bash
+python tools/cat_bridge.py --server http://192.168.1.10:8000 --station 1 --password 70cm
+```
+
+Die Stations-ID steht in der Verwaltung. Alternativ `--flrig http://localhost:12345` für flrig.
 
 ## Technik
 

@@ -190,3 +190,5 @@ table.compact td, table.compact th { padding: 5px 6px; font-size: 13.5px; }
 .result { background: var(--bg2); padding: 10px; border-radius: 8px; font-size: 12.5px; white-space: pre-wrap; }
 
 .footer { text-align: center; color: var(--muted); font-size: 12px; padding: 8px; border-top: 1px solid var(--line); }
+tr.total td { border-top: 2px solid var(--line); }
+#countdown:empty { display: none; }

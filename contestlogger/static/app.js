@@ -16,6 +16,7 @@
     suggestSel: -1,
     editingId: null,
     info: {},
+    rig: {},
   };
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -91,6 +92,13 @@
     const d = new Date();
     $("#utc-time").textContent = d.toISOString().slice(11, 19);
     $("#utc-date").textContent = d.toISOString().slice(0, 10);
+    const c = contest(); const cd = $("#countdown");
+    if (c?.end_utc && c?.start_utc) {
+      const start = Date.parse(c.start_utc), end = Date.parse(c.end_utc), now = d.getTime();
+      const fmt = (ms) => { const m = Math.floor(ms / 60000); return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`; };
+      cd.textContent = now < start ? `Start in ${fmt(start - now)}` : now < end ? `noch ${fmt(end - now)}` : "Contest beendet";
+      cd.className = "tag " + (now < start ? "" : now < end ? "me" : "");
+    } else cd.textContent = "";
   }
   setInterval(tickClock, 500); tickClock();
 
@@ -186,7 +194,8 @@
     ss.value = S.stationId ?? "";
     const st = station();
     if (st) {
-      $("#station-meta").textContent = `${st.locator} · ${st.mode} · nächste Nr. ${pad3(st.serial_next)}`;
+      const rig = S.rig[st.id];
+      $("#station-meta").textContent = `${st.locator} · ${st.mode} · nächste Nr. ${pad3(st.serial_next)}` + (rig?.freq ? ` · 📻 ${rig.freq} MHz ${rig.mode || ""}` : "");
       $("#f-nr-sent").value = pad3(st.serial_next);
       const unlocked = canLog();
       $("#station-state").innerHTML = unlocked
@@ -239,7 +248,7 @@
   function qsoRow(q, full) {
     const tr = el("tr", { class: q.dupe ? "dupe" : "" });
     const cells = full
-      ? [q.serial_sent, fmtDate(q.ts_utc), fmtTime(q.ts_utc), q.call, q.rst_sent, pad3(q.serial_sent), q.rst_rcvd, q.serial_rcvd, q.locator, q.km, q.bearing, q.points, q.country, q.mode, q.comment, q.logged_by]
+      ? [q.serial_sent, fmtDate(q.ts_utc), fmtTime(q.ts_utc), q.call, q.rst_sent, pad3(q.serial_sent), q.rst_rcvd, q.serial_rcvd, q.locator, q.km, q.bearing, q.points, q.country, q.mode, q.freq || "", q.comment, q.logged_by]
       : [fmtTime(q.ts_utc), q.call, `${q.rst_sent} ${pad3(q.serial_sent)}`, `${q.rst_rcvd} ${q.serial_rcvd}`, q.locator, q.km, q.bearing, q.points, q.country, q.logged_by];
     cells.forEach((c, i) => tr.append(el("td", { class: typeof c === "number" ? "num" : "" }, c)));
     if (q.dupe) tr.title = "Doppel-QSO (0 Punkte)";
@@ -389,6 +398,7 @@
   async function submitQso() {
     if (!canLog()) return toast("Station ist nicht freigeschaltet", "err");
     const body = { call: F.call.value.trim(), locator: F.loc.value.trim(), rst_sent: F.rs.value.trim() || "59", rst_rcvd: F.rr.value.trim() || "59", serial_rcvd: F.nr.value.trim(), comment: F.cmt.value.trim() };
+    if (!S.editingId && S.rig[S.stationId]?.freq) body.freq = S.rig[S.stationId].freq;
     if (body.call.length < 3) return F.call.focus();
     try {
       if (S.editingId) {
@@ -448,13 +458,17 @@
     let rows = [];
     try { rows = await GET(`/api/contests/${S.contestId}/scoreboard`); } catch (_) { return; }
     tb.append(el("tr", {}, el("th", {}, "Station"), el("th", {}, "Band"), el("th", { class: "num" }, "QSOs"), el("th", { class: "num" }, "Pkt"), el("th", { class: "num" }, "Felder"), el("th", { class: "num" }, "ODX"), el("th", { class: "num" }, "/h")));
+    let tq = 0, tp = 0;
     for (const r of rows) {
+      if (r.rig) S.rig[r.id] = r.rig;
+      tq += r.qsos - r.dupes; tp += r.points || 0;
       const tr = el("tr", { style: "cursor:pointer", onclick: () => { $("#sel-station").value = r.id; $("#sel-station").dispatchEvent(new Event("change")); } },
-        el("td", {}, r.id === S.stationId ? el("b", {}, r.call) : r.call), el("td", {}, r.band),
+        el("td", {}, r.id === S.stationId ? el("b", {}, r.call) : r.call, r.rig?.freq ? el("div", { class: "muted small" }, `${r.rig.freq} MHz`) : null), el("td", {}, r.band),
         el("td", { class: "num" }, r.qsos - r.dupes), el("td", { class: "num" }, (r.points || 0).toLocaleString("de")), el("td", { class: "num" }, r.squares),
         el("td", { class: "num" }, r.odx_km || "–"), el("td", { class: "num" }, r.rate_last_hour));
       tb.append(tr);
     }
+    if (rows.length > 1) tb.append(el("tr", { class: "total" }, el("td", {}, el("b", {}, "Gesamt")), el("td", {}, `${rows.length} Bänder`), el("td", { class: "num" }, el("b", {}, tq)), el("td", { class: "num" }, el("b", {}, tp.toLocaleString("de"))), el("td", { colspan: 3 })));
   }
 
   // ------------------------------------------------------------ WebSocket / Chat
@@ -467,11 +481,12 @@
     ws.onmessage = async (ev) => {
       const m = JSON.parse(ev.data);
       if (m.type === "chat") appendChat(m.msg);
+      else if (m.type === "rig") { S.rig[m.station_id] = { freq: m.freq, mode: m.mode, ts: m.ts }; if (m.station_id === S.stationId) renderStationBar(); renderScoreboard(); }
       else if (m.type === "presence") renderPresence(m.users);
       else if (m.type === "update") {
         if (m.scope === "contests") await loadContests();
         else if (m.scope === "qsos") {
-          if (m.station_id === S.stationId) { await loadQsos(); if (m.qso && m.by !== S.nick) toast(`${m.by || "?"}: ${m.qso.call} geloggt`); }
+          if (m.station_id === S.stationId) { await loadQsos(); if (m.qso && m.by !== S.nick) toast(`${m.by || "API"}: ${m.qso.call} geloggt`); }
           renderScoreboard();
           const st = S.contests.flatMap((c) => c.stations).find((s) => s.id === m.station_id);
           if (st && m.qso) { st.serial_next = Math.max(st.serial_next, m.qso.serial_sent + 1); if (st.id === S.stationId) renderStationBar(); }
@@ -509,6 +524,12 @@
       kpi(s.qsos - s.dupes, "gültige QSOs"), kpi((s.points || 0).toLocaleString("de"), "Punkte"), kpi(s.squares, "Großfelder"),
       kpi(s.countries, "Länder"), kpi(s.avg_km, "Ø km / QSO"), kpi(s.dupes, "Dupes"),
       kpi(s.odx ? `${s.odx.call} · ${s.odx.km} km` : "–", `ODX (${s.odx?.locator || ""})`, "wide")));
+    try {
+      const cs = await GET(`/api/contests/${S.contestId}/summary`);
+      if (cs.bands.length > 1) root.append(card(`Gesamtwertung ${contest()?.name || ""} (alle Bänder)`,
+        el("div", {}, el("div", { class: "kpis" }, kpi(cs.total_qsos, "QSOs gesamt"), kpi(cs.total_points.toLocaleString("de"), "Punkte gesamt"), kpi(cs.unique_calls, "verschiedene Calls")),
+          table(["Band", "Stationen", "QSOs", "Punkte", "Felder", "ODX km"], cs.bands.map((b) => [b.band, b.stations.join(", "), b.qsos, b.points, b.squares, b.odx_km])))));
+    } catch (_) { /* */ }
     root.append(card("QSOs und Punkte pro Stunde", barChart(st.per_hour.map((h) => ({ label: h.hour.slice(11) + "h", a: h.qsos, b: h.points })), "QSOs", "Punkte")));
     root.append(card("Entfernungsverteilung (km)", barChart(st.distance.map((d) => ({ label: d.range, a: d.qsos, b: d.points })), "QSOs", "Punkte")));
     root.append(card(`Richtungsverteilung von ${own?.locator || ""}`, rose(st.bearings)));
@@ -588,7 +609,7 @@
     const sb = $("#admin-stations tbody"); sb.innerHTML = "";
     for (const s of c?.stations || []) {
       sb.append(el("tr", {},
-        el("td", {}, el("b", {}, s.call)), el("td", {}, s.locator), el("td", {}, s.band), el("td", {}, s.mode),
+        el("td", {}, el("b", {}, s.call), el("div", { class: "muted small" }, `ID ${s.id}`)), el("td", {}, s.locator), el("td", {}, s.band), el("td", {}, s.mode),
         el("td", { class: "muted small" }, `Nr. ${pad3(s.serial_next)} · ${s.has_password ? "🔒" : "offen"}`),
         el("td", { class: "actions" },
           el("button", { class: "ghost", onclick: () => stationDialog(s) }, "✎"), " ",
@@ -602,6 +623,15 @@
   $("#admin-login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     try { S.adminToken = (await api("POST", "/api/admin/login", { password: $("#admin-pw").value })).token; save(); $("#admin-pw").value = ""; renderAdmin(); renderStationBar(); renderQsos(); toast("Als Admin angemeldet", "ok"); } catch (err) { toast(err.message, "err"); }
+  });
+  $("#btn-backup").addEventListener("click", async () => {
+    try {
+      const r = await fetch("/api/backup", { headers: { "X-Admin-Token": S.adminToken } });
+      if (!r.ok) throw new Error("Backup fehlgeschlagen");
+      const blob = await r.blob(); const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = (r.headers.get("Content-Disposition") || "").match(/filename="?([^";]+)/)?.[1] || "contestlogger-backup.db";
+      a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); toast("Backup heruntergeladen", "ok");
+    } catch (err) { toast(err.message, "err"); }
   });
   $("#btn-admin-logout").addEventListener("click", () => { S.adminToken = ""; save(); renderAdmin(); renderStationBar(); renderQsos(); });
   $("#admin-pw-form").addEventListener("submit", async (e) => {

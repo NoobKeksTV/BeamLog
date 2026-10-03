@@ -26,6 +26,7 @@ def create_app(db_path: str | os.PathLike | None = None) -> FastAPI:
     app.state.db = db
     hub = Hub()
     app.state.hub = hub
+    rig: dict[int, dict] = {}  # station_id -> {"freq": "432.200", "mode": "USB", "ts": ...}
 
     # ------------------------------------------------------------ Auth-Helfer
     def is_admin(token: str | None) -> bool:
@@ -112,7 +113,43 @@ def create_app(db_path: str | os.PathLike | None = None) -> FastAPI:
 
     @app.get("/api/contests/{cid}/scoreboard")
     def scoreboard(cid: int):
-        return db.scoreboard(cid)
+        rows = db.scoreboard(cid)
+        for r in rows:
+            r["rig"] = rig.get(r["id"])
+        return rows
+
+    @app.get("/api/contests/{cid}/summary")
+    def contest_summary(cid: int):
+        if not db.get_contest(cid):
+            raise HTTPException(404)
+        return db.contest_summary(cid)
+
+    @app.get("/api/backup", dependencies=[Depends(require_admin)])
+    def backup():
+        import tempfile
+        from fastapi.responses import FileResponse as _FR
+        from starlette.background import BackgroundTask
+        fh = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        fh.close()
+        db.backup_to(fh.name)
+        name = f"contestlogger-backup-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.db"
+        return _FR(fh.name, media_type="application/x-sqlite3", filename=name,
+                   background=BackgroundTask(lambda: Path(fh.name).unlink(missing_ok=True)))
+
+    @app.post("/api/stations/{sid}/rig")
+    async def rig_update(sid: int, body: dict, x_station_token: str | None = Header(default=None), x_admin_token: str | None = Header(default=None)):
+        """Von der CAT-Bridge (tools/cat_bridge.py) gemeldete Frequenz/Betriebsart."""
+        require_station(sid, x_station_token, x_admin_token)
+        freq = body.get("freq")
+        entry = {"freq": f"{float(freq):.3f}" if freq not in (None, "") else "", "mode": str(body.get("mode") or ""),
+                 "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        rig[sid] = entry
+        await hub.broadcast({"type": "rig", "station_id": sid, **entry})
+        return entry
+
+    @app.get("/api/stations/{sid}/rig")
+    def rig_get(sid: int):
+        return rig.get(sid) or {}
 
     # ------------------------------------------------------------ Stationen
     @app.post("/api/contests/{cid}/stations", dependencies=[Depends(require_admin)])

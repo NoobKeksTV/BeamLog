@@ -112,8 +112,24 @@ class Database:
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")
         self.conn.executescript(SCHEMA)
+        self._migrate()
         if self.get_setting("secret") is None:
             self.set_setting("secret", secrets.token_hex(32))
+
+    def _migrate(self) -> None:
+        """Spalten nachrüsten, die in älteren Datenbanken fehlen."""
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(qsos)")}
+        with self.conn:
+            if "freq" not in cols:
+                self.conn.execute("ALTER TABLE qsos ADD COLUMN freq TEXT NOT NULL DEFAULT ''")
+
+    def backup_to(self, path: str | os.PathLike) -> None:
+        """Konsistente Kopie der Datenbank (auch bei laufendem Betrieb)."""
+        dest = sqlite3.connect(path)
+        try:
+            self.conn.backup(dest)
+        finally:
+            dest.close()
 
     # ----- generische Helfer --------------------------------------------
     def rows(self, sql: str, params: Iterable[Any] = ()) -> list[dict]:
@@ -300,12 +316,12 @@ class Database:
             points = 0 if dupe else (q["km"] if q["km"] > 0 else (1 if q["locator"] else 0))
             cur = self.conn.execute(
                 """INSERT INTO qsos(station_id,ts_utc,call,core_call,locator,square,country,rst_sent,rst_rcvd,
-                   serial_sent,serial_rcvd,mode,band,comment,km,bearing,points,dupe,logged_by,created_at,updated_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   serial_sent,serial_rcvd,mode,band,comment,km,bearing,points,dupe,logged_by,created_at,updated_at,freq)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (station_id, ts, q["call"], q["core_call"], q["locator"], q["square"], q["country"],
                  str(q.get("rst_sent") or "59"), str(q.get("rst_rcvd") or "59"), serial,
                  str(q.get("serial_rcvd") or ""), q.get("mode") or station["mode"], band,
-                 q.get("comment") or "", q["km"], q["bearing"], points, dupe, logged_by, now, now),
+                 q.get("comment") or "", q["km"], q["bearing"], points, dupe, logged_by, now, now, str(q.get("freq") or "")),
             )
             qid = int(cur.lastrowid)
             # Seriennummer weiterzählen (auch wenn manuell eine kleinere eingegeben wurde: Maximum + 1)
@@ -326,10 +342,10 @@ class Database:
             points = 0 if dupe else (q["km"] if q["km"] > 0 else (1 if q["locator"] else 0))
             self.conn.execute(
                 """UPDATE qsos SET ts_utc=?,call=?,core_call=?,locator=?,square=?,country=?,rst_sent=?,rst_rcvd=?,
-                   serial_sent=?,serial_rcvd=?,mode=?,band=?,comment=?,km=?,bearing=?,points=?,dupe=?,updated_at=? WHERE id=?""",
+                   serial_sent=?,serial_rcvd=?,mode=?,band=?,comment=?,km=?,bearing=?,points=?,dupe=?,updated_at=?,freq=? WHERE id=?""",
                 (q["ts_utc"], q["call"], q["core_call"], q["locator"], q["square"], q["country"],
                  str(q["rst_sent"]), str(q["rst_rcvd"]), int(q["serial_sent"]), str(q["serial_rcvd"]),
-                 q["mode"], q["band"], q["comment"] or "", q["km"], q["bearing"], points, dupe, utcnow(), qid),
+                 q["mode"], q["band"], q["comment"] or "", q["km"], q["bearing"], points, dupe, utcnow(), str(q.get("freq") or ""), qid),
             )
         self.recheck_dupes(old["station_id"])
         self.learn_call(q["call"], q["locator"], source="log", when=q["ts_utc"])
@@ -448,6 +464,30 @@ class Database:
         ops = self.rows("SELECT logged_by AS nick, COUNT(*) AS qsos, SUM(points) AS points FROM qsos WHERE station_id=? GROUP BY logged_by ORDER BY qsos DESC", (station_id,))
         return {"summary": summary, "per_hour": per_hour, "squares": squares, "countries": countries,
                 "distance": dist, "bearings": bearings, "top": top, "operators": ops}
+
+    def contest_summary(self, contest_id: int) -> dict:
+        """Gesamtwertung über alle Bänder/Stationen eines Contests (Multi-Band)."""
+        stations = self.scoreboard(contest_id)
+        by_band: dict[str, dict] = {}
+        for s in stations:
+            b = by_band.setdefault(s["band"], {"band": s["band"], "qsos": 0, "points": 0, "squares": 0, "odx_km": 0, "stations": []})
+            b["qsos"] += s["qsos"] - s["dupes"]
+            b["points"] += s["points"] or 0
+            b["squares"] += s["squares"]
+            b["odx_km"] = max(b["odx_km"], s["odx_km"] or 0)
+            b["stations"].append(s["call"])
+        total_qsos = sum(b["qsos"] for b in by_band.values())
+        total_points = sum(b["points"] for b in by_band.values())
+        all_squares = self.row(
+            """SELECT COUNT(DISTINCT q.square) AS n FROM qsos q JOIN stations s ON s.id=q.station_id
+               WHERE s.contest_id=? AND q.dupe=0 AND q.square<>''""", (contest_id,))
+        uniq_calls = self.row(
+            """SELECT COUNT(DISTINCT q.core_call) AS n FROM qsos q JOIN stations s ON s.id=q.station_id
+               WHERE s.contest_id=? AND q.dupe=0""", (contest_id,))
+        return {"bands": sorted(by_band.values(), key=lambda b: int("".join(ch for ch in b["band"] if ch.isdigit()) or 0)),
+                "total_qsos": total_qsos, "total_points": total_points,
+                "unique_squares": all_squares["n"] if all_squares else 0,
+                "unique_calls": uniq_calls["n"] if uniq_calls else 0}
 
     def scoreboard(self, contest_id: int) -> list[dict]:
         out = []

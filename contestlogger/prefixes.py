@@ -51,6 +51,25 @@ PREFIXES: dict[str, str] = {
     "9H": "Malta", "T7": "San Marino", "3A": "Monaco", "HV": "Vatikan", "1A": "SMOM", "C3": "Andorra", "ZB": "Gibraltar",
     "OY": "Färöer", "TF": "Island", "JW": "Svalbard", "OX": "Grönland",
     "4U1": "UN Wien/Genf", "ZC4": "Zypern UK", "5B": "Zypern",
+    # --- Rest der Welt (die wichtigsten Präfixe, für Sporadic-E/EME/HF-Nutzung) ---
+    "K": "USA", "W": "USA", "N": "USA", "AA": "USA", "AB": "USA", "AC": "USA", "AD": "USA", "AE": "USA", "AF": "USA", "AG": "USA", "AI": "USA", "AJ": "USA", "AK": "USA",
+    "KL": "Alaska", "KH6": "Hawaii", "KP4": "Puerto Rico",
+    "VE": "Kanada", "VA": "Kanada", "VO": "Kanada", "VY": "Kanada", "XE": "Mexiko",
+    "PY": "Brasilien", "PP": "Brasilien", "PU": "Brasilien", "LU": "Argentinien", "CE": "Chile", "CX": "Uruguay", "HK": "Kolumbien", "YV": "Venezuela", "OA": "Peru", "HC": "Ecuador", "CP": "Bolivien", "ZP": "Paraguay",
+    "JA": "Japan", "JE": "Japan", "JF": "Japan", "JG": "Japan", "JH": "Japan", "JI": "Japan", "JJ": "Japan", "JK": "Japan", "JL": "Japan", "JM": "Japan", "JN": "Japan", "JO": "Japan", "JP": "Japan", "JQ": "Japan", "JR": "Japan", "JS": "Japan", "7J": "Japan", "7K": "Japan", "7L": "Japan", "7M": "Japan", "7N": "Japan", "8J": "Japan",
+    "BY": "China", "BA": "China", "BD": "China", "BG": "China", "BH": "China", "BV": "Taiwan", "HL": "Südkorea", "DS": "Südkorea", "VR": "Hongkong", "XX9": "Macao",
+    "VU": "Indien", "AP": "Pakistan", "4S": "Sri Lanka", "9N": "Nepal", "S2": "Bangladesch",
+    "HS": "Thailand", "E2": "Thailand", "9M": "Malaysia", "9V": "Singapur", "YB": "Indonesien", "YC": "Indonesien", "DU": "Philippinen", "XV": "Vietnam", "3W": "Vietnam",
+    "VK": "Australien", "ZL": "Neuseeland", "P2": "Papua-Neuguinea", "3D2": "Fidschi",
+    "ZS": "Südafrika", "ZR": "Südafrika", "ZU": "Südafrika", "5Z": "Kenia", "5H": "Tansania", "ET": "Äthiopien", "SU": "Ägypten", "CN": "Marokko", "7X": "Algerien", "3V": "Tunesien", "5A": "Libyen",
+    "EA9": "Ceuta/Melilla", "IG9": "Lampedusa", "IH9": "Pantelleria", "CT3": "Madeira", "CU": "Azoren", "D4": "Kap Verde", "9G": "Ghana", "5N": "Nigeria", "6W": "Senegal", "TU": "Elfenbeinküste",
+    "4X": "Israel", "4Z": "Israel", "JY": "Jordanien", "OD": "Libanon", "YK": "Syrien", "YI": "Irak", "EP": "Iran", "A4": "Oman", "A6": "VAE", "A7": "Katar", "A9": "Bahrain", "9K": "Kuwait", "HZ": "Saudi-Arabien", "7Z": "Saudi-Arabien",
+    "UN": "Kasachstan", "UP": "Kasachstan", "EX": "Kirgisistan", "EY": "Tadschikistan", "EZ": "Turkmenistan", "UK": "Usbekistan", "4L": "Georgien", "EK": "Armenien", "4J": "Aserbaidschan", "4K": "Aserbaidschan",
+    "UA9": "Russland (asiat.)", "UA0": "Russland (asiat.)", "R9": "Russland (asiat.)", "R0": "Russland (asiat.)", "JT": "Mongolei",
+    "TA1": "Türkei (europ.)", "1B": "Nordzypern", "GB": "Großbritannien", "ZD8": "Ascension", "VP8": "Falkland", "VP9": "Bermuda", "VP2E": "Anguilla", "8P": "Barbados", "J6": "St. Lucia", "9Y": "Trinidad", "HI": "Dominikan. Rep.", "HH": "Haiti", "CO": "Kuba", "CM": "Kuba", "6Y": "Jamaika", "TI": "Costa Rica", "HP": "Panama", "TG": "Guatemala", "YS": "El Salvador", "HR": "Honduras", "YN": "Nicaragua",
+    "FM": "Martinique", "FG": "Guadeloupe", "FY": "Franz.-Guayana", "FR": "Réunion", "FH": "Mayotte", "FK": "Neukaledonien", "FO": "Franz.-Polynesien", "FP": "St. Pierre & Miquelon",
+    "PJ2": "Curaçao", "PJ4": "Bonaire", "P4": "Aruba", "V3": "Belize", "KP2": "US Virgin Isl.",
+    "T9": "Bosnien-Herz.", "4N": "Serbien", "YZ": "Serbien", "Z6": "Kosovo", "E4": "Palästina", "T4": "Kuba",
 }
 
 # Portabel-/Zusatzkennungen, die kein Länderpräfix sind.
