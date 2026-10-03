@@ -19,6 +19,7 @@ from . import __app_name__, __copyright__, __version__, exporters, importers, lo
 from .db import Database
 
 STATIC = Path(__file__).parent / "static"
+SEED = Path(__file__).parent / "seed" / "stationsdatenbank.csv"
 
 
 def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: float | None = None, public_url: str = "") -> FastAPI:
@@ -38,8 +39,21 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             except Exception as e:  # noqa: BLE001
                 print(f"Backup fehlgeschlagen: {e}")
 
+    def seed_callbook() -> int:
+        """Beim ersten Start: mitgelieferte Stationsdatenbank (aus den eigenen WinContest-Logs) laden."""
+        if db.callbook_count() or db.get_setting("seeded") or not SEED.exists():
+            return 0
+        res = importers.parse_callbook_csv(SEED.read_text(encoding="utf-8"))
+        for call, loc, name in res.callbook:
+            db.learn_call(call, loc, source="seed", name=name)
+        db.set_setting("seeded", "1")
+        return len(res.callbook)
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        n = seed_callbook()
+        if n:
+            print(f"Stationsdatenbank: {n} Rufzeichen aus der mitgelieferten Startdatei geladen.")
         task = asyncio.create_task(backup_loop()) if interval > 0 else None
         yield
         if task:
@@ -333,6 +347,81 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if not (geo.is_valid_locator(my) and geo.is_valid_locator(loc)):
             return {"valid": False}
         return {"valid": True, "km": geo.distance_km_int(my, loc), "bearing": round(geo.bearing_deg(my, loc)) % 360}
+
+    @app.get("/api/callbook")
+    def callbook_list(q: str = "", limit: int = 200):
+        q = q.strip().upper()
+        sql = "SELECT call, locator, name, qso_count, last_seen, alt_locators, source FROM callbook"
+        params: list = []
+        if q:
+            sql += " WHERE call LIKE ? OR locator LIKE ? OR name LIKE ?"
+            params = [f"%{q}%", f"{q}%", f"%{q}%"]
+        rows = db.rows(sql + " ORDER BY call LIMIT ?", params + [min(int(limit), 2000)])
+        return {"total": db.callbook_count(), "rows": rows}
+
+    @app.delete("/api/callbook/{call}", dependencies=[Depends(require_admin)])
+    def callbook_delete(call: str):
+        with db.conn:
+            db.conn.execute("DELETE FROM callbook WHERE call=?", (call.upper(),))
+        return {"ok": True}
+
+    @app.post("/api/import/folder", dependencies=[Depends(require_admin)])
+    async def import_folder(files: list[UploadFile] = File(...), x_nick: str | None = Header(default=None)):
+        """Ganzer WinContest-Ordner (mehrere Dateien): jedes Log wird ein archivierter Contest, alle Calls ins Call-Buch."""
+        from . import prefixes
+        report: dict[str, Any] = {"files": [], "contests": 0, "qsos": 0, "callbook": 0, "skipped": []}
+        seen_logs: set[tuple[str, str]] = set()
+        for up in sorted(files, key=lambda f: (0 if (f.filename or "").lower().endswith(".mdb") else 1, f.filename or "")):
+            name = Path(up.filename or "datei").name
+            if name.lower().rsplit(".", 1)[-1] not in ("mdb", "txt", "exp", "edi", "adi", "adif", "csv"):
+                continue
+            data = await up.read()
+            try:
+                res = importers.parse_file(name, data)
+            except ValueError as e:
+                report["skipped"].append(f"{name}: {e}")
+                continue
+            if not res.qsos and not res.callbook:
+                continue
+            for call, loc, nm in res.callbook:
+                db.learn_call(call, loc, source="import", name=nm)
+                report["callbook"] += 1
+            for q in res.qsos:
+                db.learn_call(q.call, q.locator, source="import", when=q.ts_utc)
+            report["callbook"] += len(res.qsos)
+            entry = {"file": name, "kind": res.kind, "qsos": len(res.qsos), "imported": 0}
+            report["files"].append(entry)
+            if not res.qsos or not res.header.get("locator"):
+                continue
+            band = res.header.get("band") or res.qsos[0].band or "144MHz"
+            first = min(q.ts_utc for q in res.qsos)
+            key = (f"{prefixes.core_call(res.header.get('call', ''))}/{band}", first)
+            if key in seen_logs:
+                entry["note"] = "gleiches Log bereits aus anderer Datei übernommen"
+                continue
+            seen_logs.add(key)
+            cname = res.header.get("name") or f"{Path(name).stem} ({band})"
+            existing = next((c for c in db.list_contests() if c["name"] == cname), None)
+            cid = existing["id"] if existing else db.create_contest(cname, first, max(q.ts_utc for q in res.qsos))
+            if not existing:
+                db.update_contest(cid, archived=1)
+                report["contests"] += 1
+            st = next((x for x in db.list_stations(cid) if x["band"] == band), None)
+            sid = st["id"] if st else db.create_station(cid, res.header.get("call") or "IMPORT", res.header["locator"], band, "SSB", "")
+            have = {(q["core_call"], q["ts_utc"]) for q in db.list_qsos(sid)}
+            for q in sorted(res.qsos, key=lambda x: x.ts_utc):
+                if (prefixes.core_call(q.call), q.ts_utc) in have:
+                    continue
+                d = q.__dict__.copy()
+                d["band"] = d["band"] or band
+                try:
+                    db.add_qso(sid, d, logged_by=nick_of(x_nick) or "import")
+                    entry["imported"] += 1
+                    report["qsos"] += 1
+                except ValueError as e:
+                    report["skipped"].append(f"{name} {q.call}: {e}")
+        await hub.broadcast({"type": "update", "scope": "contests"})
+        return report
 
     @app.get("/api/callbook/export.csv")
     def callbook_export():

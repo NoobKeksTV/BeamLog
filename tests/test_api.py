@@ -146,3 +146,18 @@ def test_languages(client, tmp_path):
     (db_dir / "lang" / "nl.json").write_text('{"_name": "Nederlands", "Loggen": "Loggen NL"}', encoding="utf-8")
     assert any(l["name"] == "Nederlands" for l in client.get("/api/lang").json())
     assert client.get("/api/lang/nl").json()["Loggen"] == "Loggen NL"
+
+
+def test_seed_and_folder_import(client):
+    # Startdatenbank wurde beim ersten Start geladen
+    info = client.get("/api/info").json()
+    assert info["callbook_count"] >= 100
+    assert client.get("/api/callbook", params={"q": "DL8NAS"}).json()["rows"][0]["locator"] == "JN59LE"
+    admin = client.post("/api/setup", json={"password": "admin1"}).json()["token"]
+    H = {"X-Admin-Token": admin}
+    txt = b"Version:4.4.052\nN,05.10.24,17:13,DL0GM         ,59  001,59  078,JO31UB, 117,432 MHz,SQWb\n"
+    exp = b"*** Win-Contest V4 Exportdatei *** N\n4.4.053\nDN2LH\nJO31AA\n432MHz\n202410\n05.10.24,17:13,DL0GM,59  001,59  078,JO31UB,117,87,DL0GM,JO31,Deutschland,Null,SSB,x\n"
+    r = client.post("/api/import/folder", files=[("files", ("Datenbank/Oktober 2024.txt", txt)), ("files", ("DD3KU/432MHz-05102024-DN2LH.EXP", exp)), ("files", ("Contest.dat", b"\x00\x01"))], headers=H).json()
+    assert r["contests"] == 1 and r["qsos"] == 1 and len(r["files"]) == 2
+    assert any(c["archived"] for c in client.get("/api/contests").json())
+    assert client.delete("/api/callbook/DL0GM", headers=H).json()["ok"]

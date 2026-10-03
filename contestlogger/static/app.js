@@ -913,7 +913,7 @@
     const is = $("#imp-station"); is.innerHTML = "";
     S.contests.forEach((cc) => cc.stations.forEach((s) => is.append(el("option", { value: s.id }, `${cc.name} · ${s.call} ${s.band}`))));
     const inf = await GET("/api/info"); $("#cb-count").textContent = inf.callbook_count; $("#tile-url").value = inf.tile_url || "";
-    renderBackups();
+    renderBackups(); renderCallbook();
   }
   $("#admin-login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1007,9 +1007,36 @@
       await loadContests(); renderAdmin();
     } catch (err) { out.textContent = "Fehler: " + err.message; toast(err.message, "err"); }
   });
+  async function renderCallbook() {
+    const tb = $("#cb-table tbody"); tb.innerHTML = "";
+    try {
+      const r = await GET(`/api/callbook?q=${encodeURIComponent($("#cb-search").value.trim())}&limit=300`);
+      $("#cb-count").textContent = r.total;
+      for (const c of r.rows) tb.append(el("tr", {},
+        el("td", {}, el("b", {}, c.call)), el("td", {}, c.locator), el("td", { class: "muted small" }, c.name || ""),
+        el("td", { class: "num muted small" }, c.qso_count ? `${c.qso_count}×` : ""), el("td", { class: "muted small" }, c.last_seen ? fmtDate(c.last_seen) : ""),
+        el("td", { class: "actions" }, el("button", { class: "ghost", onclick: () => { $("#cb-call").value = c.call; $("#cb-loc").value = c.locator; $("#cb-name").value = c.name || ""; } }, "✎"), " ",
+          el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("{call} aus der Stationsdatenbank löschen?", c))) { await api("DELETE", `/api/callbook/${encodeURIComponent(c.call)}`); renderCallbook(); } } }, "✕"))));
+      if (!r.rows.length) tb.append(el("tr", {}, el("td", { class: "muted" }, t("Keine Einträge."))));
+    } catch (_) { /* */ }
+  }
+  let cbTimer; $("#cb-search").addEventListener("input", () => { clearTimeout(cbTimer); cbTimer = setTimeout(renderCallbook, 150); });
+  $("#folder-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const files = Array.from($("#folder-files").files).filter((f) => /\.(mdb|txt|exp|edi|adi|adif|csv)$/i.test(f.name) && f.size < 50e6);
+    if (!files.length) return toast(t("Keine passenden Dateien im Ordner"), "err");
+    const fd = new FormData(); files.forEach((f) => fd.append("files", f, f.webkitRelativePath || f.name));
+    const out = $("#folder-result"); out.classList.remove("hidden"); out.textContent = t("Importiere …") + ` (${files.length} ${t("Dateien")})`;
+    try {
+      const r = await api("POST", "/api/import/folder", fd);
+      out.textContent = `${t("Contests angelegt")}: ${r.contests}\n${t("QSOs übernommen")}: ${r.qsos}\n${t("Call-Buch-Einträge")}: ${r.callbook}\n\n` +
+        r.files.map((f) => `${f.file}: ${f.kind}, ${f.qsos} QSOs, ${f.imported} ${t("neu")}${f.note ? " – " + f.note : ""}`).join("\n") + (r.skipped.length ? `\n\n${t("Hinweise")}:\n${r.skipped.join("\n")}` : "");
+      toast(t("Import abgeschlossen"), "ok"); await loadContests(); renderAdmin();
+    } catch (err) { out.textContent = t("Fehler: ") + err.message; toast(err.message, "err"); }
+  });
   $("#cb-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    try { await api("POST", "/api/callbook", { call: $("#cb-call").value, locator: $("#cb-loc").value, name: $("#cb-name").value }); toast(t("Call gespeichert"), "ok"); $("#cb-call").value = $("#cb-loc").value = $("#cb-name").value = ""; renderAdmin(); } catch (err) { toast(err.message, "err"); }
+    try { await api("POST", "/api/callbook", { call: $("#cb-call").value, locator: $("#cb-loc").value, name: $("#cb-name").value }); toast(t("Call gespeichert"), "ok"); $("#cb-call").value = $("#cb-loc").value = $("#cb-name").value = ""; renderCallbook(); } catch (err) { toast(err.message, "err"); }
   });
 
   boot().catch((e) => toast(t("Start fehlgeschlagen: ") + e.message, "err"));

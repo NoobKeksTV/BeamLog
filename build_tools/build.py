@@ -61,7 +61,8 @@ def main() -> None:
     dist = ROOT / "dist"
     shutil.rmtree(dist, ignore_errors=True)
     static = ROOT / "contestlogger" / "static"
-    server_extra = [f"--add-data={static}{SEP}contestlogger/static"] + [f"--hidden-import={h}" for h in HIDDEN]
+    seed = ROOT / "contestlogger" / "seed"
+    server_extra = [f"--add-data={static}{SEP}contestlogger/static", f"--add-data={seed}{SEP}contestlogger/seed"] + [f"--hidden-import={h}" for h in HIDDEN]
     icon = ROOT / "build_tools" / "icon.ico"
     if icon.exists() and os.name == "nt":
         server_extra.append(f"--icon={icon}")

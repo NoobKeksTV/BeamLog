@@ -244,5 +244,21 @@
  ") und den Server neu starten. Die Sprache erscheint dann in der Auswahl.": ") and restart the server. The language then appears in the selector.",
  "lokal, offline, im LAN": "local, offline, on the LAN",
  "aktivieren": "activate",
- "archivieren": "archive"
+ "archivieren": "archive",
+ "WinContest-Ordner (DD3KU) übernehmen": "Import WinContest folder (DD3KU)",
+ "Ordner importieren": "Import folder",
+ "Einzelne Datei importieren": "Import a single file",
+ "Stationsdatenbank (Call-Buch)": "Station database (callbook)",
+ "Suchen (Call, Locator, Name) …": "Search (call, locator, name) …",
+ "{call} aus der Stationsdatenbank löschen?": "Delete {call} from the station database?",
+ "Keine Einträge.": "No entries.",
+ "Keine passenden Dateien im Ordner": "No matching files in the folder",
+ "Dateien": "files",
+ "Contests angelegt": "Contests created",
+ "neu": "new",
+ "Rufzeichen mit Locator bekannt. Wächst automatisch mit jedem geloggten QSO und jedem Import; beim ersten Start wird die mitgelieferte Startdatenbank geladen.": "callsigns with locator known. Grows automatically with every logged QSO and import; the bundled starter database is loaded on first start.",
+ "Den kompletten Ordner von WinContest auswählen (z. B.": "Select the complete WinContest folder (e.g.",
+ "). Alle Logs aus": "). All logs from",
+ "werden als archivierte Contests übernommen und jedes Rufzeichen mit Locator landet in der Stationsdatenbank.": "are imported as archived contests and every callsign with locator goes into the station database.",
+ "(DD3KUs verschlüsselte Datenbank) kann nicht gelesen werden.": "(DD3KU's encrypted database) cannot be read."
 }

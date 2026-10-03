@@ -172,7 +172,14 @@
         <table id="admin-stations" class="compact"><tbody></tbody></table>
       </div>
       <div class="card">
-        <h3>Import</h3>
+        <h3>WinContest-Ordner (DD3KU) übernehmen</h3>
+        <p class="muted small">Den kompletten Ordner von WinContest auswählen (z. B. <code>D:\Contest</code>). Alle Logs aus <code>Datenbank/</code>, <code>DD3KU/</code>, <code>Auswertung/</code> und <code>ADIF/</code> werden als archivierte Contests übernommen und jedes Rufzeichen mit Locator landet in der Stationsdatenbank. <code>Contest.dat</code> (DD3KUs verschlüsselte Datenbank) kann nicht gelesen werden.</p>
+        <form id="folder-form" class="stack">
+          <input type="file" id="folder-files" webkitdirectory directory multiple>
+          <button class="primary">Ordner importieren</button>
+          <pre id="folder-result" class="result hidden"></pre>
+        </form>
+        <h3>Einzelne Datei importieren</h3>
         <p class="muted small">WinContest (DD3KU) <code>.txt</code>/<code>.EXP</code>/<code>.mdb</code>, EDI/REG1TEST, ADIF oder Call-Listen (<code>Call;Locator;Name</code>). Rufzeichen + Locator landen immer im Call-Buch.</p>
         <form id="import-form" class="stack">
           <input type="file" id="imp-file" required>
@@ -190,8 +197,10 @@
         </form>
       </div>
       <div class="card">
-        <h3>Call-Buch</h3>
-        <p class="muted"><span id="cb-count">0</span> Rufzeichen mit Locator bekannt. Wächst automatisch mit jedem geloggten QSO.</p>
+        <h3>Stationsdatenbank (Call-Buch)</h3>
+        <p class="muted"><span id="cb-count">0</span> Rufzeichen mit Locator bekannt. Wächst automatisch mit jedem geloggten QSO und jedem Import; beim ersten Start wird die mitgelieferte Startdatenbank geladen.</p>
+        <input id="cb-search" placeholder="Suchen (Call, Locator, Name) …" class="small">
+        <div class="table-wrap" style="max-height:260px"><table id="cb-table" class="compact"><tbody></tbody></table></div>
         <form id="cb-form" class="row">
           <input id="cb-call" placeholder="Rufzeichen" required><input id="cb-loc" placeholder="Locator" required><input id="cb-name" placeholder="Name"><button class="ghost">Speichern</button>
         </form>
