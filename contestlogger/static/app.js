@@ -221,7 +221,7 @@
       e.preventDefault();
       try {
         const r = await api("POST", `/api/stations/${st.id}/unlock`, { password: box.querySelector("#unlock-pw").value });
-        S.stationTokens[st.id] = r.token; save(); closeModal(); renderStationBar(); toast(`${st.call} freigeschaltet`, "ok"); $("#f-call").focus();
+        S.stationTokens[st.id] = r.token; save(); closeModal(); renderStationBar(); renderQsos(); toast(`${st.call} freigeschaltet`, "ok"); $("#f-call").focus();
       } catch (err) { toast(err.message, "err"); }
     });
   }
@@ -601,9 +601,9 @@
   }
   $("#admin-login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    try { S.adminToken = (await api("POST", "/api/admin/login", { password: $("#admin-pw").value })).token; save(); $("#admin-pw").value = ""; renderAdmin(); renderStationBar(); toast("Als Admin angemeldet", "ok"); } catch (err) { toast(err.message, "err"); }
+    try { S.adminToken = (await api("POST", "/api/admin/login", { password: $("#admin-pw").value })).token; save(); $("#admin-pw").value = ""; renderAdmin(); renderStationBar(); renderQsos(); toast("Als Admin angemeldet", "ok"); } catch (err) { toast(err.message, "err"); }
   });
-  $("#btn-admin-logout").addEventListener("click", () => { S.adminToken = ""; save(); renderAdmin(); renderStationBar(); });
+  $("#btn-admin-logout").addEventListener("click", () => { S.adminToken = ""; save(); renderAdmin(); renderStationBar(); renderQsos(); });
   $("#admin-pw-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     try { await api("POST", "/api/admin/password", { password: $("#admin-pw-new").value }); S.adminToken = (await api("POST", "/api/admin/login", { password: $("#admin-pw-new").value })).token; save(); $("#admin-pw-new").value = ""; toast("Admin-Passwort geändert", "ok"); } catch (err) { toast(err.message, "err"); }
