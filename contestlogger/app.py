@@ -482,6 +482,52 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         finally:
             await hub.disconnect(socket)
 
+    # ------------------------------------------------------------ Sprachen
+    LANG_DIR = STATIC / "lang"
+    user_lang_dir = Path(db.path).parent / "lang"  # eigene Übersetzungen neben der Datenbank
+
+    def lang_files() -> dict[str, list[Path]]:
+        out: dict[str, list[Path]] = {}
+        for d in (LANG_DIR, user_lang_dir):
+            if d.exists():
+                for f in sorted(d.glob("*.json")):
+                    if f.stem.isalpha() and len(f.stem) <= 5:
+                        out.setdefault(f.stem.lower(), []).append(f)
+        return out
+
+    @app.get("/api/lang")
+    def lang_list():
+        langs = [{"code": "de", "name": "Deutsch"}]
+        for code, files in lang_files().items():
+            name = code
+            for f in files:
+                try:
+                    name = json.loads(f.read_text(encoding="utf-8")).get("_name") or name
+                except (OSError, json.JSONDecodeError):
+                    continue
+            langs.append({"code": code, "name": name})
+        return langs
+
+    @app.get("/api/lang/template.json")
+    def lang_template():
+        base = json.loads((LANG_DIR / "en.json").read_text(encoding="utf-8"))
+        tpl = {"_name": "Name der Sprache / language name"}
+        tpl.update({k: "" for k in base if not k.startswith("_")})
+        return Response(json.dumps(tpl, ensure_ascii=False, indent=1), media_type="application/json",
+                        headers={"Content-Disposition": "attachment; filename=xx.json"})
+
+    @app.get("/api/lang/{code}")
+    def lang_get(code: str):
+        merged: dict = {}
+        for f in lang_files().get(code.lower(), []):
+            try:
+                merged.update(json.loads(f.read_text(encoding="utf-8")))
+            except (OSError, json.JSONDecodeError) as e:
+                raise HTTPException(500, f"Sprachdatei {f.name} fehlerhaft: {e}")
+        if not merged and code.lower() != "de":
+            raise HTTPException(404, "Sprache nicht gefunden")
+        return {k: v for k, v in merged.items() if v and not k.startswith("_")}
+
     # ------------------------------------------------------------ Frontend
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 

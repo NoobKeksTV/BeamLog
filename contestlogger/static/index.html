@@ -27,6 +27,7 @@
     <button data-view="admin">Verwaltung</button>
   </nav>
   <div class="who">
+    <select id="lang-select" class="small" title="Sprache"></select>
     <span id="nick-badge" class="badge" title="Nickname ändern">–</span>
     <span id="conn" class="dot" title="Verbindung"></span>
     <button id="sound-btn" class="ghost small" title="Töne an/aus">🔔</button>
@@ -202,6 +203,9 @@
         <h3>Karte</h3>
         <form id="tile-form" class="row"><input id="tile-url" placeholder="https://tile.openstreetmap.org/{z}/{x}/{y}.png" style="flex:1;min-width:260px"><button class="ghost">Speichern</button></form>
         <p class="muted small">Kachel-URL für die Karte. Standard: OpenStreetMap (braucht Internet). Für reinen Offline-Betrieb einen lokalen Kachel-Server eintragen (z. B. <code>http://192.168.1.10:8080/tile/{z}/{x}/{y}.png</code>) – Linien und Marker funktionieren auch ohne Kacheln.</p>
+        <h3>Sprachen</h3>
+        <p class="muted small">Eigene Übersetzung: Vorlage herunterladen, Werte übersetzen, als <code>lang/&lt;code&gt;.json</code> neben der Datenbank ablegen (z. B. <code>data/lang/nl.json</code>) und den Server neu starten. Die Sprache erscheint dann in der Auswahl.</p>
+        <p><a href="/api/lang/template.json" class="button ghost" download>Übersetzungsvorlage herunterladen</a></p>
         <h3>Admin-Passwort</h3>
         <form id="admin-pw-form" class="row"><input id="admin-pw-new" type="password" placeholder="Neues Passwort" required><button class="ghost">Ändern</button></form>
         <p><button id="btn-admin-logout" class="ghost small">Admin abmelden</button></p>

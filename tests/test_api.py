@@ -131,3 +131,19 @@ def test_contest_stats(client):
     st = client.get(f"/api/contests/{cid}/stats").json()
     assert st["total_qsos"] == 1 and st["recent"][0]["own_call"] == "DN2LH" and st["odx"][0]["call"] == "DL8NAS"
     assert st["operators"][0]["nick"] == "Lars" and st["unique_countries"] == 1 and st["per_hour"][0]["band"] == "144MHz"
+
+
+def test_languages(client, tmp_path):
+    langs = client.get("/api/lang").json()
+    assert {"code": "de", "name": "Deutsch"} in langs and any(l["code"] == "en" for l in langs)
+    en = client.get("/api/lang/en").json()
+    assert en["Loggen"] == "Logging" and "_name" not in en
+    assert client.get("/api/lang/xx").status_code == 404
+    tpl = client.get("/api/lang/template.json").json()
+    assert tpl["Loggen"] == "" and "_name" in tpl
+    # eigene Sprachdatei neben der Datenbank
+    db_dir = client.app.state.db.path.parent
+    (db_dir / "lang").mkdir()
+    (db_dir / "lang" / "nl.json").write_text('{"_name": "Nederlands", "Loggen": "Loggen NL"}', encoding="utf-8")
+    assert any(l["name"] == "Nederlands" for l in client.get("/api/lang").json())
+    assert client.get("/api/lang/nl").json()["Loggen"] == "Loggen NL"

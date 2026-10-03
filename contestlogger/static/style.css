@@ -223,3 +223,4 @@ body.bigscreen .kpis.big .kpi b { font-size: 56px; }
 .leaflet-container { font: inherit; }
 .arrow-icon { font-size: 26px; color: #ff5c6c; text-shadow: 0 0 4px #000; line-height: 1; }
 .map-label { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+#lang-select { padding: 3px 6px; font-size: 12.5px; }

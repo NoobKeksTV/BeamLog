@@ -30,6 +30,17 @@ oder Handys im Browser. Kein Internet nötig, keine Accounts.
   an den Server; sie wird bei der Station angezeigt und je QSO gespeichert (ADIF `FREQ`).
 - **Backup** automatisch auf dem Server (alle 15 min bei Änderungen, beim Beenden, manuell per Knopf);
   SQLite im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt die Datenbank nicht.
+- **Karte** (OpenStreetMap, Leaflet lokal gebündelt): Großkreis-Pfeil vom eigenen zum Partner-Locator mit
+  km/Grad, alle QSOs als Punkte; Kachel-Server einstellbar (lokaler Tile-Server für reinen Offline-Betrieb).
+- **Tastatur-Makros F1–F8** mit Platzhaltern (`{mycall} {call} {nr} {rst} …`), F9 zeigt die Übersicht,
+  Esc stoppt; mit CAT-Bridge `--cw` werden sie als CW über Hamlib gegeben.
+- **Töne** (QSO, Dupe, Chat, QSO einer anderen Station), abschaltbar.
+- **Contest-Ansicht**: globale Zahlen über alle Stationen/Bänder, Stundenverlauf je Band, Live-Feed,
+  Großanzeige-Modus für einen Monitor.
+- **Log-Prüfung (Pflicht)** vor dem EDI-Export: Locator/RST/Nummern/Zeiten/Contestzeitraum/EDI-Kopfdaten,
+  Klick auf den Fehler öffnet das QSO; Export aller Bänder eines Contests als ZIP.
+- **QR-Code** mit der Server-Adresse für Handy/Tablet.
+- **Mehrsprachig** (Deutsch, Englisch); eigene Sprachen per JSON-Datei in `data/lang/` (Vorlage in der Verwaltung).
 - Länderkennung weltweit (DXCC-Präfixe), responsives Layout (Fenster beliebig skalierbar, auch Handy), hell/dunkel.
 
 ## Installation und Start
@@ -56,7 +67,13 @@ ohne mdbtools die parallele `.txt` aus dem `Datenbank`-Ordner nehmen.
 4. Im Reiter **Loggen** Station wählen, mit Stations-Passwort freischalten, loslegen.
 
 Tastatur: `Enter` springt zum nächsten Feld bzw. loggt, `Leertaste` im Rufzeichen springt
-zum Locator / zur Nr., `↑`/`↓` wählt Vorschläge, `Esc` leert die Eingabe.
+zum Locator / zur Nr., `↑`/`↓` wählt Vorschläge, `Esc` leert die Eingabe, `F1`–`F8` Makros, `F9` Makro-Übersicht.
+
+## Eigene Sprache hinzufügen
+
+Verwaltung → Sprachen → „Übersetzungsvorlage herunterladen“. Die Datei enthält alle deutschen
+Originaltexte als Schlüssel; die Werte übersetzen, `_name` setzen und als `data/lang/<code>.json`
+(z. B. `data/lang/nl.json`) neben der Datenbank speichern, Server neu starten. Leere Werte bleiben deutsch.
 
 ## Alte WinContest-Logs komplett übernehmen
 
@@ -86,8 +103,10 @@ Details, HTTPS-Variante, Update und Wiederherstellung: siehe [`deploy/README.md`
 Auf dem Rechner mit dem Transceiver (Hamlib `rigctld` muss laufen, z. B. `rigctld -m 3081 -r COM5`):
 
 ```bash
-python tools/cat_bridge.py --server http://192.168.1.10:8000 --station 1 --password 70cm
+python tools/cat_bridge.py --server http://192.168.1.10:8000 --station 1 --password 70cm --cw
 ```
+
+`--cw` gibt die F-Tasten-Makros als CW über `rigctld` aus (Hamlib `send_morse`).
 
 Die Stations-ID steht in der Verwaltung. Alternativ `--flrig http://localhost:12345` für flrig.
 
