@@ -1,0 +1,70 @@
+import os
+import tempfile
+
+from contestlogger import exporters, importers
+from contestlogger.db import Database
+
+TXT = """Version:4.4.053
+N,03.05.25,14:12,DL8NAS        ,59  001,59  010,JN59LE, 406,432 MHz,vr2S
+N,03.05.25,14:15,OL3Z          ,59  002,59  021,JN79FX, 607,432 MHz,2UvB
+"""
+
+EXP = """*** Win-Contest V4 Exportdatei *** N
+4.4.053
+DN2LH
+JO31AA
+432MHz
+202505
+03.05.25,14:12,DL8NAS,59  001,59  010,JN59LE,406,118,DL8NAS,JN59,Deutschland,Null,SSB,NQSN
+"""
+
+EDI = """[REG1TEST;1]
+TName=Test
+PCall=DN2LH/P
+PWWLo=JO31AA
+PBand=435 MHz
+[QSORecords;1]
+250503;1412;DL8NAS;1;59;001;59;010;;JN59LE;406;;;;
+"""
+
+ADI = """hdr
+<eoh>
+<call:6>DL8NAS<qso_date:8:d>20250503<time_on:4>1412<mode:3>SSB<RST_RCVD:2>59<RST_SENT:2>59<GRIDSQUARE:6>JN59LE<STX:3>001<SRX:3>010<FREQ:3>432<BAND:4>70cm<eor>
+"""
+
+
+def test_parsers_detect_and_parse():
+    for name, content in (("a.txt", TXT), ("a.EXP", EXP), ("a.edi", EDI), ("a.adi", ADI)):
+        r = importers.parse_file(name, content.encode("latin-1"))
+        assert r.qsos, name
+        q = r.qsos[0]
+        assert q.call == "DL8NAS" and q.locator == "JN59LE" and q.serial_sent == 1 and q.serial_rcvd == "010"
+        assert q.ts_utc == "2025-05-03T14:12:00Z"
+        assert q.band == "432MHz", (name, q.band)
+    r = importers.parse_file("a.EXP", EXP.encode())
+    assert r.header["call"] == "DN2LH" and r.header["locator"] == "JO31AA"
+
+
+def test_callbook_csv():
+    r = importers.parse_file("calls.csv", b"DL8NAS;JN59LE;Klaus\nOL3Z JN79FX\nfoo;bar\n")
+    assert [c[0] for c in r.callbook] == ["DL8NAS", "OL3Z"]
+    assert r.warnings
+
+
+def test_export_roundtrip():
+    with tempfile.TemporaryDirectory() as d:
+        db = Database(os.path.join(d, "t.db"))
+        cid = db.create_contest("DARC 70cm", None, None)
+        sid = db.create_station(cid, "DN2LH/P", "JO31AA", "432MHz", "SSB", "", {"section": "Single"})
+        for q in importers.parse_dd3ku_txt(TXT).qsos:
+            db.add_qso(sid, q.__dict__, "import")
+        contest, station, qsos = db.get_contest(cid), db.get_station(sid), db.list_qsos(sid)
+        edi = exporters.export_edi(contest, station, qsos)
+        assert "CQSOs=2;1" in edi and "CQSOP=1013" in edi and "CODXC=OL3Z;JN79FX;607" in edi
+        assert "250503;1412;DL8NAS;1;59;001;59;010;;JN59LE;406;;;;" in edi
+        back = importers.parse_edi(edi)
+        assert len(back.qsos) == 2 and back.header["call"] == "DN2LH/P"
+        adif = exporters.export_adif(contest, station, qsos)
+        assert len(importers.parse_adif(adif).qsos) == 2
+        csv_ = exporters.export_csv(contest, station, qsos)
+        assert "DL8NAS" in csv_
