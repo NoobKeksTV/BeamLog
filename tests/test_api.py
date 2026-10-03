@@ -8,11 +8,10 @@ from contestlogger.app import create_app
 
 
 @pytest.fixture
-def client():
-    with tempfile.TemporaryDirectory() as d:
-        app = create_app(os.path.join(d, "t.db"))
-        with TestClient(app) as c:
-            yield c
+def client(tmp_path):
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        yield c
 
 
 def test_full_flow(client):

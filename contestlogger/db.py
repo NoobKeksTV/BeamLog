@@ -175,6 +175,9 @@ class Database:
         for f in manual[keep_manual:]:
             f.unlink(missing_ok=True)
 
+    def close(self) -> None:
+        self.conn.close()
+
     # ----- generische Helfer --------------------------------------------
     def rows(self, sql: str, params: Iterable[Any] = ()) -> list[dict]:
         return [dict(r) for r in self.conn.execute(sql, tuple(params)).fetchall()]

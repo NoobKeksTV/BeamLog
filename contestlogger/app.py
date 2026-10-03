@@ -48,6 +48,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             db.create_backup("shutdown")
         except Exception:  # noqa: BLE001
             pass
+        db.close()
 
     app = FastAPI(title=__app_name__, version=__version__, lifespan=lifespan)
     app.state.db = db

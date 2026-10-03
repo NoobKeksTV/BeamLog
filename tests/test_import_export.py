@@ -51,9 +51,9 @@ def test_callbook_csv():
     assert r.warnings
 
 
-def test_export_roundtrip():
-    with tempfile.TemporaryDirectory() as d:
-        db = Database(os.path.join(d, "t.db"))
+def test_export_roundtrip(tmp_path):
+    if True:
+        db = Database(tmp_path / "t.db")
         cid = db.create_contest("DARC 70cm", None, None)
         sid = db.create_station(cid, "DN2LH/P", "JO31AA", "432MHz", "SSB", "", {"section": "Single"})
         for q in importers.parse_dd3ku_txt(TXT).qsos:

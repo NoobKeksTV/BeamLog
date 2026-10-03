@@ -37,9 +37,10 @@ def test_prefixes():
 
 
 @pytest.fixture
-def db():
-    with tempfile.TemporaryDirectory() as d:
-        yield Database(os.path.join(d, "t.db"))
+def db(tmp_path):
+    database = Database(tmp_path / "t.db")
+    yield database
+    database.close()
 
 
 def test_log_flow(db):
