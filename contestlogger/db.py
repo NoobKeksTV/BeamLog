@@ -533,6 +533,37 @@ class Database:
                 "unique_squares": all_squares["n"] if all_squares else 0,
                 "unique_calls": uniq_calls["n"] if uniq_calls else 0}
 
+    def contest_stats(self, contest_id: int) -> dict:
+        """Globale Contest-Statistik über alle Stationen/Bänder."""
+        summary = self.contest_summary(contest_id)
+        stations = self.scoreboard(contest_id)
+        per_hour = self.rows(
+            """SELECT substr(q.ts_utc,1,13) AS hour, s.band AS band, COUNT(*) AS qsos, SUM(q.points) AS points
+               FROM qsos q JOIN stations s ON s.id=q.station_id WHERE s.contest_id=? AND q.dupe=0
+               GROUP BY hour, band ORDER BY hour""", (contest_id,))
+        recent = self.rows(
+            """SELECT q.id, q.ts_utc, q.call, q.locator, q.km, q.points, q.dupe, q.logged_by, s.call AS own_call, s.band
+               FROM qsos q JOIN stations s ON s.id=q.station_id WHERE s.contest_id=?
+               ORDER BY q.ts_utc DESC, q.id DESC LIMIT 40""", (contest_id,))
+        countries = self.rows(
+            """SELECT q.country, COUNT(*) AS qsos, SUM(q.points) AS points, MAX(q.km) AS odx
+               FROM qsos q JOIN stations s ON s.id=q.station_id WHERE s.contest_id=? AND q.dupe=0
+               GROUP BY q.country ORDER BY qsos DESC""", (contest_id,))
+        operators = self.rows(
+            """SELECT q.logged_by AS nick, COUNT(*) AS qsos, SUM(q.points) AS points
+               FROM qsos q JOIN stations s ON s.id=q.station_id WHERE s.contest_id=?
+               GROUP BY q.logged_by ORDER BY qsos DESC""", (contest_id,))
+        odx = self.rows(
+            """SELECT s.band, q.call, q.locator, q.km FROM qsos q JOIN stations s ON s.id=q.station_id
+               WHERE s.contest_id=? AND q.dupe=0 AND q.km = (SELECT MAX(q2.km) FROM qsos q2 JOIN stations s2 ON s2.id=q2.station_id WHERE s2.contest_id=s.contest_id AND s2.band=s.band AND q2.dupe=0)
+               GROUP BY s.band""", (contest_id,))
+        last_hour = self.row(
+            """SELECT COUNT(*) AS n FROM qsos q JOIN stations s ON s.id=q.station_id
+               WHERE s.contest_id=? AND q.ts_utc >= strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 hour')""", (contest_id,))
+        return {**summary, "stations": stations, "per_hour": per_hour, "recent": recent, "countries": countries,
+                "operators": operators, "odx": odx, "rate_last_hour": last_hour["n"] if last_hour else 0,
+                "unique_countries": len([c for c in countries if c["country"] not in ("", "?")])}
+
     def scoreboard(self, contest_id: int) -> list[dict]:
         out = []
         for s in self.list_stations(contest_id):

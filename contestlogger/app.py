@@ -154,6 +154,12 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             r["rig"] = rig.get(r["id"])
         return rows
 
+    @app.get("/api/contests/{cid}/stats")
+    def contest_stats(cid: int):
+        if not db.get_contest(cid):
+            raise HTTPException(404)
+        return db.contest_stats(cid)
+
     @app.get("/api/contests/{cid}/summary")
     def contest_summary(cid: int):
         if not db.get_contest(cid):

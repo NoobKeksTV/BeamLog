@@ -108,6 +108,7 @@
     $$(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
     $$(".view").forEach((s) => s.classList.toggle("active", s.id === `view-${v}`));
     if (v === "stats") renderStats();
+    if (v === "contest") renderContest();
     if (v === "fulllog") renderFullLog();
     if (v === "admin") renderAdmin();
     if (v === "log") setTimeout(() => $("#f-call").focus(), 20);
@@ -605,6 +606,7 @@
           if (m.station_id === S.stationId) { await loadQsos(); if (m.qso && m.by !== S.nick) { toast(`${m.by || "API"}: ${m.qso.call} geloggt`); Sound.play("other"); } }
           else if (m.qso && m.by !== S.nick) Sound.play("other");
           renderScoreboard();
+          if ($("#view-contest").classList.contains("active")) renderContest();
           const st = S.contests.flatMap((c) => c.stations).find((s) => s.id === m.station_id);
           if (st && m.qso) { st.serial_next = Math.max(st.serial_next, m.qso.serial_sent + 1); if (st.id === S.stationId) renderStationBar(); }
         }
@@ -697,6 +699,53 @@
     [["N", 0], ["O", 90], ["S", 180], ["W", 270]].forEach(([l, d]) => { const a = ((d - 90) * Math.PI) / 180; add("text", { x: C + (R + 12) * Math.cos(a), y: C + (R + 12) * Math.sin(a) + 4, "text-anchor": "middle" }, l); });
     return svg;
   }
+
+  // ------------------------------------------------------------ Contest gesamt (alle Stationen)
+  async function renderContest() {
+    const root = $("#contest-root"); root.innerHTML = "";
+    const c = contest(); $("#contest-title").textContent = c ? c.name : "Kein Contest";
+    if (!c) return;
+    let st; try { st = await GET(`/api/contests/${c.id}/stats`); } catch (_) { return; }
+    root.append(el("div", { class: "card kpis big", style: "grid-column: 1 / -1" },
+      kpi(st.total_qsos, "QSOs gesamt"), kpi(st.total_points.toLocaleString("de"), "Punkte gesamt"), kpi(st.rate_last_hour, "QSOs letzte Stunde"), kpi(st.unique_calls, "verschiedene Calls"),
+      kpi(st.unique_squares, "Großfelder (alle Bänder)"), kpi(st.unique_countries, "Länder"), kpi(st.bands.length, "Bänder aktiv"),
+      kpi(c.end_utc ? $("#countdown").textContent || "–" : "–", "Restzeit")));
+    root.append(card("Stationen / Bänder", table(["Station", "Band", "QSOs", "Punkte", "Felder", "ODX", "ODX-Call", "/h"],
+      st.stations.map((s) => { const o = st.odx.find((x) => x.band === s.band); return [s.call, s.band, s.qsos - s.dupes, s.points || 0, s.squares, s.odx_km || 0, o ? `${o.call} ${o.locator}` : "–", s.rate_last_hour]; }))));
+    // Stundenverlauf je Band (gestapelt)
+    const hours = [...new Set(st.per_hour.map((h) => h.hour))].sort();
+    const bands = [...new Set(st.per_hour.map((h) => h.band))];
+    root.append(card("QSOs pro Stunde je Band", stackedChart(hours, bands, st.per_hour)));
+    const feed = el("div", { class: "feed table-wrap" }, table(["UTC", "Station", "Band", "Call", "Locator", "km", "Pkt", "Op"],
+      st.recent.map((q) => [fmtTime(q.ts_utc), q.own_call, q.band, q.call + (q.dupe ? " (D)" : ""), q.locator, q.km, q.points, q.logged_by])));
+    root.append(card("Letzte QSOs (alle Stationen)", feed));
+    root.append(card("Länder (alle Bänder)", table(["Land", "QSOs", "Punkte", "ODX km"], st.countries.map((x) => [x.country, x.qsos, x.points, x.odx]))));
+    root.append(card("Operatoren (alle Bänder)", table(["Nick", "QSOs", "Punkte"], st.operators.map((o) => [o.nick || "–", o.qsos, o.points]))));
+  }
+  function stackedChart(hours, bands, rows) {
+    if (!hours.length) return el("p", { class: "muted" }, "Noch keine Daten.");
+    const W = 600, H = 220, P = 30, bw = (W - 2 * P) / hours.length, ns = "http://www.w3.org/2000/svg";
+    const colors = ["#3fb3ff", "#3ddc84", "#ffb347", "#ff5c6c", "#b48cff", "#6ee7e7"];
+    const totals = hours.map((h) => rows.filter((r) => r.hour === h).reduce((a, r) => a + r.qsos, 0));
+    const max = Math.max(1, ...totals);
+    const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${H + 20}`);
+    const add = (tag, attrs, text) => { const n = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); if (text != null) n.textContent = text; svg.append(n); return n; };
+    add("line", { x1: P, y1: H, x2: W - P, y2: H, class: "axis" });
+    hours.forEach((h, i) => {
+      let y = H;
+      bands.forEach((b, bi) => {
+        const r = rows.find((x) => x.hour === h && x.band === b); if (!r) return;
+        const hh = (r.qsos / max) * (H - 30); y -= hh;
+        add("rect", { x: P + i * bw + 2, y, width: bw - 4, height: hh, fill: colors[bi % colors.length], rx: 2 }).append(Object.assign(document.createElementNS(ns, "title"), { textContent: `${h.slice(11)}h ${b}: ${r.qsos} QSOs, ${r.points} Punkte` }));
+      });
+      if (totals[i]) add("text", { x: P + i * bw + bw / 2, y: y - 3, class: "lbl", "text-anchor": "middle" }, totals[i]);
+      if (hours.length <= 30 || i % 2 === 0) add("text", { x: P + i * bw + bw / 2, y: H + 13, class: "lbl", "text-anchor": "middle" }, h.slice(11) + "h");
+    });
+    bands.forEach((b, bi) => { add("rect", { x: P + bi * 90, y: 2, width: 10, height: 10, fill: colors[bi % colors.length] }); add("text", { x: P + bi * 90 + 14, y: 11, class: "lbl" }, b); });
+    return svg;
+  }
+  $("#btn-bigscreen").addEventListener("click", () => { document.body.classList.toggle("bigscreen"); if (document.body.classList.contains("bigscreen")) document.documentElement.requestFullscreen?.().catch(() => {}); else document.exitFullscreen?.().catch(() => {}); });
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) document.body.classList.remove("bigscreen"); });
 
   // ------------------------------------------------------------ Verwaltung
   const BANDS = ["50MHz", "70MHz", "144MHz", "432MHz", "1296MHz", "2320MHz", "3400MHz", "5760MHz", "10368MHz", "24048MHz", "47088MHz", "76032MHz"];

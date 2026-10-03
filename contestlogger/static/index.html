@@ -20,6 +20,7 @@
   <div class="clock"><span id="utc-time">--:--:--</span><small>UTC · <span id="utc-date"></span></small></div>
   <nav class="tabs">
     <button data-view="log" class="active">Loggen</button>
+    <button data-view="contest">Contest</button>
     <button data-view="fulllog">Log</button>
     <button data-view="stats">Statistik</button>
     <button data-view="admin">Verwaltung</button>
@@ -108,6 +109,12 @@
         </div>
       </aside>
     </div>
+  </section>
+
+  <!-- ========================= Contest gesamt ========================= -->
+  <section id="view-contest" class="view">
+    <div class="card-head"><h3 id="contest-title">Contest</h3><button id="btn-bigscreen" class="ghost small" title="Große Anzeige für einen Monitor (F11 = Vollbild)">Großanzeige</button></div>
+    <div id="contest-root" class="stats-grid"></div>
   </section>
 
   <!-- ========================= Volles Log ========================= -->

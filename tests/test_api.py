@@ -120,3 +120,14 @@ def test_summary_backup_rig(client):
 def test_qr(client):
     r = client.get("/api/qr.svg", params={"text": "http://192.168.1.10:8000/"})
     assert r.status_code == 200 and b"<svg" in r.content
+
+
+def test_contest_stats(client):
+    admin = client.post("/api/setup", json={"password": "admin1"}).json()["token"]
+    H = {"X-Admin-Token": admin}
+    cid = client.post("/api/contests", json={"name": "G"}, headers=H).json()["id"]
+    s1 = client.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH", "locator": "JO31AA", "band": "144MHz"}, headers=H).json()["id"]
+    client.post(f"/api/stations/{s1}/qsos", json={"call": "DL8NAS", "locator": "JN59LE"}, headers={**H, "X-Nick": "Lars"})
+    st = client.get(f"/api/contests/{cid}/stats").json()
+    assert st["total_qsos"] == 1 and st["recent"][0]["own_call"] == "DN2LH" and st["odx"][0]["call"] == "DL8NAS"
+    assert st["operators"][0]["nick"] == "Lars" and st["unique_countries"] == 1 and st["per_hour"][0]["band"] == "144MHz"
