@@ -247,6 +247,7 @@
       $("#qso-form").querySelectorAll("input,button").forEach((i) => { i.disabled = true; });
     }
     for (const f of ["adi", "csv"]) $(`#exp-${f}`).href = st ? `/api/stations/${st.id}/export.${f}` : "#";
+    renderMacroBar();
     $("#exp-zip").href = S.contestId ? `/api/contests/${S.contestId}/export.zip` : "#";
   }
   $("#sel-contest").addEventListener("change", async (e) => {
@@ -370,7 +371,10 @@
   }
   $("#btn-clear").addEventListener("click", clearForm);
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { if (!$("#modal").classList.contains("hidden")) closeModal(); else if ($("#view-log").classList.contains("active")) clearForm(); }
+    if (e.key === "Escape") {
+      if (!$("#modal").classList.contains("hidden")) closeModal();
+      else if ($("#view-log").classList.contains("active")) { clearForm(); $("#macro-flash").classList.add("hidden"); if (canLog() && S.rig[S.stationId]?.cw) api("POST", `/api/stations/${S.stationId}/cw`, { stop: true }).catch(() => {}); }
+    }
   });
 
   // Enter springt weiter; wenn Call + Locator vorhanden und man im letzten Pflichtfeld ist, wird geloggt.
@@ -391,7 +395,7 @@
       if (e.key === " " && inp === F.call) { e.preventDefault(); (F.loc.value ? F.nr : F.loc).focus(); }
     });
   });
-  F.call.addEventListener("input", () => { F.call.value = F.call.value.toUpperCase(); fetchSuggest(); updateHints(); });
+  F.call.addEventListener("input", () => { F.call.value = F.call.value.toUpperCase(); fetchSuggest(); updateHints(); if (!$("#macro-bar").classList.contains("hidden")) renderMacroBar(); });
   F.loc.addEventListener("input", () => { F.loc.value = F.loc.value.toUpperCase(); updateHints(); });
   F.call.addEventListener("blur", () => setTimeout(hideSuggest, 150));
   F.nr.addEventListener("blur", () => { if (/^\d+$/.test(F.nr.value)) F.nr.value = pad3(Number(F.nr.value)); });
@@ -517,6 +521,51 @@
     if (v === null || !/^\d+$/.test(v)) return;
     try { await api("POST", `/api/stations/${st.id}/serial`, { start: Number(v) }); toast(`Nächste Nr.: ${pad3(v)}`, "ok"); } catch (err) { toast(err.message, "err"); }
   });
+
+  // ------------------------------------------------------------ Makros (F1–F8)
+  const MACRO_DEFAULTS = { F1: "CQ Contest {mycall} {mycall} Contest", F2: "{call}", F3: "{rst} {nr} {myloc}", F4: "QRZ? {mycall}", F5: "{mycall}", F6: "TU {mycall}", F7: "AGN?", F8: "NR?" };
+  const MACRO_KEYS = Object.keys(MACRO_DEFAULTS);
+  const macros = () => ({ ...MACRO_DEFAULTS, ...((station()?.info || {}).macros || {}) });
+  function expandMacro(text) {
+    const st = station() || {};
+    return text.replace(/\{(\w+)\}/g, (_, k) => ({
+      mycall: st.call || "", myloc: st.locator || "", call: F.call.value.trim() || "?", rst: F.rs.value.trim() || "59",
+      nr: pad3(st.serial_next || 1), loc: F.loc.value.trim() || "?", nick: S.nick, band: st.band || "",
+    })[k] ?? `{${k}}`);
+  }
+  function renderMacroBar() {
+    const list = $("#macro-list"); list.innerHTML = "";
+    const m = macros();
+    MACRO_KEYS.forEach((k) => list.append(el("div", { title: m[k], onclick: () => fireMacro(k) }, el("b", {}, k), expandMacro(m[k]))));
+  }
+  let flashTimer;
+  async function fireMacro(key) {
+    const text = expandMacro(macros()[key]);
+    const f = $("#macro-flash"); f.innerHTML = ""; f.append(text, el("small", {}, `${key}${S.rig[S.stationId]?.cw ? " · wird als CW gesendet" : ""}`));
+    f.classList.remove("hidden"); clearTimeout(flashTimer); flashTimer = setTimeout(() => f.classList.add("hidden"), 4000);
+    if (canLog() && S.stationId) { try { await api("POST", `/api/stations/${S.stationId}/cw`, { text }); } catch (_) { /* keine Bridge */ } }
+  }
+  function macroEditor() {
+    const st = station(); if (!st) return;
+    const m = macros();
+    const box = modal(el("div", {}, el("h3", {}, `Makros für ${st.call}`),
+      el("p", { class: "muted small" }, "Platzhalter: {mycall} {myloc} {call} {loc} {rst} {nr} {nick} {band}. Die Makros gelten für alle Operatoren dieser Station. Mit laufender CAT-Bridge (--cw) werden sie als CW gegeben, sonst nur groß angezeigt."),
+      el("form", { id: "macro-form", class: "stack" },
+        MACRO_KEYS.map((k) => lab(k, el("input", { id: `m-${k}`, value: m[k] }))),
+        el("div", { class: "row" }, el("button", { class: "primary" }, "Speichern"), el("button", { type: "button", class: "ghost", onclick: () => { MACRO_KEYS.forEach((k) => { box.querySelector(`#m-${k}`).value = MACRO_DEFAULTS[k]; }); } }, "Standard"), el("button", { type: "button", class: "ghost", "data-close": 1 }, "Abbrechen")))));
+    box.querySelector("#macro-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const out = {}; MACRO_KEYS.forEach((k) => { out[k] = box.querySelector(`#m-${k}`).value; });
+      try { await api("PATCH", `/api/stations/${st.id}`, { info: { ...(st.info || {}), macros: out } }); closeModal(); toast("Makros gespeichert", "ok"); } catch (err) { toast(err.message, "err"); }
+    });
+  }
+  $("#btn-macro-edit").addEventListener("click", macroEditor);
+  document.addEventListener("keydown", (e) => {
+    if (!$("#view-log").classList.contains("active") || !$("#modal").classList.contains("hidden")) return;
+    if (e.key === "F9") { e.preventDefault(); $("#macro-bar").classList.toggle("hidden"); localStorage.setItem("cl.macrobar", $("#macro-bar").classList.contains("hidden") ? "0" : "1"); renderMacroBar(); return; }
+    if (/^F[1-8]$/.test(e.key)) { e.preventDefault(); if (station()) fireMacro(e.key); }
+  });
+  if (localStorage.getItem("cl.macrobar") === "1") $("#macro-bar").classList.remove("hidden");
 
   // ------------------------------------------------------------ Scoreboard
   async function renderScoreboard() {

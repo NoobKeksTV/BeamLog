@@ -54,6 +54,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     hub = Hub()
     app.state.hub = hub
     rig: dict[int, dict] = {}  # station_id -> {"freq": "432.200", "mode": "USB", "ts": ...}
+    cw_queue: dict[int, list[str]] = {}  # station_id -> Texte, die die CAT-Bridge als CW senden soll
 
     # ------------------------------------------------------------ Auth-Helfer
     def is_admin(token: str | None) -> bool:
@@ -182,6 +183,30 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     @app.get("/api/stations/{sid}/rig")
     def rig_get(sid: int):
         return rig.get(sid) or {}
+
+    @app.post("/api/stations/{sid}/cw")
+    async def cw_send(sid: int, body: dict, x_station_token: str | None = Header(default=None), x_admin_token: str | None = Header(default=None)):
+        """Makro-Text in die CW-Warteschlange stellen; die CAT-Bridge (--cw) holt ihn ab und gibt ihn über rigctld."""
+        require_station(sid, x_station_token, x_admin_token)
+        text = (body.get("text") or "").strip()[:200]
+        if body.get("stop"):
+            cw_queue[sid] = ["\x00STOP"]
+        elif text:
+            cw_queue.setdefault(sid, []).append(text)
+        return {"queued": len(cw_queue.get(sid, []))}
+
+    @app.get("/api/stations/{sid}/cw/next")
+    def cw_next(sid: int, x_station_token: str | None = Header(default=None), x_admin_token: str | None = Header(default=None)):
+        require_station(sid, x_station_token, x_admin_token)
+        q = cw_queue.get(sid) or []
+        if not q:
+            return {}
+        text = q.pop(0)
+        if text == "\x00STOP":
+            cw_queue[sid] = []
+            return {"stop": True}
+        rig.setdefault(sid, {})["cw"] = True
+        return {"text": text}
 
     # ------------------------------------------------------------ Stationen
     @app.post("/api/contests/{cid}/stations", dependencies=[Depends(require_admin)])
