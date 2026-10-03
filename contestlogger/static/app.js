@@ -143,8 +143,7 @@
   function showView(v) {
     $$(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
     $$(".view").forEach((s) => s.classList.toggle("active", s.id === `view-${v}`));
-    if (v === "stats") renderStats();
-    if (v === "contest") renderContest();
+    if (v === "stats") { renderContest(); renderStats(); }
     if (v === "fulllog") renderFullLog();
     if (v === "admin") renderAdmin();
     if (v === "log") setTimeout(() => $("#f-call").focus(), 20);
@@ -281,9 +280,10 @@
     if (!c?.stations?.length) ss.append(el("option", { value: "" }, t("– keine Station –")));
     ss.value = S.stationId ?? "";
     const st = station();
+    if (st && !st.has_password && !canLog()) autoUnlock(st);
     if (st) {
       const rig = S.rig[st.id];
-      $("#station-meta").textContent = `${st.locator} · ${st.mode} · ${t("nächste Nr.")} ${pad3(st.serial_next)}` + (rig?.freq ? ` · 📻 ${rig.freq} MHz ${rig.mode || ""}` : "");
+      $("#station-meta").innerHTML = `${esc(st.locator)} · ${esc(st.mode)} · ${t("nächste Nr.")} <span class="serial-badge">${pad3(st.serial_next)}</span>` + (rig?.freq ? ` · 📻 ${esc(rig.freq)} MHz ${esc(rig.mode || "")}` : "");
       $("#f-nr-sent").value = pad3(st.serial_next);
       const unlocked = canLog();
       $("#station-state").innerHTML = unlocked
@@ -312,8 +312,15 @@
     if (S.stationId && !canLog()) askUnlock(station());
   });
 
+  async function autoUnlock(st) {
+    try {
+      const r = await api("POST", `/api/stations/${st.id}/unlock`, { password: "" });
+      S.stationTokens[st.id] = r.token; save(); renderStationBar(); renderQsos();
+    } catch (_) { askUnlock(st); }
+  }
   function askUnlock(st) {
     if (!st) return;
+    if (!st.has_password) return autoUnlock(st);
     const box = modal(fromTpl("tpl-unlock"));
     box.querySelector(".st-name").textContent = `${st.call} (${st.band})`;
     box.querySelector("#unlock-form").addEventListener("submit", async (e) => {
@@ -732,7 +739,7 @@
           if (m.station_id === S.stationId) { await loadQsos(); if (m.qso && m.by !== S.nick) { toast(`${m.by || "API"}: ${m.qso.call} ${t("geloggt")}`); Sound.play("other"); } }
           else if (m.qso && m.by !== S.nick) Sound.play("other");
           renderScoreboard();
-          if ($("#view-contest").classList.contains("active")) renderContest();
+          if ($("#view-stats").classList.contains("active")) renderContest();
           const st = S.contests.flatMap((c) => c.stations).find((s) => s.id === m.station_id);
           if (st && m.qso) { st.serial_next = Math.max(st.serial_next, m.qso.serial_sent + 1); if (st.id === S.stationId) renderStationBar(); }
         }
@@ -765,16 +772,11 @@
     if (!S.stationId) { root.append(el("p", { class: "muted" }, t("Keine Station ausgewählt."))); return; }
     let st; try { st = await GET(`/api/stations/${S.stationId}/stats`); } catch (e) { return; }
     const s = st.summary; const own = station();
+    $("#stats-title").textContent = `${t("Station")} ${own?.call || ""} ${own?.band || ""}`;
     root.append(el("div", { class: "card kpis stat-card" },
       kpi(s.qsos - s.dupes, t("gültige QSOs")), kpi((s.points || 0).toLocaleString("de"), t("Punkte")), kpi(s.squares, t("Großfelder")),
       kpi(s.countries, t("Länder")), kpi(s.avg_km, t("Ø km / QSO")), kpi(s.dupes, t("Dupes")),
       kpi(s.odx ? `${s.odx.call} · ${s.odx.km} km` : "–", `ODX (${s.odx?.locator || ""})`, "wide")));
-    try {
-      const cs = await GET(`/api/contests/${S.contestId}/summary`);
-      if (cs.bands.length > 1) root.append(card(t("Gesamtwertung {name} (alle Bänder)", { name: contest()?.name || "" }),
-        el("div", {}, el("div", { class: "kpis" }, kpi(cs.total_qsos, t("QSOs gesamt")), kpi(cs.total_points.toLocaleString("de"), t("Punkte gesamt")), kpi(cs.unique_calls, t("verschiedene Calls"))),
-          table([t("Band"), t("Stationen"), t("QSOs"), t("Punkte"), t("Felder"), t("ODX km")], cs.bands.map((b) => [b.band, b.stations.join(", "), b.qsos, b.points, b.squares, b.odx_km])))));
-    } catch (_) { /* */ }
     const mapCard = card(t("Karte aller QSOs"), el("div", { id: "map-stats", class: "map tall" })); mapCard.style.gridColumn = "1 / -1"; root.append(mapCard);
     setTimeout(() => { const m = makeMap("map-stats"); if (!m) return; m.map.invalidateSize(); drawQsoDots(m, S.qsos); m.layer.clearLayers(); const a = locToLatLon(own?.locator); if (a) L.circleMarker(a, { radius: 7, color: "#3fb3ff", fillOpacity: 1 }).addTo(m.layer); const pts = S.qsos.map((q) => locToLatLon(q.locator)).filter(Boolean); if (pts.length) m.map.fitBounds(L.latLngBounds(pts.concat(a ? [a] : [])), { padding: [20, 20] }); }, 50);
     root.append(card(t("QSOs und Punkte pro Stunde"), barChart(st.per_hour.map((h) => ({ label: h.hour.slice(11) + "h", a: h.qsos, b: h.points })), t("QSOs"), t("Punkte"))));
