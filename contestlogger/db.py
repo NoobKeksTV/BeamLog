@@ -540,7 +540,7 @@ class Database:
         per_hour = self.rows(
             """SELECT substr(q.ts_utc,1,13) AS hour, s.band AS band, COUNT(*) AS qsos, SUM(q.points) AS points
                FROM qsos q JOIN stations s ON s.id=q.station_id WHERE s.contest_id=? AND q.dupe=0
-               GROUP BY hour, band ORDER BY hour""", (contest_id,))
+               GROUP BY hour, s.band ORDER BY hour""", (contest_id,))
         recent = self.rows(
             """SELECT q.id, q.ts_utc, q.call, q.locator, q.km, q.points, q.dupe, q.logged_by, s.call AS own_call, s.band
                FROM qsos q JOIN stations s ON s.id=q.station_id WHERE s.contest_id=?
