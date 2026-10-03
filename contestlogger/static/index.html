@@ -214,6 +214,18 @@
         <p class="muted small" id="backup-info">Der Server sichert die Datenbank automatisch (nur wenn sich etwas geändert hat) in den Ordner <code>backup/</code> neben der Datenbank; beim Beenden zusätzlich. Die Datenbank selbst läuft im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt sie nicht.</p>
         <p><button id="btn-backup" class="ghost">Jetzt sichern</button></p>
         <div class="table-wrap" style="max-height:180px"><table id="backup-list" class="compact"><tbody></tbody></table></div>
+        <h3>Externe Rufzeichen-Abfrage</h3>
+        <p class="muted small">Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH (kostenloser Account) oder QRZ.com (XML-Abo) nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. Ohne Internet oder Zugangsdaten bleibt alles lokal.</p>
+        <form id="lookup-form" class="stack">
+          <div class="row">
+            <select id="lookup-provider"><option value="none">aus</option><option value="hamqth">HamQTH (kostenlos)</option><option value="qrz">QRZ.com (XML-Abo)</option></select>
+            <input id="lookup-user" placeholder="Benutzername / Rufzeichen" autocomplete="off">
+            <input id="lookup-pass" type="password" placeholder="Passwort" autocomplete="new-password">
+            <button class="ghost">Speichern</button>
+            <button type="button" id="btn-lookup-test" class="ghost">Testen</button>
+          </div>
+          <div id="lookup-result" class="muted small"></div>
+        </form>
         <h3>Karte</h3>
         <form id="tile-form" class="row"><input id="tile-url" placeholder="https://tile.openstreetmap.org/{z}/{x}/{y}.png" style="flex:1;min-width:260px"><button class="ghost">Speichern</button></form>
         <p class="muted small">Kachel-URL für die Karte. Standard: OpenStreetMap (braucht Internet). Für reinen Offline-Betrieb einen lokalen Kachel-Server eintragen (z. B. <code>http://192.168.1.10:8080/tile/{z}/{x}/{y}.png</code>) – Linien und Marker funktionieren auch ohne Kacheln.</p>

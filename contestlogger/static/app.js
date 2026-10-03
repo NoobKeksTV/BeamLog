@@ -484,8 +484,10 @@
     const call = F.call.value.trim();
     if (call.length < 3) return;
     try {
-      const r = await GET(`/api/call?call=${encodeURIComponent(call)}`);
-      if (r && r.locator && call === F.call.value.trim()) setAutoLocator(r.locator);
+      const r = await GET(`/api/lookup?call=${encodeURIComponent(call)}`);
+      if (call !== F.call.value.trim()) return;
+      if (r && r.locator) { setAutoLocator(r.locator); if (r.source !== "local") toast(`${r.call}: ${r.locator}${r.name ? " · " + r.name : ""} (${r.source === "hamqth" ? "HamQTH" : "QRZ"})`); }
+      else if (r && r.source === "error") toast(r.error, "err");
     } catch (_) { /* */ }
   }
   F.loc.addEventListener("input", () => { S.locAuto = false; F.loc.classList.remove("auto"); });
@@ -730,6 +732,16 @@
     drawBearing(m, st.locator, loc, locToLatLon(loc) ? `${F.call.value.trim() || loc} · ${geo}` : "");
     $("#map-info").textContent = locToLatLon(loc) ? `${loc}: ${geo}` : `${st.locator} · ${S.qsos.filter((q) => !q.dupe).length} QSOs`;
   }
+  $("#lookup-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = { lookup_provider: $("#lookup-provider").value, lookup_user: $("#lookup-user").value.trim() };
+    if ($("#lookup-pass").value) body.lookup_pass = $("#lookup-pass").value;
+    try { await api("POST", "/api/settings", body); $("#lookup-pass").value = ""; toast(t("Einstellungen gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
+  });
+  $("#btn-lookup-test").addEventListener("click", async () => {
+    $("#lookup-result").textContent = "…";
+    try { const r = await api("POST", "/api/lookup/test"); $("#lookup-result").textContent = r.msg; $("#lookup-result").style.color = r.ok ? "var(--ok)" : "var(--bad)"; } catch (err) { $("#lookup-result").textContent = err.message; }
+  });
   $("#tile-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try { await api("POST", "/api/settings", { tile_url: $("#tile-url").value.trim() }); toast(t("Kachel-URL gespeichert – Seite neu laden"), "ok"); } catch (err) { toast(err.message, "err"); }
@@ -952,6 +964,7 @@
     const is = $("#imp-station"); is.innerHTML = "";
     S.contests.forEach((cc) => cc.stations.forEach((s) => is.append(el("option", { value: s.id }, `${cc.name} · ${s.call} ${s.band}`))));
     const inf = await GET("/api/info"); $("#cb-count").textContent = inf.callbook_count; $("#tile-url").value = inf.tile_url || "";
+    try { const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider; $("#lookup-user").value = cfg.lookup_user || ""; $("#lookup-pass").placeholder = cfg.lookup_pass_set ? t("Passwort (gespeichert)") : t("Passwort"); } catch (_) { /* */ }
     renderBackups(); renderCallbook();
   }
   $("#admin-login-form").addEventListener("submit", async (e) => {

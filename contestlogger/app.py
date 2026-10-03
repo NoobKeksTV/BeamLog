@@ -15,7 +15,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __version__, exporters, importers, logcheck
+from . import __app_name__, __copyright__, __version__, exporters, importers, logcheck, lookup
 from .db import Database
 
 STATIC = Path(__file__).parent / "static"
@@ -72,6 +72,14 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     app.state.hub = hub
     rig: dict[int, dict] = {}  # station_id -> {"freq": "432.200", "mode": "USB", "ts": ...}
     cw_queue: dict[int, list[str]] = {}  # station_id -> Texte, die die CAT-Bridge als CW senden soll
+    lookup_state = {"client": None}
+    lookup_cache: dict[str, float] = {}  # Call -> Zeitpunkt der letzten erfolglosen Abfrage
+
+    def lookup_client() -> lookup.Lookup:
+        if lookup_state["client"] is None:
+            lookup_state["client"] = lookup.Lookup(db.get_setting("lookup_provider", "none") or "none",
+                                                   db.get_setting("lookup_user", "") or "", db.get_setting("lookup_pass", "") or "")
+        return lookup_state["client"]
 
     # ------------------------------------------------------------ Auth-Helfer
     def is_admin(token: str | None) -> bool:
@@ -101,6 +109,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             "server_time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "public_url": public_url or os.environ.get("CONTESTLOGGER_URL", ""),
             "tile_url": db.get_setting("tile_url", "") or "",
+            "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
             "mdbtools": bool(__import__("shutil").which("mdb-tables")),
         }
 
@@ -113,10 +122,49 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.post("/api/settings", dependencies=[Depends(require_admin)])
     def set_settings(body: dict):
-        for k in ("tile_url",):
+        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass"):
             if k in body:
                 db.set_setting(k, str(body[k] or ""))
+        lookup_state["client"] = None
+        lookup_cache.clear()
         return {"ok": True}
+
+    @app.get("/api/settings", dependencies=[Depends(require_admin)])
+    def get_settings():
+        return {"tile_url": db.get_setting("tile_url", ""), "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
+                "lookup_user": db.get_setting("lookup_user", ""), "lookup_pass_set": bool(db.get_setting("lookup_pass", "")),
+                "providers": lookup.PROVIDERS}
+
+    @app.post("/api/lookup/test", dependencies=[Depends(require_admin)])
+    async def lookup_test():
+        try:
+            return {"ok": True, "msg": await asyncio.to_thread(lookup_client().test)}
+        except lookup.LookupError_ as e:
+            return {"ok": False, "msg": str(e)}
+
+    @app.get("/api/lookup")
+    async def lookup_call(call: str):
+        """Rufzeichen nachschlagen: erst Stationsdatenbank, dann (wenn eingerichtet) HamQTH/QRZ."""
+        from . import prefixes
+        core = prefixes.core_call(call)
+        known = db.lookup_call(core)
+        if known and known.get("locator"):
+            return {"source": "local", **{k: known[k] for k in ("call", "locator", "name")}}
+        client = lookup_client()
+        if not client.enabled or not prefixes.is_plausible_call(core):
+            return {"source": "none"}
+        import time as _t
+        if _t.time() - lookup_cache.get(core, 0) < 600:
+            return {"source": "none"}
+        try:
+            res = await asyncio.to_thread(client.lookup, core)
+        except lookup.LookupError_ as e:
+            return {"source": "error", "error": str(e)}
+        if not res:
+            lookup_cache[core] = _t.time()
+            return {"source": "none"}
+        db.learn_call(core, res.get("locator", ""), source=res["source"], name=res.get("name", ""))
+        return {"call": core, **res}
 
     @app.post("/api/setup")
     def setup(body: dict):

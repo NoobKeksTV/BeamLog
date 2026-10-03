@@ -264,5 +264,13 @@
  "Export / Abgabe": "Export / submission",
  "EDI dieser Station": "EDI of this station",
  "Für die Contest-Abgabe das": "For the contest submission use the",
- "(REG1TEST) der jeweiligen Station/des Bandes verwenden. Vor dem EDI-Export läuft automatisch die Log-Prüfung. „Alle Bänder (ZIP)“ packt die EDI-Dateien aller Stationen des Contests zusammen.": "(REG1TEST) of the respective station/band. The log check runs automatically before the EDI export. “All bands (ZIP)” bundles the EDI files of all stations of the contest."
+ "(REG1TEST) der jeweiligen Station/des Bandes verwenden. Vor dem EDI-Export läuft automatisch die Log-Prüfung. „Alle Bänder (ZIP)“ packt die EDI-Dateien aller Stationen des Contests zusammen.": "(REG1TEST) of the respective station/band. The log check runs automatically before the EDI export. “All bands (ZIP)” bundles the EDI files of all stations of the contest.",
+ "Externe Rufzeichen-Abfrage": "External callsign lookup",
+ "Benutzername / Rufzeichen": "Username / callsign",
+ "Passwort": "Password",
+ "Passwort (gespeichert)": "Password (saved)",
+ "Testen": "Test",
+ "Einstellungen gespeichert": "Settings saved",
+ "aus": "off",
+ "Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH (kostenloser Account) oder QRZ.com (XML-Abo) nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. Ohne Internet oder Zugangsdaten bleibt alles lokal.": "If the local station database does not know a callsign, it is looked up online at HamQTH (free account) or QRZ.com (XML subscription) – locator, name and QTH are taken over and stored. Without internet or credentials everything stays local."
 }

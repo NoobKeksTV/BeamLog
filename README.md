@@ -41,6 +41,9 @@ oder Handys im Browser. Kein Internet nötig, keine Accounts.
   Klick auf den Fehler öffnet das QSO; Export aller Bänder eines Contests als ZIP.
 - **QR-Code** mit der Server-Adresse für Handy/Tablet.
 - **Mehrsprachig** (Deutsch, Englisch); eigene Sprachen per JSON-Datei in `data/lang/` (Vorlage in der Verwaltung).
+- **Stationsdatenbank** mit Startdaten, wächst mit jedem QSO/Import; Locator/km/Grad werden beim Eingeben
+  des Rufzeichens automatisch gesetzt. Optional **externe Abfrage** bei HamQTH oder QRZ.com (wie Wavelog),
+  Ergebnisse werden gespeichert. **Plausibilitätsprüfung** Rufzeichen-Land ↔ Locator (live und bei der Log-Prüfung).
 - Länderkennung weltweit (DXCC-Präfixe), responsives Layout (Fenster beliebig skalierbar, auch Handy), hell/dunkel.
 
 ## Installation und Start
@@ -125,6 +128,13 @@ python tools/cat_bridge.py --server http://192.168.1.10:8000 --station 1 --passw
 `--cw` gibt die F-Tasten-Makros als CW über `rigctld` aus (Hamlib `send_morse`).
 
 Die Stations-ID steht in der Verwaltung. Alternativ `--flrig http://localhost:12345` für flrig.
+
+## Roadmap
+
+- **ON4KST-Chat-Anbindung** (Telnet-Schnittstelle, Port 23000): Login, Räume (144/432/µW), Fenster „alle
+  Nachrichten“ und „an mich gerichtet“, Direktantwort, `/cq`-Vorlage mit dem aktuellen Rufzeichen,
+  gespeicherte und bearbeitbare Textbausteine mit Senden-Knopf.
+- Rotor-Steuerung (Hamlib `rotctld`), Lücken-Liste aus früheren Contests, weitere Wertungsregeln, Cabrillo.
 
 ## Technik
 
