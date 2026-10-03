@@ -22,16 +22,19 @@ jobs:
       - run: pip install -r requirements.txt pyinstaller pytest httpx
       - run: python -m pytest -q
       - run: python build_tools/build.py
+      - id: ver
+        shell: bash
+        run: echo "version=$(python -c 'import contestlogger;print(contestlogger.__version__)')" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
           name: ContestLogger-${{ matrix.os }}
           path: dist/*.zip
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
-          name: ContestLogger ${{ github.ref_name }}
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: ContestLogger ${{ steps.ver.outputs.version }}
           body: |
             Portable Versionen (kein Python nötig): ZIP entpacken, `ContestLogger.exe` bzw. `./ContestLogger` starten.
             Siehe START.txt im Paket.
