@@ -246,7 +246,8 @@
       $("#station-state").textContent = S.contests.length ? "" : "Lege unter „Verwaltung“ einen Contest und eine Station an.";
       $("#qso-form").querySelectorAll("input,button").forEach((i) => { i.disabled = true; });
     }
-    for (const f of ["edi", "adi", "csv"]) $(`#exp-${f}`).href = st ? `/api/stations/${st.id}/export.${f}` : "#";
+    for (const f of ["adi", "csv"]) $(`#exp-${f}`).href = st ? `/api/stations/${st.id}/export.${f}` : "#";
+    $("#exp-zip").href = S.contestId ? `/api/contests/${S.contestId}/export.zip` : "#";
   }
   $("#sel-contest").addEventListener("change", async (e) => {
     S.contestId = Number(e.target.value) || null;
@@ -313,6 +314,34 @@
     $("#full-count").textContent = `${list.length} / ${S.qsos.length}`;
   }
   $("#full-search").addEventListener("input", renderFullLog);
+
+  // ---- Log-Prüfung (Pflicht vor dem EDI-Export)
+  async function runCheck(thenExport) {
+    const st = station(); if (!st) return toast("Keine Station gewählt", "err");
+    let res; try { res = await GET(`/api/stations/${st.id}/check`); } catch (err) { return toast(err.message, "err"); }
+    const list = el("div", { class: "check-list" });
+    const item = (x, cls) => el("div", { class: cls, onclick: () => { if (x.qso_id) { const q = S.qsos.find((q) => q.id === x.qso_id); closeModal(); if (q) editQso(q); } } },
+      x.serial ? el("span", { class: "n" }, `#${pad3(x.serial)} ${x.call}`) : null, x.msg);
+    res.errors.forEach((x) => list.append(item(x, "err")));
+    res.warnings.forEach((x) => list.append(item(x, "warn")));
+    const dl = (force) => { window.location.href = `/api/stations/${st.id}/export.edi${force ? "?force=1" : ""}`; };
+    const buttons = el("div", { class: "row" });
+    if (res.ok) buttons.append(el("button", { class: "primary", onclick: () => { closeModal(); dl(false); } }, "EDI herunterladen"));
+    else if (S.adminToken) buttons.append(el("button", { class: "ghost danger", onclick: () => { if (confirm("Mit Fehlern exportieren? Der Auswerter wird diese QSOs wahrscheinlich streichen.")) { closeModal(); dlForce(); } } }, "Trotzdem exportieren (Admin)"));
+    buttons.append(el("button", { type: "button", class: "ghost", "data-close": 1 }, "Schließen"));
+    const dlForce = async () => {
+      const r = await fetch(`/api/stations/${st.id}/export.edi?force=1`, { headers: { "X-Admin-Token": S.adminToken } });
+      const blob = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${st.call.replace("/", "-")}_${st.band}.edi`; a.click();
+    };
+    modal(el("div", {},
+      el("h3", {}, `Log-Prüfung ${st.call} ${st.band} – ${res.qsos} QSOs`),
+      res.ok ? el("p", { class: "check-ok" }, `✔ Keine Fehler${res.warnings.length ? `, ${res.warnings.length} Hinweise` : ""} – das Log kann abgegeben werden.`)
+             : el("p", { class: "hint warn" }, `✖ ${res.errors.length} Fehler, ${res.warnings.length} Hinweise. Fehler müssen vor dem EDI-Export behoben werden (Klick auf eine Zeile öffnet das QSO).`),
+      list, buttons));
+    if (res.ok && thenExport) { closeModal(); dl(false); }
+  }
+  $("#btn-check").addEventListener("click", () => runCheck(false));
+  $("#exp-edi").addEventListener("click", () => runCheck(true));
 
   function renderKpis(summary) {
     const box = $("#kpis");

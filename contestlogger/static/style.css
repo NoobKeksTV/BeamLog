@@ -196,3 +196,8 @@ tr.total td { border-top: 2px solid var(--line); }
 .qr-box img { width: min(320px, 80vw); background: #fff; padding: 8px; border-radius: 10px; }
 .qr-url { font-family: var(--mono); font-size: 20px; margin-top: 10px; word-break: break-all; }
 #sound-btn.off { opacity: .4; }
+.check-list { max-height: 50vh; overflow: auto; }
+.check-list div { padding: 5px 8px; border-left: 3px solid var(--warn); margin-bottom: 4px; background: var(--card2); border-radius: 0 6px 6px 0; cursor: pointer; font-size: 13.5px; }
+.check-list div.err { border-color: var(--bad); }
+.check-list .n { font-family: var(--mono); color: var(--muted); margin-right: 8px; }
+.check-ok { color: var(--ok); font-weight: 700; font-size: 16px; }

@@ -15,7 +15,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __version__, exporters, importers
+from . import __app_name__, __copyright__, __version__, exporters, importers, logcheck
 from .db import Database
 
 STATIC = Path(__file__).parent / "static"
@@ -362,8 +362,41 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return report
 
     # ------------------------------------------------------------ Export
+    @app.get("/api/stations/{sid}/check")
+    def check(sid: int):
+        station = db.get_station(sid)
+        if not station:
+            raise HTTPException(404)
+        contest = db.get_contest(station["contest_id"]) or {"name": ""}
+        return logcheck.check_station(contest, station, db.list_qsos(sid))
+
+    @app.get("/api/contests/{cid}/export.zip")
+    def export_contest_zip(cid: int, force: int = 0, x_admin_token: str | None = Header(default=None)):
+        """Alle Stationen/Bänder eines Contests als EDI-Dateien in einem ZIP – nur geprüfte Logs."""
+        import io
+        import zipfile
+        contest = db.get_contest(cid)
+        if not contest:
+            raise HTTPException(404)
+        buf = io.BytesIO()
+        skipped = []
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            for st in db.list_stations(cid):
+                station = db.get_station(st["id"])
+                qsos = db.list_qsos(st["id"])
+                res = logcheck.check_station(contest, station, qsos)
+                if res["errors"] and not (force and is_admin(x_admin_token)):
+                    skipped.append(f"{station['call']} {station['band']}: {len(res['errors'])} Fehler")
+                    continue
+                name = f"{station['call'].replace('/', '-')}_{station['band']}.edi"
+                z.writestr(name, exporters.export_edi(contest, station, qsos).encode("latin-1", "replace"))
+            if skipped:
+                z.writestr("NICHT_EXPORTIERT.txt", "Diese Logs haben die Prüfung nicht bestanden:\n" + "\n".join(skipped))
+        fname = f"{contest['name']}".replace("/", "-").replace(" ", "_") + ".zip"
+        return Response(buf.getvalue(), media_type="application/zip", headers={"Content-Disposition": f"attachment; filename={fname}"})
+
     @app.get("/api/stations/{sid}/export.{fmt}")
-    def export(sid: int, fmt: str):
+    def export(sid: int, fmt: str, force: int = 0, x_admin_token: str | None = Header(default=None)):
         station = db.get_station(sid)
         if not station:
             raise HTTPException(404)
@@ -371,6 +404,10 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         qsos = db.list_qsos(sid)
         base = f"{station['call'].replace('/', '-')}_{station['band']}"
         if fmt == "edi":
+            # Die Log-Prüfung ist Pflicht: mit Fehlern wird nur exportiert, wenn der Admin es erzwingt.
+            res = logcheck.check_station(contest, station, qsos)
+            if res["errors"] and not (force and is_admin(x_admin_token)):
+                raise HTTPException(409, f"Log-Prüfung nicht bestanden: {len(res['errors'])} Fehler – bitte erst beheben")
             return Response(exporters.export_edi(contest, station, qsos).encode("latin-1", "replace"),
                             media_type="text/plain", headers={"Content-Disposition": f"attachment; filename={base}.edi"})
         if fmt in ("adi", "adif"):
