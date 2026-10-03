@@ -1,1 +1,210 @@
-<!doctype html><title>x</title>
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ContestLogger</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233fb3ff'/%3E%3Ctext x='16' y='22' font-family='monospace' font-weight='700' font-size='15' text-anchor='middle' fill='%2304121f'%3ECL%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">CL</span>
+    <div>
+      <div class="brand-name">ContestLogger <small id="version"></small></div>
+      <div class="brand-copy" id="copyright"></div>
+    </div>
+  </div>
+  <div class="clock"><span id="utc-time">--:--:--</span><small>UTC · <span id="utc-date"></span></small></div>
+  <nav class="tabs">
+    <button data-view="log" class="active">Loggen</button>
+    <button data-view="fulllog">Log</button>
+    <button data-view="stats">Statistik</button>
+    <button data-view="admin">Verwaltung</button>
+  </nav>
+  <div class="who">
+    <span id="nick-badge" class="badge" title="Nickname ändern">–</span>
+    <span id="conn" class="dot" title="Verbindung"></span>
+    <button id="theme-btn" class="ghost small" title="Hell/Dunkel umschalten">◐</button>
+  </div>
+</header>
+
+<div class="stationbar">
+  <label>Contest
+    <select id="sel-contest"></select>
+  </label>
+  <label>Station
+    <select id="sel-station"></select>
+  </label>
+  <span id="station-state" class="muted"></span>
+  <span class="grow"></span>
+  <span id="station-meta" class="meta"></span>
+</div>
+
+<main>
+  <!-- ========================= Loggen ========================= -->
+  <section id="view-log" class="view active">
+    <div class="log-grid">
+      <div class="col-main">
+        <form id="qso-form" class="card qso-form" autocomplete="off">
+          <div class="fields">
+            <label class="f-call">Rufzeichen
+              <input id="f-call" placeholder="DL1ABC" spellcheck="false" required>
+              <div id="suggest" class="suggest hidden"></div>
+            </label>
+            <label class="f-rsts">RST geg.<input id="f-rst-sent" value="59"></label>
+            <label class="f-nrs">Nr geg.<input id="f-nr-sent" readonly tabindex="-1"></label>
+            <label class="f-rstr">RST erh.<input id="f-rst-rcvd" value="59"></label>
+            <label class="f-nrr">Nr erh.<input id="f-nr-rcvd" placeholder="001" inputmode="numeric"></label>
+            <label class="f-loc">Locator<input id="f-loc" placeholder="JO31AA" spellcheck="false" maxlength="8"></label>
+            <label class="f-cmt">Kommentar<input id="f-comment"></label>
+            <button type="submit" class="primary f-btn">Loggen ⏎</button>
+          </div>
+          <div class="hint-row">
+            <div id="hint-geo" class="hint">— km · —°</div>
+            <div id="hint-info" class="hint muted">Rufzeichen eingeben – Vorschläge aus Call-Buch und alten Logs erscheinen automatisch.</div>
+            <div id="hint-dupe" class="hint warn hidden"></div>
+            <button type="button" id="btn-clear" class="ghost small">Leeren (Esc)</button>
+          </div>
+        </form>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Letzte QSOs <span id="qso-count" class="badge"></span></h3>
+            <div class="row">
+              <input id="log-search" placeholder="Suchen …" class="small">
+              <button id="btn-serial" class="ghost small" title="Seriennummer setzen/zurücksetzen">Nr. zurücksetzen</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="qso-table" class="qsos">
+              <thead><tr><th>UTC</th><th>Rufzeichen</th><th>geg.</th><th>erh.</th><th>Locator</th><th class="num">km</th><th class="num">°</th><th class="num">Pkt</th><th>Land</th><th>Op</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <aside class="col-side">
+        <div class="card kpis" id="kpis"></div>
+        <div class="card">
+          <h3>Stationen im Contest</h3>
+          <table id="scoreboard" class="compact"><tbody></tbody></table>
+        </div>
+        <div class="card chat">
+          <h3>Chat <span id="online" class="muted small"></span></h3>
+          <div id="chat-log" class="chat-log"></div>
+          <form id="chat-form" class="row"><input id="chat-input" placeholder="Nachricht …" maxlength="500"><button class="primary">Senden</button></form>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ========================= Volles Log ========================= -->
+  <section id="view-fulllog" class="view">
+    <div class="card">
+      <div class="card-head">
+        <h3>Komplettes Log <span id="full-count" class="badge"></span></h3>
+        <div class="row">
+          <input id="full-search" placeholder="Call / Locator / Kommentar suchen …">
+          <a id="exp-edi" class="button ghost" download>EDI</a>
+          <a id="exp-adi" class="button ghost" download>ADIF</a>
+          <a id="exp-csv" class="button ghost" download>CSV</a>
+        </div>
+      </div>
+      <div class="table-wrap tall">
+        <table id="full-table" class="qsos">
+          <thead><tr><th>#</th><th>Datum</th><th>UTC</th><th>Rufzeichen</th><th>RST g</th><th>Nr g</th><th>RST e</th><th>Nr e</th><th>Locator</th><th class="num">km</th><th class="num">°</th><th class="num">Pkt</th><th>Land</th><th>Mode</th><th>Kommentar</th><th>Op</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= Statistik ========================= -->
+  <section id="view-stats" class="view">
+    <div id="stats-root" class="stats-grid"></div>
+  </section>
+
+  <!-- ========================= Verwaltung ========================= -->
+  <section id="view-admin" class="view">
+    <div id="admin-login" class="card narrow">
+      <h3 id="admin-login-title">Admin-Anmeldung</h3>
+      <p id="admin-login-text" class="muted"></p>
+      <form id="admin-login-form" class="row">
+        <input id="admin-pw" type="password" placeholder="Admin-Passwort" required>
+        <button class="primary">Anmelden</button>
+      </form>
+    </div>
+    <div id="admin-root" class="hidden admin-grid">
+      <div class="card">
+        <div class="card-head"><h3>Contests</h3><button id="btn-new-contest" class="primary small">+ Contest</button></div>
+        <table id="admin-contests" class="compact"><tbody></tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Stationen <span id="admin-contest-name" class="muted"></span></h3><button id="btn-new-station" class="primary small">+ Station</button></div>
+        <p class="muted small">Jede Station hat eigenes Rufzeichen, Locator, Band und Passwort. Operatoren schalten die Station mit dem Passwort frei und loggen darunter.</p>
+        <table id="admin-stations" class="compact"><tbody></tbody></table>
+      </div>
+      <div class="card">
+        <h3>Import</h3>
+        <p class="muted small">WinContest (DD3KU) <code>.txt</code>/<code>.EXP</code>/<code>.mdb</code>, EDI/REG1TEST, ADIF oder Call-Listen (<code>Call;Locator;Name</code>). Rufzeichen + Locator landen immer im Call-Buch.</p>
+        <form id="import-form" class="stack">
+          <input type="file" id="imp-file" required>
+          <label>Ziel
+            <select id="imp-target">
+              <option value="auto">Automatisch (QSOs als neue Station, sonst Call-Buch)</option>
+              <option value="callbook">Nur ins Call-Buch (Call + Locator)</option>
+              <option value="station">QSOs in bestehende Station übernehmen</option>
+            </select>
+          </label>
+          <label id="imp-station-wrap" class="hidden">Zielstation<select id="imp-station"></select></label>
+          <label>Contest-Name (nur bei neuer Station, optional)<input id="imp-contest-name" placeholder="z. B. DARC UKW Mai 2025"></label>
+          <button class="primary">Importieren</button>
+          <pre id="imp-result" class="result hidden"></pre>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Call-Buch</h3>
+        <p class="muted"><span id="cb-count">0</span> Rufzeichen mit Locator bekannt. Wächst automatisch mit jedem geloggten QSO.</p>
+        <form id="cb-form" class="row">
+          <input id="cb-call" placeholder="Rufzeichen" required><input id="cb-loc" placeholder="Locator" required><input id="cb-name" placeholder="Name"><button class="ghost">Speichern</button>
+        </form>
+        <p><a href="/api/callbook/export.csv" class="button ghost" download>Call-Buch als CSV exportieren</a></p>
+        <h3>Admin-Passwort</h3>
+        <form id="admin-pw-form" class="row"><input id="admin-pw-new" type="password" placeholder="Neues Passwort" required><button class="ghost">Ändern</button></form>
+        <p><button id="btn-admin-logout" class="ghost small">Admin abmelden</button></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ========================= Dialoge ========================= -->
+<div id="modal" class="modal hidden"><div class="modal-box" id="modal-box"></div></div>
+<div id="toast" class="toast hidden"></div>
+
+<template id="tpl-nick">
+  <h3>Willkommen beim ContestLogger</h3>
+  <p class="muted">Wie sollen dich die anderen im Chat und im Log sehen?</p>
+  <form class="stack" id="nick-form"><input id="nick-input" placeholder="Nickname / Vorname" maxlength="24" required autofocus><button class="primary">Los geht’s</button></form>
+</template>
+
+<template id="tpl-setup">
+  <h3>Erster Start – Admin-Passwort festlegen</h3>
+  <p class="muted">Mit dem Admin-Passwort werden Contests und Stationen angelegt. Es ist unabhängig von den Stations-Passwörtern.</p>
+  <form class="stack" id="setup-form"><input id="setup-pw" type="password" placeholder="Admin-Passwort (mind. 4 Zeichen)" required autofocus><button class="primary">Speichern</button></form>
+</template>
+
+<template id="tpl-unlock">
+  <h3>Station freischalten</h3>
+  <p class="muted">Passwort für <b class="st-name"></b> eingeben, um unter dieser Station zu loggen. Zuschauen geht auch ohne.</p>
+  <form class="stack" id="unlock-form"><input id="unlock-pw" type="password" placeholder="Stations-Passwort" autofocus><div class="row"><button class="primary">Freischalten</button><button type="button" class="ghost" data-close>Nur zuschauen</button></div></form>
+</template>
+
+<footer class="footer"><span id="footer-text"></span></footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

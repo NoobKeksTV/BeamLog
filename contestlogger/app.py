@@ -285,6 +285,7 @@ def create_app(db_path: str | os.PathLike | None = None) -> FastAPI:
                 d["band"] = d["band"] or station["band"]
                 db.add_qso(sid, d, logged_by=nick_of(x_nick) or "import")
                 report["qsos"] += 1
+                report["callbook"] += 1
             except ValueError as e:
                 report["warnings"].append(f"{q.call}: {e}")
         await hub.broadcast({"type": "update", "scope": "contests"})
