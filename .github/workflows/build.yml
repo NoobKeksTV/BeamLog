@@ -5,6 +5,9 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -28,3 +31,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
+          name: ContestLogger ${{ github.ref_name }}
+          body: |
+            Portable Versionen (kein Python nötig): ZIP entpacken, `ContestLogger.exe` bzw. `./ContestLogger` starten.
+            Siehe START.txt im Paket.
