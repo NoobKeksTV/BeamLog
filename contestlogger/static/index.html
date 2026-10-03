@@ -75,6 +75,7 @@
             <div id="hint-geo" class="hint">— km · —°</div>
             <div id="hint-info" class="hint muted">Rufzeichen eingeben – Vorschläge aus Call-Buch und alten Logs erscheinen automatisch.</div>
             <div id="hint-dupe" class="hint warn hidden"></div>
+            <div id="hint-plaus" class="hint warn hidden"></div>
             <button type="button" id="btn-clear" class="ghost small">Leeren (Esc)</button>
           </div>
         </form>
@@ -120,16 +121,22 @@
 
   <!-- ========================= Volles Log ========================= -->
   <section id="view-fulllog" class="view">
+    <div class="card export-card">
+      <div class="card-head"><h3>Export / Abgabe <span id="export-station" class="muted"></span></h3></div>
+      <p class="muted small">Für die Contest-Abgabe das <b>EDI</b> (REG1TEST) der jeweiligen Station/des Bandes verwenden. Vor dem EDI-Export läuft automatisch die Log-Prüfung. „Alle Bänder (ZIP)“ packt die EDI-Dateien aller Stationen des Contests zusammen.</p>
+      <div class="row">
+        <button id="btn-check" class="primary">Log prüfen</button>
+        <button id="exp-edi" class="primary" title="REG1TEST-Datei für die Abgabe (nur nach bestandener Prüfung)">EDI dieser Station</button>
+        <a id="exp-adi" class="button ghost" download>ADIF</a>
+        <a id="exp-csv" class="button ghost" download>CSV</a>
+        <a id="exp-zip" class="button ghost" download title="Alle Stationen/Bänder dieses Contests als EDI-Dateien">Alle Bänder (ZIP)</a>
+      </div>
+    </div>
     <div class="card">
       <div class="card-head">
         <h3>Komplettes Log <span id="full-count" class="badge"></span></h3>
         <div class="row">
           <input id="full-search" placeholder="Call / Locator / Kommentar suchen …">
-          <button id="btn-check" class="primary">Log prüfen</button>
-          <button id="exp-edi" class="ghost" title="REG1TEST-Datei für die Abgabe (nur nach bestandener Prüfung)">EDI</button>
-          <a id="exp-adi" class="button ghost" download>ADIF</a>
-          <a id="exp-csv" class="button ghost" download>CSV</a>
-          <a id="exp-zip" class="button ghost" download title="Alle Stationen/Bänder dieses Contests als EDI-Dateien">Alle Bänder (ZIP)</a>
         </div>
       </div>
       <div class="table-wrap tall">

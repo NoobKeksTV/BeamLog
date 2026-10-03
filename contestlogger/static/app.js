@@ -17,6 +17,7 @@
     editingId: null,
     info: {},
     rig: {},
+    locAuto: false,
   };
   // ------------------------------------------------------------ Sprache
   // Schlüssel = deutscher Originaltext; Übersetzungen kommen aus /static/lang/<code>.json bzw. data/lang/<code>.json.
@@ -299,6 +300,7 @@
     for (const f of ["adi", "csv"]) $(`#exp-${f}`).href = st ? `/api/stations/${st.id}/export.${f}` : "#";
     renderMacroBar();
     $("#exp-zip").href = S.contestId ? `/api/contests/${S.contestId}/export.zip` : "#";
+    $("#export-station").textContent = st ? `– ${st.call} ${st.band}` : "";
   }
   $("#sel-contest").addEventListener("change", async (e) => {
     S.contestId = Number(e.target.value) || null;
@@ -424,6 +426,7 @@
 
   function clearForm() {
     F.call.value = ""; F.rs.value = "59"; F.rr.value = "59"; F.nr.value = ""; F.loc.value = ""; F.cmt.value = "";
+    S.locAuto = false; F.loc.classList.remove("auto");
     S.editingId = null; $("#qso-form button.primary").textContent = t("Loggen ⏎");
     hideSuggest(); updateHints(); F.call.focus();
   }
@@ -453,15 +456,40 @@
       // Leertaste springt: Rufzeichen -> Nr erhalten -> Locator -> Kommentar -> Rufzeichen
       if (e.key === " " && inp !== F.cmt) {
         e.preventDefault();
+        if (inp === F.call) lookupCall();
         const hop = { [F.call.id]: F.nr, [F.rs.id]: F.nr, [F.rr.id]: F.nr, [F.nr.id]: F.loc, [F.loc.id]: F.cmt };
         (hop[inp.id] || F.call).focus();
       }
     });
   });
-  F.call.addEventListener("input", () => { F.call.value = F.call.value.toUpperCase(); fetchSuggest(); updateHints(); if (!$("#macro-bar").classList.contains("hidden")) renderMacroBar(); });
+  F.call.addEventListener("input", () => {
+    F.call.value = F.call.value.toUpperCase();
+    if (S.locAuto) { F.loc.value = ""; S.locAuto = false; F.loc.classList.remove("auto"); }
+    fetchSuggest(); updateHints();
+    clearTimeout(lookupTimer); lookupTimer = setTimeout(lookupCall, 150);
+    if (!$("#macro-bar").classList.contains("hidden")) renderMacroBar();
+  });
   F.loc.addEventListener("input", () => { F.loc.value = F.loc.value.toUpperCase(); updateHints(); });
   F.call.addEventListener("blur", () => setTimeout(hideSuggest, 150));
   F.nr.addEventListener("blur", () => { if (/^\d+$/.test(F.nr.value)) F.nr.value = pad3(Number(F.nr.value)); });
+
+  const coreOf = (call) => (call || "").trim().toUpperCase().split("/").filter((p) => !["P", "M", "MM", "AM", "QRP"].includes(p) && !/^\d+$/.test(p)).sort((a, b) => b.length - a.length)[0] || "";
+  function setAutoLocator(loc) {
+    // Locator aus der Stationsdatenbank übernehmen, solange der Operator nichts eigenes eingetragen hat
+    if (!loc || (F.loc.value && !S.locAuto)) return;
+    if (F.loc.value !== loc) { F.loc.value = loc; S.locAuto = true; F.loc.classList.add("auto"); updateHints(); }
+  }
+  let lookupTimer;
+  async function lookupCall() {
+    const call = F.call.value.trim();
+    if (call.length < 3) return;
+    try {
+      const r = await GET(`/api/call?call=${encodeURIComponent(call)}`);
+      if (r && r.locator && call === F.call.value.trim()) setAutoLocator(r.locator);
+    } catch (_) { /* */ }
+  }
+  F.loc.addEventListener("input", () => { S.locAuto = false; F.loc.classList.remove("auto"); });
+  F.call.addEventListener("blur", lookupCall);
 
   let suggestTimer;
   function fetchSuggest() {
@@ -477,8 +505,8 @@
   }
   function renderSuggest() {
     const box = $("#suggest"); box.innerHTML = ""; S.suggestSel = -1;
-    const exact = S.suggestions.find((s) => s.call === F.call.value.trim());
-    if (exact && !F.loc.value) { F.loc.value = exact.locator; updateHints(); }
+    const exact = S.suggestions.find((s) => s.call === coreOf(F.call.value));
+    if (exact) setAutoLocator(exact.locator);
     if (!S.suggestions.length) return hideSuggest();
     S.suggestions.slice(0, 10).forEach((s, i) => {
       const meta = [];
@@ -520,12 +548,14 @@
     if (st && /^[A-R]{2}\d{2}([A-X]{2})?$/.test(loc)) {
       hintTimer = setTimeout(async () => {
         try {
-          const r = await GET(`/api/calc?my=${st.locator}&loc=${loc}`);
+          const r = await GET(`/api/calc?my=${st.locator}&loc=${loc}&call=${encodeURIComponent(call)}`);
           $("#hint-geo").textContent = r.valid ? `${r.km} km · ${r.bearing}°` : "— km · —°";
+          const pb = $("#hint-plaus");
+          if (r.warnings && r.warnings.length) { pb.textContent = "⚠ " + r.warnings.join(" · "); pb.classList.remove("hidden"); } else pb.classList.add("hidden");
           updateLogMap();
         } catch (_) { /* */ }
       }, 80);
-    } else { $("#hint-geo").textContent = "— km · —°"; updateLogMap(); }
+    } else { $("#hint-geo").textContent = "— km · —°"; $("#hint-plaus").classList.add("hidden"); updateLogMap(); }
   }
 
   $("#qso-form").addEventListener("submit", (e) => { e.preventDefault(); submitQso(); });
@@ -900,6 +930,7 @@
         el("td", { class: "muted small" }, `${c.stations.length} ${t("Stationen")}${c.archived ? " · " + t("Archiv") : ""}`),
         el("td", { class: "actions" },
           el("button", { class: "ghost", onclick: () => { S.contestId = c.id; S.stationId = c.stations[0]?.id || null; save(); renderStationBar(); loadQsos(); renderScoreboard(); renderAdmin(); } }, t("wählen")), " ",
+          el("a", { class: "button ghost", href: `/api/contests/${c.id}/export.zip`, download: 1, title: t("Alle Stationen/Bänder dieses Contests als EDI-Dateien") }, "ZIP"), " ",
           el("button", { class: "ghost", onclick: () => contestDialog(c) }, "✎"), " ",
           el("button", { class: "ghost", onclick: async () => { await api("PATCH", `/api/contests/${c.id}`, { archived: c.archived ? 0 : 1 }); } }, c.archived ? t("aktivieren") : t("archivieren")), " ",
           el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("Contest „{name}“ mit allen Stationen und QSOs löschen?", c))) await api("DELETE", `/api/contests/${c.id}`); } }, "✕"))));
@@ -912,6 +943,8 @@
         el("td", {}, el("b", {}, s.call), el("div", { class: "muted small" }, `ID ${s.id}`)), el("td", {}, s.locator), el("td", {}, s.band), el("td", {}, s.mode),
         el("td", { class: "muted small" }, `${t("Nr.")} ${pad3(s.serial_next)} · ${s.has_password ? "🔒" : t("offen")}`),
         el("td", { class: "actions" },
+          el("button", { class: "ghost", onclick: () => { S.stationId = s.id; save(); renderStationBar(); loadQsos(); showView("fulllog"); setTimeout(() => runCheck(true), 300); } , title: t("EDI dieser Station") }, "EDI"), " ",
+          el("a", { class: "button ghost", href: `/api/stations/${s.id}/export.adi`, download: 1 }, "ADIF"), " ",
           el("button", { class: "ghost", onclick: () => stationDialog(s) }, "✎"), " ",
           el("button", { class: "ghost", onclick: async () => { const v = prompt("Nächste Seriennummer:", s.serial_next); if (v && /^\d+$/.test(v)) await api("POST", `/api/stations/${s.id}/serial`, { start: Number(v) }); } }, t("Nr.")), " ",
           el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("Station {call} mit allen QSOs löschen?", s))) await api("DELETE", `/api/stations/${s.id}`); } }, "✕"))));

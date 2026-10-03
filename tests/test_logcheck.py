@@ -42,3 +42,23 @@ def test_export_gate(tmp_path):
             assert c.get(f"/api/stations/{sid}/check").json()["ok"] is True
             assert c.get(f"/api/stations/{sid}/export.edi").status_code == 200
             assert b"DN2LH_432MHz.edi" in c.get(f"/api/contests/{cid}/export.zip").content
+
+
+def test_plausibility(tmp_path):
+    from contestlogger.prefixes import check_plausibility
+    assert check_plausibility("DL8NAS", "JN59LE")["ok"]
+    assert not check_plausibility("DL8NAS", "JO22AA")["ok"]
+    assert check_plausibility("OE/DL1ABC", "JN77AA")["ok"]
+    assert check_plausibility("GB2RS", "IO91AA")["ok"]
+    assert check_plausibility("XX9ZZ", "JO31AA")["ok"]  # unbekanntes Land: kein Fehlalarm
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        admin = c.post("/api/setup", json={"password": "admin1"}).json()["token"]
+        H = {"X-Admin-Token": admin}
+        cid = c.post("/api/contests", json={"name": "T"}, headers=H).json()["id"]
+        sid = c.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH", "locator": "JO31AA", "band": "432MHz"}, headers=H).json()["id"]
+        c.post(f"/api/stations/{sid}/qsos", json={"call": "PA3XYZ", "locator": "JN59LE", "serial_rcvd": "001"}, headers=H)
+        res = c.get(f"/api/stations/{sid}/check").json()
+        assert any("Niederlande" in e["msg"] for e in res["errors"])
+        r = c.get("/api/calc", params={"my": "JO31AA", "loc": "JO22AA", "call": "DL8NAS"}).json()
+        assert any("Deutschland" in w for w in r["warnings"]) and any("Stationsdatenbank" in w for w in r["warnings"])

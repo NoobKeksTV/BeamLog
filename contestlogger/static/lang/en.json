@@ -260,5 +260,9 @@
  "Den kompletten Ordner von WinContest auswählen (z. B.": "Select the complete WinContest folder (e.g.",
  "). Alle Logs aus": "). All logs from",
  "werden als archivierte Contests übernommen und jedes Rufzeichen mit Locator landet in der Stationsdatenbank.": "are imported as archived contests and every callsign with locator goes into the station database.",
- "(DD3KUs verschlüsselte Datenbank) kann nicht gelesen werden.": "(DD3KU's encrypted database) cannot be read."
+ "(DD3KUs verschlüsselte Datenbank) kann nicht gelesen werden.": "(DD3KU's encrypted database) cannot be read.",
+ "Export / Abgabe": "Export / submission",
+ "EDI dieser Station": "EDI of this station",
+ "Für die Contest-Abgabe das": "For the contest submission use the",
+ "(REG1TEST) der jeweiligen Station/des Bandes verwenden. Vor dem EDI-Export läuft automatisch die Log-Prüfung. „Alle Bänder (ZIP)“ packt die EDI-Dateien aller Stationen des Contests zusammen.": "(REG1TEST) of the respective station/band. The log check runs automatically before the EDI export. “All bands (ZIP)” bundles the EDI files of all stations of the contest."
 }

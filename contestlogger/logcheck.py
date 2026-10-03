@@ -80,6 +80,9 @@ def check_station(contest: dict, station: dict, qsos: list[dict]) -> dict:
         prev_ts = (t, q["serial_sent"])
         if q["dupe"]:
             warn("Doppel-QSO (wird mit 0 Punkten als Dupe exportiert)", q)
+        pl = prefixes.check_plausibility(q["call"], q["locator"]) if q["locator"] else {"ok": True}
+        if not pl["ok"]:
+            err(pl["msg"], q)
         if q["km"] > 1500:
             warn(f"{q['km']} km – ungewöhnlich weit, Locator prüfen", q)
     nums = sorted(serials)

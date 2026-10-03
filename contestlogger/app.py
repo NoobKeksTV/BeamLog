@@ -44,8 +44,10 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if db.callbook_count() or db.get_setting("seeded") or not SEED.exists():
             return 0
         res = importers.parse_callbook_csv(SEED.read_text(encoding="utf-8"))
+        import re as _re
         for call, loc, name in res.callbook:
-            db.learn_call(call, loc, source="seed", name=name)
+            when = f"{name}T00:00:00Z" if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) else ""
+            db.learn_call(call, loc, source="seed", name="" if when else name, when=when)
         db.set_setting("seeded", "1")
         return len(res.callbook)
 
@@ -342,11 +344,19 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return db.lookup_call(call) or {}
 
     @app.get("/api/calc")
-    def calc(my: str, loc: str):
-        from . import geo
+    def calc(my: str, loc: str, call: str = ""):
+        from . import geo, prefixes
         if not (geo.is_valid_locator(my) and geo.is_valid_locator(loc)):
             return {"valid": False}
-        return {"valid": True, "km": geo.distance_km_int(my, loc), "bearing": round(geo.bearing_deg(my, loc)) % 360}
+        out = {"valid": True, "km": geo.distance_km_int(my, loc), "bearing": round(geo.bearing_deg(my, loc)) % 360, "warnings": []}
+        if call:
+            pl = prefixes.check_plausibility(call, loc)
+            if not pl["ok"]:
+                out["warnings"].append(pl["msg"])
+            known = db.lookup_call(call)
+            if known and known["locator"] and known["locator"] != geo.normalize_locator(loc):
+                out["warnings"].append(f"Stationsdatenbank kennt {prefixes.core_call(call)} mit {known['locator']} (zuletzt {known['last_seen'][:10] if known['last_seen'] else '–'})")
+        return out
 
     @app.get("/api/callbook")
     def callbook_list(q: str = "", limit: int = 200):
