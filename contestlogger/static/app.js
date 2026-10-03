@@ -281,6 +281,7 @@
     S.qsos = await GET(`/api/stations/${S.stationId}/qsos`);
     renderQsos();
     renderKpis();
+    const m = makeMap("map-log"); if (m) { drawQsoDots(m, S.qsos); updateLogMap(); }
     if ($("#view-fulllog").classList.contains("active")) renderFullLog();
     if ($("#view-stats").classList.contains("active")) renderStats();
   }
@@ -460,9 +461,10 @@
         try {
           const r = await GET(`/api/calc?my=${st.locator}&loc=${loc}`);
           $("#hint-geo").textContent = r.valid ? `${r.km} km · ${r.bearing}°` : "— km · —°";
+          updateLogMap();
         } catch (_) { /* */ }
       }, 80);
-    } else $("#hint-geo").textContent = "— km · —°";
+    } else { $("#hint-geo").textContent = "— km · —°"; updateLogMap(); }
   }
 
   $("#qso-form").addEventListener("submit", (e) => { e.preventDefault(); submitQso(); });
@@ -568,6 +570,80 @@
   });
   if (localStorage.getItem("cl.macrobar") === "1") $("#macro-bar").classList.remove("hidden");
 
+  // ------------------------------------------------------------ Karte (Leaflet, lokal gebündelt; Kacheln von OSM oder eigenem Server)
+  function locToLatLon(loc) {
+    loc = (loc || "").toUpperCase();
+    if (!/^[A-R]{2}[0-9]{2}([A-X]{2})?$/.test(loc)) return null;
+    let lon = (loc.charCodeAt(0) - 65) * 20 - 180 + Number(loc[2]) * 2;
+    let lat = (loc.charCodeAt(1) - 65) * 10 - 90 + Number(loc[3]);
+    if (loc.length >= 6) { lon += (loc.charCodeAt(4) - 65) * (2 / 24) + 1 / 24; lat += (loc.charCodeAt(5) - 65) * (1 / 24) + 1 / 48; }
+    else { lon += 1; lat += 0.5; }
+    return [lat, lon];
+  }
+  function geodesic(a, b, n = 48) {
+    const r = Math.PI / 180, [lat1, lon1] = [a[0] * r, a[1] * r], [lat2, lon2] = [b[0] * r, b[1] * r];
+    const d = 2 * Math.asin(Math.sqrt(Math.sin((lat2 - lat1) / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) ** 2));
+    if (d < 1e-9) return [a, b];
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const f = i / n, A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
+      const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+      const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+      const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+      pts.push([Math.atan2(z, Math.sqrt(x * x + y * y)) / r, Math.atan2(y, x) / r]);
+    }
+    return pts;
+  }
+  const Maps = {};
+  function makeMap(id) {
+    if (Maps[id]) return Maps[id];
+    if (typeof L === "undefined") return null;
+    const map = L.map(id, { zoomControl: true, attributionControl: true }).setView([51, 10], 5);
+    const url = localStorage.getItem("cl.tileurl") || S.info.tile_url || "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+    L.tileLayer(url, { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(map);
+    const m = { map, layer: L.layerGroup().addTo(map), dots: L.layerGroup().addTo(map) };
+    Maps[id] = m;
+    return m;
+  }
+  function drawQsoDots(m, qsos) {
+    m.dots.clearLayers();
+    for (const q of qsos) {
+      const p = locToLatLon(q.locator); if (!p || q.dupe) continue;
+      L.circleMarker(p, { radius: 3, color: "#3ddc84", fillOpacity: .8, weight: 1 }).bindTooltip(`${q.call} ${q.locator} · ${q.km} km`).addTo(m.dots);
+    }
+  }
+  function drawBearing(m, myLoc, loc, label) {
+    m.layer.clearLayers();
+    const a = locToLatLon(myLoc); if (!a) return;
+    L.circleMarker(a, { radius: 6, color: "#3fb3ff", fillColor: "#3fb3ff", fillOpacity: 1 }).bindTooltip(`Eigene Station ${myLoc}`).addTo(m.layer);
+    const b = locToLatLon(loc);
+    if (!b) { m.map.setView(a, 7); return; }
+    // Feld des Partners als Rechteck
+    const sz = loc.length >= 6 ? [1 / 24, 2 / 24] : [1, 2];
+    L.rectangle([[b[0] - sz[0] / 2, b[1] - sz[1] / 2], [b[0] + sz[0] / 2, b[1] + sz[1] / 2]], { color: "#ff5c6c", weight: 1, fillOpacity: .25 }).addTo(m.layer);
+    const pts = geodesic(a, b);
+    L.polyline(pts, { color: "#ff5c6c", weight: 3, opacity: .9 }).addTo(m.layer);
+    // Pfeilspitze in Linienrichtung
+    const p1 = pts[pts.length - 2], p2 = pts[pts.length - 1];
+    const ang = Math.atan2((p2[1] - p1[1]) * Math.cos(p2[0] * Math.PI / 180), p2[0] - p1[0]) * 180 / Math.PI;
+    L.marker(b, { icon: L.divIcon({ className: "arrow-icon", html: `<div style="transform:rotate(${ang - 90}deg)">➤</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }), interactive: false }).addTo(m.layer);
+    if (label) L.marker(b, { icon: L.divIcon({ className: "map-label", html: label, iconAnchor: [-10, -10] }), interactive: false }).addTo(m.layer);
+    m.map.fitBounds(L.latLngBounds(pts), { padding: [30, 30], maxZoom: 9 });
+  }
+  function updateLogMap() {
+    const st = station(); const m = makeMap("map-log"); if (!m) return;
+    setTimeout(() => m.map.invalidateSize(), 50);
+    if (!st) { m.layer.clearLayers(); m.dots.clearLayers(); return; }
+    const loc = F.loc.value.trim().toUpperCase();
+    const geo = $("#hint-geo").textContent;
+    drawBearing(m, st.locator, loc, locToLatLon(loc) ? `${F.call.value.trim() || loc} · ${geo}` : "");
+    $("#map-info").textContent = locToLatLon(loc) ? `${loc}: ${geo}` : `${st.locator} · ${S.qsos.filter((q) => !q.dupe).length} QSOs`;
+  }
+  $("#tile-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try { await api("POST", "/api/settings", { tile_url: $("#tile-url").value.trim() }); toast("Kachel-URL gespeichert – Seite neu laden", "ok"); } catch (err) { toast(err.message, "err"); }
+  });
+
   // ------------------------------------------------------------ Scoreboard
   async function renderScoreboard() {
     const tb = $("#scoreboard tbody"); tb.innerHTML = "";
@@ -649,6 +725,8 @@
         el("div", {}, el("div", { class: "kpis" }, kpi(cs.total_qsos, "QSOs gesamt"), kpi(cs.total_points.toLocaleString("de"), "Punkte gesamt"), kpi(cs.unique_calls, "verschiedene Calls")),
           table(["Band", "Stationen", "QSOs", "Punkte", "Felder", "ODX km"], cs.bands.map((b) => [b.band, b.stations.join(", "), b.qsos, b.points, b.squares, b.odx_km])))));
     } catch (_) { /* */ }
+    const mapCard = card("Karte aller QSOs", el("div", { id: "map-stats", class: "map tall" })); mapCard.style.gridColumn = "1 / -1"; root.append(mapCard);
+    setTimeout(() => { const m = makeMap("map-stats"); if (!m) return; m.map.invalidateSize(); drawQsoDots(m, S.qsos); m.layer.clearLayers(); const a = locToLatLon(own?.locator); if (a) L.circleMarker(a, { radius: 7, color: "#3fb3ff", fillOpacity: 1 }).addTo(m.layer); const pts = S.qsos.map((q) => locToLatLon(q.locator)).filter(Boolean); if (pts.length) m.map.fitBounds(L.latLngBounds(pts.concat(a ? [a] : [])), { padding: [20, 20] }); }, 50);
     root.append(card("QSOs und Punkte pro Stunde", barChart(st.per_hour.map((h) => ({ label: h.hour.slice(11) + "h", a: h.qsos, b: h.points })), "QSOs", "Punkte")));
     root.append(card("Entfernungsverteilung (km)", barChart(st.distance.map((d) => ({ label: d.range, a: d.qsos, b: d.points })), "QSOs", "Punkte")));
     root.append(card(`Richtungsverteilung von ${own?.locator || ""}`, rose(st.bearings)));
@@ -784,7 +862,7 @@
     }
     const is = $("#imp-station"); is.innerHTML = "";
     S.contests.forEach((cc) => cc.stations.forEach((s) => is.append(el("option", { value: s.id }, `${cc.name} · ${s.call} ${s.band}`))));
-    $("#cb-count").textContent = (await GET("/api/info")).callbook_count;
+    const inf = await GET("/api/info"); $("#cb-count").textContent = inf.callbook_count; $("#tile-url").value = inf.tile_url || "";
     renderBackups();
   }
   $("#admin-login-form").addEventListener("submit", async (e) => {

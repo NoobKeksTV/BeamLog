@@ -83,6 +83,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             "admin_configured": db.admin_configured(), "callbook_count": db.callbook_count(),
             "server_time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "public_url": public_url or os.environ.get("CONTESTLOGGER_URL", ""),
+            "tile_url": db.get_setting("tile_url", "") or "",
             "mdbtools": bool(__import__("shutil").which("mdb-tables")),
         }
 
@@ -92,6 +93,13 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         import qrcode.image.svg
         img = qrcode.make(text, image_factory=qrcode.image.svg.SvgPathImage, box_size=12, border=2)
         return Response(img.to_string(), media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
+
+    @app.post("/api/settings", dependencies=[Depends(require_admin)])
+    def set_settings(body: dict):
+        for k in ("tile_url",):
+            if k in body:
+                db.set_setting(k, str(body[k] or ""))
+        return {"ok": True}
 
     @app.post("/api/setup")
     def setup(body: dict):

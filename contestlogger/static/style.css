@@ -218,3 +218,8 @@ body.bigscreen main { padding: 20px; }
 body.bigscreen .kpis.big .kpi b { font-size: 56px; }
 .feed { font-family: var(--mono); font-size: 14px; }
 .feed .dupe { color: var(--muted); text-decoration: line-through; }
+.map { height: 260px; border-radius: 8px; background: var(--bg2); }
+.map.tall { height: 60vh; }
+.leaflet-container { font: inherit; }
+.arrow-icon { font-size: 26px; color: #ff5c6c; text-shadow: 0 0 4px #000; line-height: 1; }
+.map-label { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font-family: var(--mono); font-size: 12px; white-space: nowrap; }
