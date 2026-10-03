@@ -155,7 +155,6 @@
     await loadLanguage();
     renderLangSelect();
     $("#version").textContent = "v" + S.info.version;
-    $("#copyright").textContent = S.info.copyright;
     $("#footer-text").textContent = `${S.info.app} ${S.info.version} · ${S.info.copyright} · ${t("lokal, offline, im LAN")}`;
     if (!S.info.admin_configured) await askSetup();
     if (!S.nick) await askNick();
