@@ -111,6 +111,9 @@ class Database:
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")
+        # FULL: jede Transaktion ist beim Rückgabezeitpunkt auf der Platte – ein Stromausfall
+        # verliert höchstens das gerade laufende QSO, die Datei bleibt konsistent.
+        self.conn.execute("PRAGMA synchronous = FULL")
         self.conn.executescript(SCHEMA)
         self._migrate()
         if self.get_setting("secret") is None:
@@ -124,12 +127,53 @@ class Database:
                 self.conn.execute("ALTER TABLE qsos ADD COLUMN freq TEXT NOT NULL DEFAULT ''")
 
     def backup_to(self, path: str | os.PathLike) -> None:
-        """Konsistente Kopie der Datenbank (auch bei laufendem Betrieb)."""
-        dest = sqlite3.connect(path)
+        """Konsistente Kopie der Datenbank (auch bei laufendem Betrieb), atomar über eine temporäre Datei."""
+        tmp = Path(str(path) + ".tmp")
+        dest = sqlite3.connect(tmp)
         try:
             self.conn.backup(dest)
+            dest.execute("PRAGMA journal_mode = DELETE")
         finally:
             dest.close()
+        os.replace(tmp, path)
+
+    @property
+    def backup_dir(self) -> Path:
+        return self.path.parent / "backup"
+
+    def create_backup(self, reason: str = "auto") -> Path:
+        self.backup_dir.mkdir(parents=True, exist_ok=True)
+        name = f"contestlogger-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{reason}.db"
+        self.backup_to(self.backup_dir / name)
+        self.prune_backups()
+        return self.backup_dir / name
+
+    def list_backups(self) -> list[dict]:
+        if not self.backup_dir.exists():
+            return []
+        out = []
+        for f in sorted(self.backup_dir.glob("contestlogger-*.db"), reverse=True):
+            st = f.stat()
+            out.append({"name": f.name, "size": st.st_size,
+                        "ts_utc": datetime.fromtimestamp(st.st_mtime, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")})
+        return out
+
+    def prune_backups(self, keep_auto: int = 48, keep_manual: int = 50) -> None:
+        """Automatische Sicherungen: die letzten 48 behalten (bei 15 min = 12 h) plus eine pro Tag für 30 Tage."""
+        files = sorted(self.backup_dir.glob("contestlogger-*-auto.db"), reverse=True)
+        daily_seen: set[str] = set()
+        for i, f in enumerate(files):
+            day = f.name[14:22]
+            if i < keep_auto:
+                daily_seen.add(day)
+                continue
+            if day not in daily_seen and len(daily_seen) < 30:
+                daily_seen.add(day)
+                continue
+            f.unlink(missing_ok=True)
+        manual = sorted(self.backup_dir.glob("contestlogger-*-manual.db"), reverse=True)
+        for f in manual[keep_manual:]:
+            f.unlink(missing_ok=True)
 
     # ----- generische Helfer --------------------------------------------
     def rows(self, sql: str, params: Iterable[Any] = ()) -> list[dict]:

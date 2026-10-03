@@ -619,20 +619,24 @@
     const is = $("#imp-station"); is.innerHTML = "";
     S.contests.forEach((cc) => cc.stations.forEach((s) => is.append(el("option", { value: s.id }, `${cc.name} · ${s.call} ${s.band}`))));
     $("#cb-count").textContent = (await GET("/api/info")).callbook_count;
+    renderBackups();
   }
   $("#admin-login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     try { S.adminToken = (await api("POST", "/api/admin/login", { password: $("#admin-pw").value })).token; save(); $("#admin-pw").value = ""; renderAdmin(); renderStationBar(); renderQsos(); toast("Als Admin angemeldet", "ok"); } catch (err) { toast(err.message, "err"); }
   });
   $("#btn-backup").addEventListener("click", async () => {
-    try {
-      const r = await fetch("/api/backup", { headers: { "X-Admin-Token": S.adminToken } });
-      if (!r.ok) throw new Error("Backup fehlgeschlagen");
-      const blob = await r.blob(); const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob); a.download = (r.headers.get("Content-Disposition") || "").match(/filename="?([^";]+)/)?.[1] || "contestlogger-backup.db";
-      a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); toast("Backup heruntergeladen", "ok");
-    } catch (err) { toast(err.message, "err"); }
+    try { const r = await api("POST", "/api/backups"); toast(`Gesichert: ${r.name}`, "ok"); renderBackups(); } catch (err) { toast(err.message, "err"); }
   });
+  async function renderBackups() {
+    const tb = $("#backup-list tbody"); tb.innerHTML = "";
+    try {
+      const r = await GET("/api/backups");
+      $("#backup-info").textContent = `Automatisch alle ${r.interval_min} Minuten (nur bei Änderungen) nach ${r.dir}; beim Beenden zusätzlich. WAL + synchrones Schreiben: ein Stromausfall beschädigt die Datenbank nicht.`;
+      for (const b of r.backups) tb.append(el("tr", {}, el("td", {}, b.name), el("td", { class: "num muted small" }, `${Math.round(b.size / 1024)} KB`), el("td", { class: "muted small" }, `${fmtDate(b.ts_utc)} ${fmtTime(b.ts_utc)}`)));
+      if (!r.backups.length) tb.append(el("tr", {}, el("td", { class: "muted" }, "Noch keine Sicherung.")));
+    } catch (_) { /* */ }
+  }
   $("#btn-admin-logout").addEventListener("click", () => { S.adminToken = ""; save(); renderAdmin(); renderStationBar(); renderQsos(); });
   $("#admin-pw-form").addEventListener("submit", async (e) => {
     e.preventDefault();

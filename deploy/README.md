@@ -60,7 +60,9 @@ sudo chown contestlogger:contestlogger /var/lib/contestlogger/contestlogger.db
 sudo systemctl start contestlogger
 ```
 
-Ein Backup aus der Oberfläche (Verwaltung → Backup herunterladen) ist dieselbe Datei, unkomprimiert.
+Zusätzlich sichert der Server selbst alle 15 Minuten (nur bei Änderungen) nach
+`/var/lib/contestlogger/backup/` und beim Beenden; „Jetzt sichern“ in der Verwaltung legt
+eine manuelle Sicherung an derselben Stelle an.
 
 ## Ohne nginx
 

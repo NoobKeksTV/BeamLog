@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,9 +21,35 @@ from .db import Database
 STATIC = Path(__file__).parent / "static"
 
 
-def create_app(db_path: str | os.PathLike | None = None) -> FastAPI:
+def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: float | None = None) -> FastAPI:
     db = Database(db_path or os.environ.get("CONTESTLOGGER_DB", "data/contestlogger.db"))
-    app = FastAPI(title=__app_name__, version=__version__)
+    interval = backup_interval_min if backup_interval_min is not None else float(os.environ.get("CONTESTLOGGER_BACKUP_MIN", "15"))
+
+    async def backup_loop():
+        while True:
+            await asyncio.sleep(interval * 60)
+            try:
+                # Nur sichern, wenn sich seit der letzten Sicherung etwas geändert hat
+                changed = db.row("SELECT MAX(updated_at) AS t FROM qsos")
+                last = db.get_setting("last_backup_change", "")
+                if (changed or {}).get("t") != last:
+                    await asyncio.to_thread(db.create_backup, "auto")
+                    db.set_setting("last_backup_change", (changed or {}).get("t") or "")
+            except Exception as e:  # noqa: BLE001
+                print(f"Backup fehlgeschlagen: {e}")
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        task = asyncio.create_task(backup_loop()) if interval > 0 else None
+        yield
+        if task:
+            task.cancel()
+        try:
+            db.create_backup("shutdown")
+        except Exception:  # noqa: BLE001
+            pass
+
+    app = FastAPI(title=__app_name__, version=__version__, lifespan=lifespan)
     app.state.db = db
     hub = Hub()
     app.state.hub = hub
@@ -124,17 +151,14 @@ def create_app(db_path: str | os.PathLike | None = None) -> FastAPI:
             raise HTTPException(404)
         return db.contest_summary(cid)
 
-    @app.get("/api/backup", dependencies=[Depends(require_admin)])
-    def backup():
-        import tempfile
-        from fastapi.responses import FileResponse as _FR
-        from starlette.background import BackgroundTask
-        fh = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-        fh.close()
-        db.backup_to(fh.name)
-        name = f"contestlogger-backup-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.db"
-        return _FR(fh.name, media_type="application/x-sqlite3", filename=name,
-                   background=BackgroundTask(lambda: Path(fh.name).unlink(missing_ok=True)))
+    @app.get("/api/backups", dependencies=[Depends(require_admin)])
+    def backups():
+        return {"dir": str(db.backup_dir), "interval_min": interval, "backups": db.list_backups()[:60]}
+
+    @app.post("/api/backups", dependencies=[Depends(require_admin)])
+    async def backup_now():
+        path = await asyncio.to_thread(db.create_backup, "manual")
+        return {"name": path.name}
 
     @app.post("/api/stations/{sid}/rig")
     async def rig_update(sid: int, body: dict, x_station_token: str | None = Header(default=None), x_admin_token: str | None = Header(default=None)):

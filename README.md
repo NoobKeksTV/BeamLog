@@ -28,7 +28,8 @@ oder Handys im Browser. Kein Internet nötig, keine Accounts.
 - **Multi-Band-Gesamtwertung** pro Contest (alle Stationen/Bänder zusammen), Countdown bis Contest-Ende.
 - **CAT-Anbindung**: `tools/cat_bridge.py` meldet die Frequenz des Funkgeräts (Hamlib rigctld oder flrig)
   an den Server; sie wird bei der Station angezeigt und je QSO gespeichert (ADIF `FREQ`).
-- **Backup** der kompletten Datenbank per Knopf (Verwaltung) oder täglich per Cron auf dem Server.
+- **Backup** automatisch auf dem Server (alle 15 min bei Änderungen, beim Beenden, manuell per Knopf);
+  SQLite im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt die Datenbank nicht.
 - Länderkennung weltweit (DXCC-Präfixe), responsives Layout (Fenster beliebig skalierbar, auch Handy), hell/dunkel.
 
 ## Installation und Start

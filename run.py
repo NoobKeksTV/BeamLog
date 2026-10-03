@@ -32,12 +32,13 @@ def main() -> None:
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--db", default="data/contestlogger.db")
+    p.add_argument("--backup-min", type=float, default=15, help="automatische Sicherung alle N Minuten (0 = aus)")
     a = p.parse_args()
-    app = create_app(a.db)
+    app = create_app(a.db, backup_interval_min=a.backup_min)
     print(f"\n  {__app_name__} {__version__}  {__copyright__}")
     print(f"  Lokal:    http://localhost:{a.port}")
     print(f"  Im LAN:   http://{lan_ip()}:{a.port}")
-    print(f"  Daten:    {a.db}\n")
+    print(f"  Daten:    {a.db}  (Backups alle {a.backup_min:g} min in backup/)\n")
     uvicorn.run(app, host=a.host, port=a.port, log_level="warning")
 
 

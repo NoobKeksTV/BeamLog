@@ -107,6 +107,11 @@ def test_summary_backup_rig(client):
     assert sb[s1]["rig"]["freq"] == "144.300" and sb[s2]["rig"] is None
     assert client.get(f"/api/stations/{s1}/rig").json()["mode"] == "USB"
 
-    assert client.get("/api/backup").status_code == 403
-    b = client.get("/api/backup", headers=H)
-    assert b.status_code == 200 and b.content[:15] == b"SQLite format 3"
+    assert client.post("/api/backups").status_code == 403
+    name = client.post("/api/backups", headers=H).json()["name"]
+    lst = client.get("/api/backups", headers=H).json()
+    assert lst["backups"][0]["name"] == name and name.endswith("-manual.db")
+    import sqlite3, os
+    con = sqlite3.connect(os.path.join(lst["dir"], name))
+    assert con.execute("SELECT COUNT(*) FROM qsos").fetchone()[0] == 3
+    con.close()

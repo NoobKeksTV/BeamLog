@@ -174,9 +174,10 @@
           <input id="cb-call" placeholder="Rufzeichen" required><input id="cb-loc" placeholder="Locator" required><input id="cb-name" placeholder="Name"><button class="ghost">Speichern</button>
         </form>
         <p><a href="/api/callbook/export.csv" class="button ghost" download>Call-Buch als CSV exportieren</a></p>
-        <h3>Backup</h3>
-        <p class="muted small">Lädt eine konsistente Kopie der kompletten Datenbank (alle Contests, Logs, Call-Buch, Chat) herunter. Zum Wiederherstellen die Datei als <code>data/contestlogger.db</code> ablegen und den Server neu starten.</p>
-        <p><button id="btn-backup" class="ghost">Backup herunterladen</button></p>
+        <h3>Backups auf dem Server</h3>
+        <p class="muted small" id="backup-info">Der Server sichert die Datenbank automatisch (nur wenn sich etwas geändert hat) in den Ordner <code>backup/</code> neben der Datenbank; beim Beenden zusätzlich. Die Datenbank selbst läuft im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt sie nicht.</p>
+        <p><button id="btn-backup" class="ghost">Jetzt sichern</button></p>
+        <div class="table-wrap" style="max-height:180px"><table id="backup-list" class="compact"><tbody></tbody></table></div>
         <h3>Admin-Passwort</h3>
         <form id="admin-pw-form" class="row"><input id="admin-pw-new" type="password" placeholder="Neues Passwort" required><button class="ghost">Ändern</button></form>
         <p><button id="btn-admin-logout" class="ghost small">Admin abmelden</button></p>
