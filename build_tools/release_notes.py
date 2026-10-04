@@ -10,7 +10,7 @@ import sys
 
 
 def git(*args: str) -> str:
-    return subprocess.run(["git", *args], capture_output=True, text=True, check=False).stdout.strip()
+    return subprocess.run(["git", *args], capture_output=True, encoding="utf-8", errors="replace", check=False).stdout.strip()
 
 
 def main() -> None:
