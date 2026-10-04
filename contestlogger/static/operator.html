@@ -4,10 +4,12 @@
 <meta charset="utf-8">
 <title>Operator – ContestLogger</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/vendor/leaflet.css">
 <style>
   :root { --bg:#0f1419; --bg2:#161c24; --card:#1b232d; --line:#2b3643; --text:#e6edf3; --muted:#8b98a8; --accent:#3fb3ff; --ok:#3ddc84; --warn:#ffb347; --bad:#ff5c6c; --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace; --sans:system-ui,Segoe UI,Roboto,sans-serif; }
   * { box-sizing: border-box; }
-  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); }
+  html, body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); }
+  html { height:100%; } body { height:100%; overflow:auto; }
   body { display:flex; flex-direction:column; padding:12px; gap:10px; }
   header { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
   header .st { font:700 26px var(--mono); }
@@ -16,26 +18,44 @@
   header .dot.on { background:var(--ok); }
   .note { background:rgba(255,179,71,.14); border:1px solid var(--warn); border-radius:12px; padding:12px 16px; font-size:clamp(20px, 3vw, 34px); font-weight:700; min-height:1.4em; }
   .note:empty { display:none; }
+  /* neuer Hinweis: kurz blinken, damit der Operator ihn bemerkt */
+  @keyframes noteblink { 0%, 100% { background:rgba(255,179,71,.14); color:var(--text); } 50% { background:var(--warn); color:#000; } }
+  .note.blink { animation: noteblink .5s ease-in-out 5; }
   .dupe { background:rgba(255,92,108,.18); border:2px solid var(--bad); border-radius:12px; padding:10px 16px; font-size:clamp(18px, 2.6vw, 30px); font-weight:800; color:#ffb3ba; }
   .dupe.hidden { display:none; }
-  .tiles { display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1.4fr 1.4fr; gap:10px; }
+  /* Reihenfolge wie im Logger: Rufzeichen · RST geg. · Nr geg. · RST erh. · Nr erh. · Locator · km/° */
+  .tiles { display:grid; grid-template-columns: 2.2fr 1fr 1.2fr 1fr 1.2fr 1.5fr 1.6fr; gap:10px; }
   .tile { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; min-width:0; }
   .tile span { display:block; color:var(--muted); font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
-  .tile b { display:block; font:700 clamp(28px, 4.2vw, 64px)/1.15 var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tile b { display:block; font:700 clamp(26px, 3.8vw, 58px)/1.15 var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tile.call b { color:var(--accent); }
+  .tile.serial { background:rgba(255,179,71,.14); border-color:var(--warn); }
   .tile.serial b { color:var(--warn); }
   .tile.loc b { color:var(--ok); }
-  .tile.geo b { font-size:clamp(20px, 2.4vw, 36px); white-space:normal; }
+  .tile.geo { text-align:center; display:flex; flex-direction:column; justify-content:center; }
+  .tile.geo b { font-size:clamp(24px, 3vw, 44px); white-space:normal; line-height:1.1; }
+  .tile.geo b small { display:block; font-size:.6em; color:var(--muted); font-weight:600; }
   .cmt { color:var(--muted); font-size:16px; min-height:1.3em; }
-  .list { flex:1; min-height:0; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:auto; }
-  table { width:100%; border-collapse:collapse; font:17px var(--mono); }
-  th, td { padding:6px 10px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap; }
-  th { color:var(--muted); font-weight:600; font-size:13px; text-transform:uppercase; position:sticky; top:0; background:var(--card); }
+  .cmt:empty { display:none; }
+  /* Statistikzeile wie im Logger */
+  .statline { display:flex; flex-wrap:wrap; gap:6px 22px; align-items:baseline; padding:8px 14px; background:var(--card); border:1px solid var(--line); border-radius:10px; font-size:14px; color:var(--muted); }
+  .statline .st b { font-family:var(--mono); font-size:20px; color:var(--text); margin-right:5px; }
+  .statline .st.odx b { color:var(--accent); }
+  .main { flex:1; min-height:0; display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap:10px; }
+  .mapcard { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:8px; display:flex; flex-direction:column; min-height:0; }
+  .mapcard .mh { display:flex; justify-content:space-between; color:var(--muted); font-size:13px; padding:0 4px 6px; }
+  #map { flex:1; min-height:200px; border-radius:8px; background:var(--bg2); position:relative; z-index:0; isolation:isolate; overflow:hidden; }
+  .arrow-icon { font-size:26px; color:#ff5c6c; text-shadow:0 0 4px #000; line-height:1; }
+  .map-label { background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:2px 6px; font-family:var(--mono); font-size:13px; white-space:nowrap; }
+  .list { min-height:0; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:auto; }
+  table { width:100%; border-collapse:collapse; font:16px var(--mono); }
+  th, td { padding:5px 9px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; position:sticky; top:0; background:var(--card); }
   td.num { text-align:right; }
   tr.new td { background:rgba(61,220,132,.16); }
   tr.dupe td { color:var(--muted); text-decoration:line-through; }
   footer { color:var(--muted); font-size:12px; display:flex; gap:12px; }
-  @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(4, 1fr); } .tile.call { grid-column: span 4; } }
+  @media (max-width: 1100px) { .tiles { grid-template-columns: repeat(4, 1fr); } .tile.call { grid-column: span 4; } .tile.loc, .tile.geo { grid-column: span 2; } .main { grid-template-columns: 1fr; grid-template-rows: minmax(200px, 3fr) minmax(140px, 2fr); } #map { min-height:160px; } }
 </style>
 </head>
 <body>
@@ -51,31 +71,95 @@
 <div class="dupe hidden" id="dupe"></div>
 <div class="tiles">
   <div class="tile call"><span>Rufzeichen</span><b id="t-call">–</b></div>
-  <div class="tile serial"><span>Nr gegeben</span><b id="t-serial">–</b></div>
-  <div class="tile"><span>Nr erhalten</span><b id="t-nr">–</b></div>
   <div class="tile"><span>RST geg.</span><b id="t-rs">–</b></div>
+  <div class="tile serial"><span>Nr geg.</span><b id="t-serial">–</b></div>
   <div class="tile"><span>RST erh.</span><b id="t-rr">–</b></div>
+  <div class="tile"><span>Nr erh.</span><b id="t-nr">–</b></div>
   <div class="tile loc"><span>Locator</span><b id="t-loc">–</b></div>
   <div class="tile geo"><span>Entfernung · Richtung</span><b id="t-geo">–</b></div>
 </div>
 <div class="cmt" id="cmt"></div>
-<div class="list">
-  <table><thead><tr><th>UTC</th><th>Rufzeichen</th><th>Nr geg.</th><th>Nr erh.</th><th>Locator</th><th>km</th><th>°</th></tr></thead><tbody id="qsos"></tbody></table>
+<div class="statline" id="stats"></div>
+<div class="main">
+  <div class="mapcard"><div class="mh"><span>Karte / Antennenrichtung</span><span id="map-info"></span></div><div id="map"></div></div>
+  <div class="list">
+    <table><thead><tr><th>UTC</th><th>Rufzeichen</th><th>RST</th><th>Nr geg.</th><th>RST</th><th>Nr erh.</th><th>Locator</th><th>km</th><th>°</th></tr></thead><tbody id="qsos"></tbody></table>
+  </div>
 </div>
-<footer><span id="count"></span><span id="by"></span><span style="flex:1"></span><span id="ver"></span></footer>
+<footer><span id="by"></span><span style="flex:1"></span><span id="ver"></span></footer>
+<script src="/static/vendor/leaflet.js"></script>
 <script>
 (() => {
   const $ = (s) => document.querySelector(s);
   const sid = Number(new URLSearchParams(location.search).get("station")) || 0;
   const pad3 = (n) => String(n ?? "").padStart(3, "0");
   const fmtTime = (ts) => ts ? ts.slice(11, 16) : "";
-  let station = null, lastIds = new Set(), ws;
+  let station = null, qsos = [], lastIds = new Set(), ws, info = {};
 
   async function GET(u) { const r = await fetch(u); if (!r.ok) throw new Error(r.statusText); return r.json(); }
-  function tick() { const d = new Date(); $("#clock").textContent = d.toISOString().slice(11, 19) + " UTC"; }
+  function tick() { $("#clock").textContent = new Date().toISOString().slice(11, 19) + " UTC"; }
   setInterval(tick, 1000); tick();
 
+  // ---------------------------------------------------------------- Karte (wie im Logger)
+  function locToLatLon(loc) {
+    loc = (loc || "").toUpperCase();
+    if (!/^[A-R]{2}[0-9]{2}([A-X]{2})?$/.test(loc)) return null;
+    let lon = (loc.charCodeAt(0) - 65) * 20 - 180 + Number(loc[2]) * 2;
+    let lat = (loc.charCodeAt(1) - 65) * 10 - 90 + Number(loc[3]);
+    if (loc.length >= 6) { lon += (loc.charCodeAt(4) - 65) * (2 / 24) + 1 / 24; lat += (loc.charCodeAt(5) - 65) * (1 / 24) + 1 / 48; }
+    else { lon += 1; lat += 0.5; }
+    return [lat, lon];
+  }
+  function geodesic(a, b, n = 48) {
+    const r = Math.PI / 180, [lat1, lon1] = [a[0] * r, a[1] * r], [lat2, lon2] = [b[0] * r, b[1] * r];
+    const d = 2 * Math.asin(Math.sqrt(Math.sin((lat2 - lat1) / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) ** 2));
+    if (d < 1e-9) return [a, b];
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const f = i / n, A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
+      const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+      const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+      const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+      pts.push([Math.atan2(z, Math.sqrt(x * x + y * y)) / r, Math.atan2(y, x) / r]);
+    }
+    return pts;
+  }
+  let M = null;
+  function makeMap() {
+    if (M || typeof L === "undefined") return M;
+    const map = L.map("map", { zoomControl: true, attributionControl: true }).setView([51, 10], 5);
+    L.tileLayer(info.tile_url || "https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(map);
+    M = { map, layer: L.layerGroup().addTo(map), dots: L.layerGroup().addTo(map) };
+    setTimeout(() => map.invalidateSize(), 100);
+    return M;
+  }
+  function drawDots() {
+    const m = makeMap(); if (!m) return;
+    m.dots.clearLayers();
+    for (const q of qsos) { const p = locToLatLon(q.locator); if (!p || q.dupe) continue; L.circleMarker(p, { radius: 3, color: "#3ddc84", fillOpacity: .8, weight: 1 }).bindTooltip(`${q.call} ${q.locator} · ${q.km} km`).addTo(m.dots); }
+  }
+  function drawBearing(loc, label) {
+    const m = makeMap(); if (!m || !station) return;
+    m.layer.clearLayers();
+    const a = locToLatLon(station.locator); if (!a) return;
+    L.circleMarker(a, { radius: 6, color: "#3fb3ff", fillColor: "#3fb3ff", fillOpacity: 1 }).bindTooltip(`Eigene Station ${station.locator}`).addTo(m.layer);
+    const b = locToLatLon(loc);
+    if (!b) { m.map.setView(a, 7); $("#map-info").textContent = `${station.locator} · ${qsos.filter((q) => !q.dupe).length} QSOs`; return; }
+    const sz = loc.length >= 6 ? [1 / 24, 2 / 24] : [1, 2];
+    L.rectangle([[b[0] - sz[0] / 2, b[1] - sz[1] / 2], [b[0] + sz[0] / 2, b[1] + sz[1] / 2]], { color: "#ff5c6c", weight: 1, fillOpacity: .25 }).addTo(m.layer);
+    const pts = geodesic(a, b);
+    L.polyline(pts, { color: "#ff5c6c", weight: 3, opacity: .9 }).addTo(m.layer);
+    const p1 = pts[pts.length - 2], p2 = pts[pts.length - 1];
+    const ang = Math.atan2((p2[1] - p1[1]) * Math.cos(p2[0] * Math.PI / 180), p2[0] - p1[0]) * 180 / Math.PI;
+    L.marker(b, { icon: L.divIcon({ className: "arrow-icon", html: `<div style="transform:rotate(${ang - 90}deg)">➤</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }), interactive: false }).addTo(m.layer);
+    if (label) L.marker(b, { icon: L.divIcon({ className: "map-label", html: label, iconAnchor: [-10, -10] }), interactive: false }).addTo(m.layer);
+    m.map.fitBounds(L.latLngBounds(pts), { padding: [30, 30], maxZoom: 9 });
+    $("#map-info").textContent = label || loc;
+  }
+
+  // ---------------------------------------------------------------- Daten
   async function loadStation() {
+    info = await GET("/api/info").catch(() => ({}));
     const contests = await GET("/api/contests");
     for (const c of contests) for (const s of c.stations) if (s.id === sid) { station = s; station.contest = c.name; }
     if (!station) { $("#station").textContent = "Station nicht gefunden"; return; }
@@ -83,26 +167,35 @@
     $("#meta").textContent = `${station.locator} · ${station.mode} · ${station.contest}`;
     document.title = `Operator ${station.call} ${station.band} – ContestLogger`;
     $("#t-serial").textContent = pad3(station.serial_next);
-    try { const r = await GET(`/api/stations/${sid}/rig`); showRig(r); } catch (_) { /* */ }
+    $("#ver").textContent = "ContestLogger " + (info.version || "");
+    try { showRig(await GET(`/api/stations/${sid}/rig`)); } catch (_) { /* */ }
     try { $("#note").textContent = (await GET(`/api/stations/${sid}/opnote`)).text || ""; } catch (_) { /* */ }
-    try { $("#ver").textContent = "ContestLogger " + (await GET("/api/info")).version; } catch (_) { /* */ }
   }
   function showRig(r) { $("#rig").textContent = r && r.freq ? `📻 ${r.freq} MHz ${r.mode || ""}` : ""; }
+  function renderStats() {
+    const valid = qsos.filter((q) => !q.dupe);
+    const pts = valid.reduce((a, q) => a + (q.points || 0), 0);
+    const squares = new Set(valid.map((q) => q.square).filter(Boolean)).size;
+    const odx = valid.reduce((a, q) => (q.km > (a?.km || 0) ? q : a), null);
+    const hourAgo = Date.now() - 3600e3;
+    const rate = qsos.filter((q) => Date.parse(q.ts_utc) > hourAgo).length;
+    const k = (v, l, cls = "") => `<span class="st ${cls}"><b>${v}</b>${l}</span>`;
+    $("#stats").innerHTML = k(valid.length, "QSOs") + k(pts.toLocaleString("de"), "Punkte") + k(squares, "Großfelder") + k(valid.length ? Math.round(pts / valid.length) : 0, "Ø km")
+      + k(rate, "QSOs / letzte h") + k(qsos.length - valid.length, "Dupes") + k(odx ? `${odx.call} ${odx.km} km` : "–", "ODX", "odx");
+  }
   async function loadQsos(flash) {
-    const qs = await GET(`/api/stations/${sid}/qsos?limit=40`);
+    qsos = await GET(`/api/stations/${sid}/qsos`);
     const tb = $("#qsos"); tb.innerHTML = "";
-    const recent = qs.slice(-40).reverse();
-    for (const q of recent) {
+    for (const q of qsos.slice(-60).reverse()) {
       const tr = document.createElement("tr");
       if (flash && !lastIds.has(q.id)) tr.className = "new";
       if (q.dupe) tr.className += " dupe";
-      tr.innerHTML = `<td>${fmtTime(q.ts_utc)}</td><td><b>${q.call}</b></td><td class="num">${pad3(q.serial_sent)}</td><td class="num">${pad3(q.serial_rcvd)}</td><td>${q.locator}</td><td class="num">${q.km ?? ""}</td><td class="num">${q.bearing ?? ""}</td>`;
+      tr.innerHTML = `<td>${fmtTime(q.ts_utc)}</td><td><b>${q.call}</b></td><td>${q.rst_sent || ""}</td><td class="num">${pad3(q.serial_sent)}</td><td>${q.rst_rcvd || ""}</td><td class="num">${pad3(q.serial_rcvd)}</td><td>${q.locator}</td><td class="num">${q.km ?? ""}</td><td class="num">${q.bearing ?? ""}</td>`;
       tb.append(tr);
     }
-    lastIds = new Set(qs.map((q) => q.id));
-    $("#count").textContent = `${qs.filter((q) => !q.dupe).length} QSOs`;
-    const next = Math.max(...qs.map((q) => q.serial_sent || 0), 0) + 1;
-    if (!$("#t-call").textContent || $("#t-call").textContent === "–") $("#t-serial").textContent = pad3(Math.max(next, station?.serial_next || 1));
+    lastIds = new Set(qsos.map((q) => q.id));
+    renderStats(); drawDots();
+    if ($("#t-call").textContent === "–") { const next = Math.max(...qsos.map((q) => q.serial_sent || 0), 0) + 1; $("#t-serial").textContent = pad3(Math.max(next, station?.serial_next || 1)); drawBearing("", ""); }
   }
   function showTyping(d, by) {
     $("#t-call").textContent = d.call || "–";
@@ -111,11 +204,14 @@
     $("#t-rs").textContent = d.rs || "–";
     $("#t-rr").textContent = d.rr || "–";
     $("#t-loc").textContent = d.loc || "–";
-    $("#t-geo").textContent = (d.geo && !d.geo.startsWith("—")) ? d.geo : "–";
+    const geo = (d.geo && !d.geo.startsWith("—")) ? d.geo : "";
+    const gm = geo.match(/^(\d+)\s*km\s*·\s*(\d+)°/);
+    $("#t-geo").innerHTML = gm ? `${gm[1]} km<small>Richtung ${gm[2]}°</small>` : "–";
     $("#cmt").textContent = d.cmt ? `Kommentar: ${d.cmt}` : "";
     const dupe = $("#dupe");
-    if (d.dupe) { dupe.textContent = d.dupe.replace(/\s*–\s*DUPE!?$/, "").replace(/^⚠\s*/, "⚠ ") ; dupe.classList.remove("hidden"); } else dupe.classList.add("hidden");
+    if (d.dupe) { dupe.textContent = d.dupe.replace(/\s*–\s*DUPE!?$/, "").replace(/^⚠\s*/, "⚠ "); dupe.classList.remove("hidden"); } else dupe.classList.add("hidden");
     $("#by").textContent = by ? `Logger: ${by}${d.editing ? " (bearbeitet ein QSO)" : ""}` : "";
+    drawBearing((d.loc || "").toUpperCase(), locToLatLon(d.loc) ? `${d.call || d.loc} · ${geo}` : "");
   }
   function connect() {
     ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?nick=${encodeURIComponent("Operator")}`);
@@ -125,13 +221,14 @@
       const m = JSON.parse(ev.data);
       if (m.station_id !== undefined && m.station_id !== null && m.station_id !== sid && m.type !== "update") return;
       if (m.type === "typing") showTyping(m.data || {}, m.by);
-      else if (m.type === "opnote") $("#note").textContent = m.text || "";
+      else if (m.type === "opnote") { const n = $("#note"); n.textContent = m.text || ""; n.classList.remove("blink"); if (m.text) { void n.offsetWidth; n.classList.add("blink"); setTimeout(() => n.classList.remove("blink"), 3000); } }
       else if (m.type === "rig") showRig(m);
-      else if (m.type === "update" && (m.scope === "qsos" ? m.station_id === sid : m.scope === "contests")) { loadStation().then(() => loadQsos(true)); }
+      else if (m.type === "update" && (m.scope === "qsos" ? m.station_id === sid : m.scope === "contests")) loadStation().then(() => loadQsos(true));
     };
   }
   loadStation().then(() => loadQsos(false)).catch((e) => { $("#station").textContent = e.message; });
   connect();
+  window.addEventListener("resize", () => M && M.map.invalidateSize());
 })();
 </script>
 </body>
