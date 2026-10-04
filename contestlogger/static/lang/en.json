@@ -389,5 +389,9 @@
  "Suchen (Aktion, Nutzer, Details) …": "Search (action, user, details) …",
  "Aktualisieren": "Refresh",
  "Als Textdatei": "As text file",
- "fehlgeschlagen": "failed"
+ "fehlgeschlagen": "failed",
+ "Nächste →": "Next →",
+ "Auswahl weiterdrehen: die nächsten noch nicht angeschriebenen Kandidaten ankreuzen": "Rotate selection: tick the next candidates not yet contacted",
+ "alle bereits angeschrieben": "all already contacted",
+ "Auswahl": "selection"
 }

@@ -1016,7 +1016,8 @@
         lab(t("Umkreis km"), el("input", { id: "rr-km", type: "number", value: localStorage.getItem("cl.rr.km") || 300, min: 10, max: 2000, style: "width:90px" })),
         lab(t("max. Anzahl"), el("input", { id: "rr-n", type: "number", value: localStorage.getItem("cl.rr.n") || 10, min: 1, max: 60, style: "width:80px" })),
         el("label", { class: "check" }, el("input", { id: "rr-away", type: "checkbox" }), t("abwesende (Klammer) auch")),
-        el("button", { type: "button", class: "ghost", onclick: loadCands }, t("Liste laden"))),
+        el("button", { type: "button", class: "ghost", onclick: loadCands }, t("Liste laden")),
+        el("button", { type: "button", class: "ghost", id: "rr-next", title: t("Auswahl weiterdrehen: die nächsten noch nicht angeschriebenen Kandidaten ankreuzen") }, t("Nächste →"))),
       el("div", { class: "row rr-top" },
         lab(t("Gespeicherte Rundruf-Texte"), el("select", { id: "rr-tpl", style: "max-width:420px", onchange: (e) => { if (e.target.value) box.querySelector("#rr-text").value = e.target.value; } }, el("option", { value: "" }, t("– Text wählen –")))),
         el("button", { type: "button", class: "ghost", title: t("aktuellen Text in die Liste aufnehmen"), onclick: () => saveTexts([...rrTexts.filter((x) => x !== box.querySelector("#rr-text").value.trim()), box.querySelector("#rr-text").value.trim()]) }, t("Text speichern")),
@@ -1036,22 +1037,38 @@
       try { rrTexts = await api("POST", "/api/kst/rundruf_texts", { texts: list }); renderTexts(); toast(t("Rundruf-Texte gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
     }
     GET("/api/kst/rundruf_texts").then((l) => { rrTexts = l; renderTexts(); if (!box.querySelector("#rr-text").value && l.length) box.querySelector("#rr-text").value = l[0]; }).catch(() => {});
+    // Rotation: S.rrSent merkt sich (je Station, bis zum Neuladen der Seite) wer schon angeschrieben wurde,
+    // rrOffset zeigt auf den nächsten noch offenen Kandidaten; „Nächste →“ dreht die Auswahl weiter.
+    S.rrSent = S.rrSent || {}; const sentSet = (S.rrSent[st.id] = S.rrSent[st.id] || new Set());
+    let cands = [], rrOffset = 0;
+    function selectWindow() {
+      const n = Number(box.querySelector("#rr-n").value) || 10;
+      const open = cands.filter((u) => !sentSet.has(u.call));
+      if (!open.length) { $$("#rr-list .rr-sel").forEach((cb) => { cb.checked = false; }); box.querySelector("#rr-status").textContent = `${cands.length} ${t("Kandidaten")} – ${t("alle bereits angeschrieben")}`; return; }
+      if (rrOffset >= open.length) rrOffset = 0;
+      const pick = new Set(open.slice(rrOffset, rrOffset + n).map((u) => u.call));
+      $$("#rr-list .rr-sel").forEach((cb) => { cb.checked = pick.has(cb.value); cb.closest("label").classList.toggle("sent", sentSet.has(cb.value)); });
+      const first = box.querySelector("#rr-list .rr-sel:checked"); if (first) first.closest("label").scrollIntoView({ block: "nearest" });
+      box.querySelector("#rr-status").textContent = `${cands.length} ${t("Kandidaten")}, ${open.length} ${t("offen")} – ${t("Auswahl")} ${rrOffset + 1}–${Math.min(rrOffset + n, open.length)}`;
+    }
     async function loadCands() {
       const km = Number(box.querySelector("#rr-km").value) || 300, n = Number(box.querySelector("#rr-n").value) || 10, away = box.querySelector("#rr-away").checked ? 1 : 0;
       localStorage.setItem("cl.rr.km", km); localStorage.setItem("cl.rr.n", n);
-      const list = box.querySelector("#rr-list"); list.innerHTML = "";
+      const list = box.querySelector("#rr-list"); list.innerHTML = ""; rrOffset = 0;
       try {
-        const c = await GET(`/api/kst/candidates?station_id=${st.id}&max_km=${km}&include_away=${away}`);
-        c.forEach((u, i) => list.append(el("label", {}, el("input", { type: "checkbox", class: "rr-sel", value: u.call, checked: i < n ? 1 : null }), el("b", {}, u.call), `${u.locator} ${u.name || ""}`, el("span", { class: "muted" }, `${u.km} km · ${u.bearing}°`))));
-        if (!c.length) list.append(el("div", { class: "muted small" }, t("Niemand gefunden – Nutzerliste aktuell? (Knopf „Nutzer“, max. 1 Abfrage/Minute)")));
-        box.querySelector("#rr-status").textContent = `${c.length} ${t("Kandidaten")}, ${Math.min(n, c.length)} ${t("vorausgewählt")}`;
+        cands = await GET(`/api/kst/candidates?station_id=${st.id}&max_km=${km}&include_away=${away}`);
+        cands.forEach((u) => list.append(el("label", {}, el("input", { type: "checkbox", class: "rr-sel", value: u.call }), el("b", {}, u.call), `${u.locator} ${u.name || ""}`, el("span", { class: "muted" }, `${u.km} km · ${u.bearing}°`))));
+        if (!cands.length) { list.append(el("div", { class: "muted small" }, t("Niemand gefunden – Nutzerliste aktuell? (Knopf „Nutzer“, max. 1 Abfrage/Minute)"))); box.querySelector("#rr-status").textContent = ""; return; }
+        selectWindow();
       } catch (err) { list.append(el("div", { class: "muted small" }, err.message)); }
     }
+    box.querySelector("#rr-next").addEventListener("click", () => { if (!cands.length) return loadCands(); rrOffset += Number(box.querySelector("#rr-n").value) || 10; selectWindow(); });
     box.querySelector("#rr-send").addEventListener("click", async () => {
       const calls = $$("#rr-list .rr-sel:checked").map((c) => c.value); const text = box.querySelector("#rr-text").value.trim();
       if (!calls.length || !text) return toast(t("Empfänger und Text angeben"), "err");
       localStorage.setItem("cl.rr.text", text);
       box.querySelector("#rr-sent").innerHTML = "";
+      calls.forEach((c) => sentSet.add(c));
       box.querySelector("#rr-status").textContent = `${t("Sende an")} ${calls.length}: ${calls.join(", ")} …`;
       try { await api("POST", "/api/kst/broadcast", { calls, text, station_id: st.id }); } catch (err) { box.querySelector("#rr-status").textContent = err.message; toast(err.message, "err"); }
     });
