@@ -293,7 +293,9 @@ table.fixed td.actions button, table.fixed td.actions .button { margin-left: 2px
 .dm-list .dm .t { color: var(--muted); font-size: 10.5px; font-family: var(--mono); }
 .dm-list .dm .new { background: var(--warn); color: #04121f; border-radius: 999px; padding: 0 6px; font-size: 11px; font-weight: 700; }
 .dm-chat { display: flex; flex-direction: column; min-width: 0; }
-.dm-head { padding: 4px 6px; }
+.dm-head { padding: 4px 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dm-head .c, .dm-msgs .c { cursor: pointer; }
+.dm-head .c:hover, .dm-msgs .c:hover { text-decoration: underline; }
 .dm-msgs { flex: 1; height: auto; margin-bottom: 0; }
 .dm-msgs .m.own { background: rgba(63,179,255,.12); opacity: 1; }
 body.popup .dm-pane { height: calc(100vh - 230px); grid-template-columns: 170px minmax(0, 1fr); }

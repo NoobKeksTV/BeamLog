@@ -362,5 +362,7 @@
  "Der KST-Chat (Telnet,": "The KST chat (telnet,",
  ") wird": ") is connected",
  "je Station": "per station",
- "verbunden: Zugangsdaten, Raum und Autostart stehen bei der Station (Stationen → ✎). Jede Station hat so ihren eigenen Chat; die Nutzerliste wird alle 10 Minuten geholt und Nutzer mit Locator wandern automatisch in die Stationsdatenbank. Das Passwort geht im Klartext über das Netz – ein eigenes KST-Passwort verwenden.": ": login, room and autostart are stored with the station (Stations → ✎). Each station thus has its own chat; the user list is fetched every 10 minutes and users with locator automatically go into the station database. The password crosses the network in clear text – use a dedicated KST password."
+ "verbunden: Zugangsdaten, Raum und Autostart stehen bei der Station (Stationen → ✎). Jede Station hat so ihren eigenen Chat; die Nutzerliste wird alle 10 Minuten geholt und Nutzer mit Locator wandern automatisch in die Stationsdatenbank. Das Passwort geht im Klartext über das Netz – ein eigenes KST-Passwort verwenden.": ": login, room and autostart are stored with the station (Stations → ✎). Each station thus has its own chat; the user list is fetched every 10 minutes and users with locator automatically go into the station database. The password crosses the network in clear text – use a dedicated KST password.",
+ "ins Log übernehmen": "copy into log",
+ "Log": "Log"
 }

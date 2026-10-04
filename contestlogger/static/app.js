@@ -946,8 +946,11 @@
       const u = S.kst.dm ? kstUser(S.kst.dm) : null;
       $("#kst-dm-head").innerHTML = "";
       if (S.kst.dm) {
-        $("#kst-dm-head").append(el("b", { class: "c", style: "cursor:pointer", onclick: () => fillFromKst(S.kst.dm, u?.locator) }, S.kst.dm), ` ${u?.name || ""} ${u?.locator || ""}${u?.km != null ? ` · ${u.km} km ${u.bearing}°` : ""}`);
-        for (const m of list) msgs.append(el("div", { class: "m" + (m.own ? " own" : "") }, el("span", { class: "t" }, m.time), el("span", { class: "c" }, m.own ? t("ich") : m.call), el("span", { class: "txt" }, m.text)));
+        const dmLoc = u?.locator || list.find((m) => !m.own && m.locator)?.locator || "";
+        $("#kst-dm-head").append(el("b", { class: "c", title: t("ins Log übernehmen"), onclick: () => fillFromKst(S.kst.dm, dmLoc) }, S.kst.dm), ` ${u?.name || ""} ${dmLoc}${u?.km != null ? ` · ${u.km} km ${u.bearing}°` : ""}`,
+          el("button", { type: "button", class: "ghost small", style: "margin-left:auto", onclick: () => fillFromKst(S.kst.dm, dmLoc) }, "→ " + t("Log")));
+        for (const m of list) msgs.append(el("div", { class: "m" + (m.own ? " own" : "") }, el("span", { class: "t" }, m.time),
+          m.own ? el("span", { class: "c" }, t("ich")) : el("span", { class: "c", title: t("ins Log übernehmen"), onclick: () => fillFromKst(m.call, m.locator || dmLoc) }, m.call), el("span", { class: "txt" }, m.text)));
         if (!list.length) msgs.append(el("div", { class: "sys" }, t("Noch keine Nachrichten in diesem Gespräch.")));
         msgs.scrollTop = msgs.scrollHeight;
         S.kst.seen[coreOf(S.kst.dm)] = new Date().toISOString(); localStorage.setItem("cl.dmseen", JSON.stringify(S.kst.seen));
