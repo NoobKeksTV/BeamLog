@@ -14,6 +14,7 @@ def git(*args: str) -> str:
 
 
 def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")  # Windows-Runner: Umlaute nicht als cp1252 ausgeben
     new_tag = sys.argv[1] if len(sys.argv) > 1 else ""
     tags = [t for t in git("tag", "--list", "v*", "--sort=-v:refname").splitlines() if t and t != new_tag]
     prev = tags[0] if tags else ""
