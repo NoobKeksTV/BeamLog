@@ -84,7 +84,7 @@ def split_call(call: str) -> tuple[str, str]:
     DL1ABC/P -> (DL1ABC, DL1ABC); OE/DL1ABC -> (DL1ABC, OE); DL1ABC/HB9 -> (DL1ABC, HB9)
     """
     call = (call or "").strip().upper()
-    call = re.sub(r"-\d{1,2}$", "", call)  # KST-Instanz-Suffix (DN2LH-2 = zweite Anmeldung) gehört nicht zum Rufzeichen
+    call = re.sub(r"-.*$", "", call)  # KST-Anhängsel wie DN2LH-2 (zweite Anmeldung) oder OJ7F-23CM (Band) gehören nicht zum Rufzeichen
     parts = [p for p in call.split("/") if p]
     if not parts:
         return "", ""

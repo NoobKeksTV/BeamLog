@@ -46,8 +46,8 @@ def parse_message(line: str) -> dict | None:
 
 
 def _base(call: str) -> str:
-    """KST hängt bei Mehrfach-Anmeldung -2, -3 an (DN2LH-2) – das ist kein Teil des Rufzeichens."""
-    return re.sub(r"-\d{1,2}$", "", (call or "").strip().upper())
+    """KST hängt Zusätze mit Bindestrich an (DN2LH-2 bei Mehrfach-Anmeldung, OJ7F-23CM fürs Band) – kein Teil des Rufzeichens."""
+    return re.sub(r"-.*$", "", (call or "").strip().upper())
 
 
 def parse_user(line: str) -> dict | None:

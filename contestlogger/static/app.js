@@ -480,7 +480,7 @@
   F.call.addEventListener("blur", () => setTimeout(hideSuggest, 150));
   F.nr.addEventListener("blur", () => { if (/^\d+$/.test(F.nr.value)) F.nr.value = pad3(Number(F.nr.value)); });
 
-  const coreOf = (call) => (call || "").trim().toUpperCase().split("/").filter((p) => !["P", "M", "MM", "AM", "QRP"].includes(p) && !/^\d+$/.test(p)).sort((a, b) => b.length - a.length)[0] || "";
+  const coreOf = (call) => (call || "").trim().toUpperCase().replace(/-.*$/, "").split("/").filter((p) => !["P", "M", "MM", "AM", "QRP"].includes(p) && !/^\d+$/.test(p)).sort((a, b) => b.length - a.length)[0] || "";
   function setAutoLocator(loc) {
     // Locator aus der Stationsdatenbank übernehmen, solange der Operator nichts eigenes eingetragen hat
     if (!loc || (F.loc.value && !S.locAuto)) return;
