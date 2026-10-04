@@ -212,8 +212,16 @@
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       o.start(t); o.stop(t + dur + 0.02);
     },
+    last: {}, bootAt: Date.now(), quietUntil: 0,
     play(kind) {
       if (!this.on) return;
+      // Drossel: bei Nachrichtenschüben (z. B. Verlauf nach Neuverbinden, Import) nur ein Ton je Art pro 1,5 s,
+      // und in den ersten Sekunden nach Seitenstart/Neuverbindung gar keine Hinweistöne
+      const now = Date.now();
+      if ((kind === "chat" || kind === "other") && (now - this.bootAt < 3000 || now < this.quietUntil)) return;
+      const gap = kind === "chat" || kind === "other" ? 1500 : 250;
+      if (now - (this.last[kind] || 0) < gap) return;
+      this.last[kind] = now;
       if (kind === "qso") { this.tone(880, 0, 0.12); this.tone(1320, 0.1, 0.18); }          // Pling – QSO geloggt
       else if (kind === "dupe") { this.tone(220, 0, 0.18, "square", 0.12); this.tone(180, 0.2, 0.25, "square", 0.12); } // Brummen – Dupe
       else if (kind === "chat") { this.tone(1046, 0, 0.08); this.tone(1568, 0.09, 0.12); }   // Ping – Chat
@@ -785,7 +793,7 @@
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${proto}://${location.host}/ws?nick=${encodeURIComponent(S.nick)}`);
     S.ws = ws;
-    ws.onopen = () => { $("#conn").classList.add("on"); sendStatus(); };
+    ws.onopen = () => { $("#conn").classList.add("on"); Sound.quietUntil = Date.now() + 3000; sendStatus(); };
     ws.onclose = () => { $("#conn").classList.remove("on"); setTimeout(connectWs, 2000); };
     ws.onmessage = async (ev) => {
       const m = JSON.parse(ev.data);
@@ -797,7 +805,8 @@
         if (S.kst.tab === "local") S.kst.unread++;
         if (incoming) {
           if (!(S.kst.tab === "dm" && S.kst.dm && coreOf(S.kst.dm) === coreOf(m.msg.call))) S.kst.unreadDm++;
-          Sound.play("chat"); toast(`KST ${m.msg.call}: ${m.msg.text}`.slice(0, 120));
+          Sound.play("chat");
+          if (Date.now() - (S.kst.lastToast || 0) > 1500) { S.kst.lastToast = Date.now(); toast(`KST ${m.msg.call}: ${m.msg.text}`.slice(0, 120)); }
         }
         renderKst();
       }

@@ -157,3 +157,32 @@ def test_candidates_and_broadcast(tmp_path, monkeypatch):
         assert any(x == "/CQ DF7KF GA Peter, QRV 432 MHz? loc JO31AA" for x in fake.received)
         c.post("/api/kst/stop", headers=H)
     loop.call_soon_threadsafe(loop.stop)
+
+
+def test_kst_history_not_duplicated(tmp_path, monkeypatch):
+    """Der KST-Server schickt nach dem Neuverbinden den Verlauf erneut – Nachrichten dürfen nicht doppelt gespeichert werden."""
+    loop = asyncio.new_event_loop()
+    fake = FakeKst()
+    loop.run_until_complete(fake.start())
+    import threading, time
+    threading.Thread(target=loop.run_forever, daemon=True).start()
+    monkeypatch.setattr(kst, "HOST", "127.0.0.1")
+    monkeypatch.setattr(kst, "PORT", fake.port)
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        admin = c.post("/api/setup", json={"password": "admin1"}).json()["token"]
+        H = {"X-Admin-Token": admin}
+        cid = c.post("/api/contests", json={"name": "T"}, headers=H).json()["id"]
+        sid = c.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH", "locator": "JO31AA", "band": "432MHz", "kst_user": "DN2LH", "kst_pass": "secret"}, headers=H).json()["id"]
+        c.post("/api/kst/start", json={"station_id": sid}, headers=H)
+        for _ in range(60):
+            time.sleep(0.05)
+            if c.get("/api/kst/status", params={"station_id": sid}).json().get("state") == "verbunden":
+                break
+        for _ in range(3):  # dieselbe Nachricht dreimal (wie ein wiederholter Verlauf)
+            asyncio.run_coroutine_threadsafe(fake.push("1203Z DL8NAS Klaus> (DN2LH)  hi Lars"), loop).result()
+        time.sleep(0.5)
+        msgs = c.get("/api/kst/messages", params={"station_id": sid}).json()
+        assert len([m for m in msgs if m["text"] == "hi Lars"]) == 1
+        c.post("/api/kst/stop", json={"station_id": sid}, headers=H)
+    loop.call_soon_threadsafe(loop.stop)

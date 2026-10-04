@@ -93,6 +93,12 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                         db.learn_call(u["call"], u["locator"], source="kst", name=u.get("name", ""))
             if ev.get("type") == "kst":
                 m = ev["msg"]
+                # Nach einem Neuverbinden schickt der KST-Server den letzten Verlauf erneut – schon bekannte
+                # Nachrichten (gleiche Uhrzeit, Absender, Ziel, Text) nicht doppelt speichern und nicht erneut melden
+                dup = db.row("SELECT 1 FROM kst_messages WHERE station_id=? AND time=? AND call=? AND to_call=? AND text=? AND id > (SELECT COALESCE(MAX(id),0) FROM kst_messages) - 400",
+                             (station_id, m["time"], m["call"], m["to"], m["text"]))
+                if dup:
+                    return
                 with db.conn:
                     db.conn.execute("INSERT INTO kst_messages(ts_utc,time,call,name,to_call,text,own,to_me,station_id) VALUES(?,?,?,?,?,?,?,?,?)",
                                     (m["ts"], m["time"], m["call"], m["name"], m["to"], m["text"], int(m["own"]), int(m["to_me"]), station_id))
