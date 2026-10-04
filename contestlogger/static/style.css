@@ -80,7 +80,7 @@ code { background: var(--bg2); padding: 1px 5px; border-radius: 4px; font-family
 .card-head h3 { margin: 0; }
 .narrow { max-width: 480px; margin: 40px auto; }
 
-.log-grid { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 12px; }
+.log-grid { display: grid; grid-template-columns: minmax(0, 1fr) 470px; gap: 12px; }
 .log-grid > *, .qso-form .fields > *, .admin-grid > *, .stats-grid > * { min-width: 0; }
 .qso-form .fields input { width: 100%; }
 .admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -162,7 +162,7 @@ table.compact td, table.compact th { padding: 5px 6px; font-size: 13.5px; }
 .kpi.wide { grid-column: span 3; }
 
 /* ---------- Chat ---------- */
-.chat-log { height: 260px; overflow: auto; background: var(--bg2); border-radius: 8px; padding: 8px; margin-bottom: 8px; font-size: 13.5px; }
+.chat-log { height: 420px; overflow: auto; background: var(--bg2); border-radius: 8px; padding: 8px; margin-bottom: 8px; font-size: 14.5px; }
 .chat-log .m { margin-bottom: 4px; }
 .chat-log .m .n { font-weight: 700; color: var(--accent); }
 .chat-log .m .t { color: var(--muted); font-size: 11px; margin-right: 4px; font-family: var(--mono); }
@@ -281,3 +281,14 @@ table.fixed td.actions button, table.fixed td.actions .button { margin-left: 2px
 .card > h3:not(:first-child) { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); }
 .card form.stack, .card .table-wrap, .card > pre.result { margin-bottom: 8px; }
 .card-head h3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dm-list { background: var(--bg2); border-radius: 8px; padding: 4px; margin-bottom: 8px; max-height: 420px; overflow: auto; }
+.dm-list .dm { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.dm-list .dm:hover { background: var(--card2); }
+.dm-list .dm b { font-family: var(--mono); color: var(--accent); min-width: 90px; }
+.dm-list .dm .snip { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }
+.dm-list .dm .t { color: var(--muted); font-size: 11.5px; font-family: var(--mono); }
+.dm-list .dm .new { background: var(--warn); color: #04121f; border-radius: 999px; padding: 0 6px; font-size: 11px; font-weight: 700; }
+.rundruf-list { max-height: 40vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 4px; }
+.rundruf-list label { flex-direction: row; align-items: center; gap: 8px; padding: 3px 6px; font-size: 13.5px; color: var(--text); }
+.rundruf-list label b { font-family: var(--mono); min-width: 90px; }
+.rundruf-list label .muted { margin-left: auto; }

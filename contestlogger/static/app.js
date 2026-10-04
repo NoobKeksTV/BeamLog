@@ -18,7 +18,7 @@
     info: {},
     rig: {},
     locAuto: false,
-    kst: { msgs: [], users: [], status: {}, tab: "local", dm: "", unread: 0, unreadMe: 0, macros: [] },
+    kst: { msgs: [], users: [], status: {}, tab: "local", dm: "", unread: 0, unreadMe: 0, unreadDm: 0, macros: [], seen: JSON.parse(localStorage.getItem("cl.dmseen") || "{}") },
   };
   const POPUP = new URLSearchParams(location.search).get("popup") === "chat";
   if (POPUP) document.body.classList.add("popup");
@@ -783,9 +783,20 @@
     ws.onmessage = async (ev) => {
       const m = JSON.parse(ev.data);
       if (m.type === "chat") { appendChat(m.msg); if (m.msg.nick !== S.nick) Sound.play("chat"); }
-      else if (m.type === "kst") { S.kst.msgs.push(m.msg); S.kst.msgs.splice(0, S.kst.msgs.length - 800); if (S.kst.tab !== "kst" && S.kst.tab !== "me" && S.kst.tab !== "dm") { S.kst.unread++; if (m.msg.to_me) S.kst.unreadMe++; } if (m.msg.to_me && !m.msg.own) Sound.play("chat"); renderKst(); }
+      else if (m.type === "kst") {
+        S.kst.msgs.push(m.msg); S.kst.msgs.splice(0, S.kst.msgs.length - 800);
+        const incoming = m.msg.to_me && !m.msg.own;
+        if (S.kst.tab === "local") S.kst.unread++;
+        if (incoming) {
+          if (S.kst.tab !== "me") S.kst.unreadMe++;
+          if (!(S.kst.tab === "dm" && S.kst.dm && coreOf(S.kst.dm) === coreOf(m.msg.call))) S.kst.unreadDm++;
+          Sound.play("chat"); toast(`KST ${m.msg.call}: ${m.msg.text}`.slice(0, 120));
+        }
+        renderKst();
+      }
       else if (m.type === "kst_users") { S.kst.users = m.users; renderKstUsers(); renderKst(); }
       else if (m.type === "kst_status") { S.kst.status = { ...S.kst.status, state: m.state, error: m.error }; renderKstStatus(); }
+      else if (m.type === "kst_broadcast") { const s_ = $("#rr-status"); if (s_) s_.textContent = `${m.done}/${m.total} ${t("gesendet")} (${m.call})`; }
       else if (m.type === "rig") { S.rig[m.station_id] = { freq: m.freq, mode: m.mode, ts: m.ts }; if (m.station_id === S.stationId) renderStationBar(); renderScoreboard(); }
       else if (m.type === "presence") renderPresence(m.users);
       else if (m.type === "update") {
@@ -828,13 +839,14 @@
     $$(".chat-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.ctab === tab));
     $("#ctab-local").classList.toggle("active", tab === "local");
     $("#ctab-kst").classList.toggle("active", tab !== "local");
-    if (tab !== "local") { S.kst.unread = 0; if (tab === "me") S.kst.unreadMe = 0; renderKst(); $("#kst-input").focus(); }
+    if (tab !== "local") { S.kst.unread = 0; if (tab === "me") S.kst.unreadMe = 0; if (tab === "dm") S.kst.unreadDm = 0; renderKst(); $("#kst-input").focus(); }
     renderKstBadges();
   }
   function renderKstBadges() {
     const b = $("#kst-badge"), bm = $("#kst-me-badge");
     b.textContent = S.kst.unread; b.classList.toggle("hidden", !S.kst.unread);
     bm.textContent = S.kst.unreadMe; bm.classList.toggle("hidden", !S.kst.unreadMe);
+    const bd = $("#kst-dm-badge"); bd.textContent = S.kst.unreadDm; bd.classList.toggle("hidden", !S.kst.unreadDm);
   }
   $("#btn-chat-pop").addEventListener("click", () => window.open(`${location.pathname}?popup=chat`, "clchat", "width=480,height=780,resizable=yes"));
   if (POPUP) setChatTab(localStorage.getItem("cl.chattab") || "kst");
@@ -883,9 +895,27 @@
     updateHints(); if (!p.locator) lookupCall(); F.nr.focus();
   }
   if (BC && !POPUP) BC.onmessage = (ev) => { if (ev.data?.type === "fill") applyFill(ev.data); };
+  function dmConversations() {
+    const conv = {};
+    for (const m of S.kst.msgs) {
+      const partner = m.own ? coreOf(m.to) : (m.to_me ? coreOf(m.call) : "");
+      if (!partner) continue;
+      const c = conv[partner] || (conv[partner] = { call: m.own ? m.to : m.call, last: m, unread: 0 });
+      c.last = m; if (!m.own) c.call = m.call;
+      if (!m.own && m.ts > (S.kst.seen[partner] || "")) c.unread++;
+    }
+    return Object.values(conv).sort((a, b) => (b.last.ts || "").localeCompare(a.last.ts || ""));
+  }
+  function renderDmList() {
+    const box = $("#kst-dm-list"); box.innerHTML = "";
+    const list = dmConversations();
+    for (const c of list) box.append(el("div", { class: "dm", onclick: () => setDm(c.call, true) },
+      el("b", {}, c.call), el("span", { class: "snip" }, `${c.last.own ? "→ " : ""}${c.last.text}`), el("span", { class: "t" }, c.last.time), c.unread ? el("span", { class: "new" }, c.unread) : null));
+    if (!list.length) box.append(el("div", { class: "muted small", style: "padding:8px" }, t("Noch keine Gespräche – Nachrichten an dich oder von dir per /CQ erscheinen hier.")));
+  }
   function kstFiltered() {
     const my = S.kst.msgs;
-    if (S.kst.tab === "me") return my.filter((m) => m.to_me || m.own && m.to);
+    if (S.kst.tab === "me") return my.filter((m) => m.to_me && !m.own);
     if (S.kst.tab === "dm" && S.kst.dm) { const c = coreOf(S.kst.dm); return my.filter((m) => coreOf(m.call) === c || (m.own && coreOf(m.to) === c)); }
     return my;
   }
@@ -902,15 +932,20 @@
         el("span", { class: "txt" }, m.text),
         el("span", { class: "act" }, el("button", { class: "ghost", title: t("Antworten"), onclick: () => replyTo(m.call) }, "↩"), el("button", { class: "ghost", title: "DM", onclick: () => setDm(m.call) }, "DM"))));
     }
-    if (!list.length) log.append(el("div", { class: "sys" }, S.kst.tab === "dm" && !S.kst.dm ? t("Im DM-Reiter einen Nutzer wählen (DM-Knopf an einer Nachricht oder Klick in der Nutzerliste).") : t("Keine Nachrichten.")));
+    if (!list.length) log.append(el("div", { class: "sys" }, t("Keine Nachrichten.")));
     if (atBottom || true) log.scrollTop = log.scrollHeight;
+    const dmOverview = S.kst.tab === "dm" && !S.kst.dm;
     $("#kst-dm-bar").classList.toggle("hidden", !(S.kst.tab === "dm" && S.kst.dm));
+    $("#kst-dm-list").classList.toggle("hidden", !dmOverview);
+    log.classList.toggle("hidden", dmOverview);
+    if (dmOverview) renderDmList();
+    if (S.kst.tab === "dm" && S.kst.dm) { S.kst.seen[coreOf(S.kst.dm)] = new Date().toISOString(); localStorage.setItem("cl.dmseen", JSON.stringify(S.kst.seen)); }
     $("#kst-dm-call").textContent = S.kst.dm;
     renderKstBadges();
   }
   function replyTo(call) { const i = $("#kst-input"); i.value = `/CQ ${call} `; i.focus(); if (S.kst.tab === "dm") setDm(call, true); }
-  function setDm(call, keep) { S.kst.dm = call; if (!keep) setChatTab("dm"); renderKst(); if (!keep) replyTo(call); }
-  $("#btn-kst-dm-off").addEventListener("click", () => { S.kst.dm = ""; setChatTab("kst"); });
+  function setDm(call, keep) { S.kst.dm = call; if (S.kst.tab !== "dm") setChatTab("dm"); renderKst(); const i = $("#kst-input"); if (!i.value) i.value = `/CQ ${call} `; i.focus(); }
+  $("#btn-kst-dm-off").addEventListener("click", () => { S.kst.dm = ""; renderKst(); });
   $("#kst-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = $("#kst-input").value.trim(); if (!text) return;
@@ -943,6 +978,39 @@
       const out = $$("#kst-macro-rows .row").map((r) => ({ label: r.querySelector(".km-label").value.trim(), text: r.querySelector(".km-text").value.trim() })).filter((m) => m.label && m.text);
       try { await api("POST", "/api/settings", { kst_macros: out }); S.kst.macros = out; renderKstMacros(); closeModal(); toast(t("Gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
     });
+  }
+  // Rundruf: Nutzer im Umkreis anschreiben, die noch nicht im Log sind
+  $("#btn-kst-rundruf").addEventListener("click", rundrufDialog);
+  async function rundrufDialog() {
+    const st = station(); if (!st) return toast(t("Keine Station gewählt"), "err");
+    const box = modal(el("div", {}, el("h3", {}, t("Rundruf – noch nicht gearbeitete Stationen anschreiben")),
+      el("p", { class: "muted small" }, t("KST-Nutzer mit Locator im Umkreis von {loc}, die in diesem Log noch fehlen. Jeder Empfänger bekommt eine eigene /CQ-Nachricht, gesendet mit 2 s Abstand.", { loc: st.locator })),
+      el("div", { class: "row" },
+        lab(t("Umkreis km"), el("input", { id: "rr-km", type: "number", value: localStorage.getItem("cl.rr.km") || 300, min: 10, max: 2000, style: "width:90px" })),
+        lab(t("max. Anzahl"), el("input", { id: "rr-n", type: "number", value: localStorage.getItem("cl.rr.n") || 10, min: 1, max: 60, style: "width:80px" })),
+        lab(t("abwesende (Klammer) auch"), el("input", { id: "rr-away", type: "checkbox" })),
+        el("button", { type: "button", class: "ghost", onclick: loadCands }, t("Liste laden"))),
+      lab(t("Text (Platzhalter {call} {name} {loc} {mycall} {myloc} {band})"), el("input", { id: "rr-text", value: localStorage.getItem("cl.rr.text") || "/CQ {call} GA {name}, QRV {band}? pse QSO, my loc {myloc}" })),
+      el("div", { id: "rr-list", class: "rundruf-list stack" }, el("div", { class: "muted small" }, "…")),
+      el("div", { class: "row" }, el("button", { type: "button", class: "primary", id: "rr-send" }, t("An ausgewählte senden")), el("span", { id: "rr-status", class: "muted small" }), el("span", { class: "grow" }), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")))));
+    async function loadCands() {
+      const km = Number(box.querySelector("#rr-km").value) || 300, n = Number(box.querySelector("#rr-n").value) || 10, away = box.querySelector("#rr-away").checked ? 1 : 0;
+      localStorage.setItem("cl.rr.km", km); localStorage.setItem("cl.rr.n", n);
+      const list = box.querySelector("#rr-list"); list.innerHTML = "";
+      try {
+        const c = await GET(`/api/kst/candidates?station_id=${st.id}&max_km=${km}&include_away=${away}`);
+        c.forEach((u, i) => list.append(el("label", {}, el("input", { type: "checkbox", class: "rr-sel", value: u.call, checked: i < n ? 1 : null }), el("b", {}, u.call), `${u.locator} ${u.name || ""}`, el("span", { class: "muted" }, `${u.km} km · ${u.bearing}°`))));
+        if (!c.length) list.append(el("div", { class: "muted small" }, t("Niemand gefunden – Nutzerliste aktuell? (Knopf „Nutzer“, max. 1 Abfrage/Minute)")));
+        box.querySelector("#rr-status").textContent = `${c.length} ${t("Kandidaten")}, ${Math.min(n, c.length)} ${t("vorausgewählt")}`;
+      } catch (err) { list.append(el("div", { class: "muted small" }, err.message)); }
+    }
+    box.querySelector("#rr-send").addEventListener("click", async () => {
+      const calls = $$("#rr-list .rr-sel:checked").map((c) => c.value); const text = box.querySelector("#rr-text").value.trim();
+      if (!calls.length || !text) return toast(t("Empfänger und Text angeben"), "err");
+      localStorage.setItem("cl.rr.text", text);
+      try { await api("POST", "/api/kst/broadcast", { calls, text, station_id: st.id }); box.querySelector("#rr-status").textContent = `${t("Sende an")} ${calls.length} …`; } catch (err) { toast(err.message, "err"); }
+    });
+    loadCands();
   }
   // Verwaltung: KST
   $("#kst-form-admin").addEventListener("submit", async (e) => {

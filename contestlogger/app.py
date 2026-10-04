@@ -15,7 +15,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __version__, exporters, geo, importers, kst, logcheck, lookup
+from . import __app_name__, __copyright__, __version__, exporters, geo, importers, kst, logcheck, lookup, prefixes
 from .db import Database
 
 STATIC = Path(__file__).parent / "static"
@@ -609,6 +609,61 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         else:
             await c.send_text(text)
         return {"ok": True}
+
+    @app.get("/api/kst/candidates")
+    def kst_candidates(station_id: int, max_km: int = 300, include_away: int = 0):
+        """KST-Nutzer im Umkreis, die mit dieser Station (Band) noch nicht gearbeitet wurden."""
+        st = db.get_station(station_id)
+        c = kst_client()
+        if not st or not c:
+            return []
+        worked = {q["core_call"] for q in db.list_qsos(station_id)}
+        out = []
+        for u in c.users.values():
+            if not u.get("locator") or not geo.is_valid_locator(u["locator"]):
+                continue
+            if u.get("away") and not include_away:
+                continue
+            core = prefixes.core_call(u["call"])
+            if core in worked or core == prefixes.core_call(st["call"]):
+                continue
+            km = geo.distance_km_int(st["locator"], u["locator"])
+            if km > max_km:
+                continue
+            out.append({**u, "km": km, "bearing": round(geo.bearing_deg(st["locator"], u["locator"])) % 360})
+        out.sort(key=lambda u: u["km"])
+        return out
+
+    @app.post("/api/kst/broadcast")
+    async def kst_broadcast(body: dict, x_nick: str | None = Header(default=None)):
+        """Mehrere Nutzer nacheinander per /CQ anschreiben (Platzhalter je Empfänger, 2 s Abstand)."""
+        c = kst_client()
+        if not c or c.state != "verbunden":
+            raise HTTPException(409, "Nicht mit dem KST-Chat verbunden")
+        calls = [str(x).strip().upper() for x in (body.get("calls") or []) if str(x).strip()][:60]
+        text = (body.get("text") or "").strip()
+        if not calls or not text:
+            raise HTTPException(400, "Empfänger und Text angeben")
+        st = db.get_station(int(body.get("station_id") or 0)) or {}
+
+        async def run():
+            for i, call in enumerate(calls):
+                u = c.users.get(call) or {}
+                msg = text
+                for k, v in {"call": call, "name": (u.get("name") or "").split(" ")[0], "loc": u.get("locator", ""), "mycall": st.get("call", ""),
+                             "myloc": st.get("locator", ""), "band": (st.get("band") or "").replace("MHz", " MHz")}.items():
+                    msg = msg.replace("{" + k + "}", v)
+                if not msg.upper().startswith("/CQ "):
+                    msg = f"/CQ {call} {msg}"
+                try:
+                    await c.send_text(msg)
+                except RuntimeError:
+                    break
+                await hub.broadcast({"type": "kst_broadcast", "done": i + 1, "total": len(calls), "call": call})
+                if i < len(calls) - 1:
+                    await asyncio.sleep(2)
+        asyncio.create_task(run())
+        return {"queued": len(calls)}
 
     @app.post("/api/kst/refresh_users")
     async def kst_refresh_users():

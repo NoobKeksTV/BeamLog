@@ -102,3 +102,36 @@ def test_kst_endpoints(tmp_path, monkeypatch):
         assert c.get("/api/kst/status").json()["macros"][0]["label"] == "X"
         assert c.post("/api/kst/stop", headers=H).json()["state"] == "aus"
     loop.call_soon_threadsafe(loop.stop)
+
+
+def test_candidates_and_broadcast(tmp_path, monkeypatch):
+    loop = asyncio.new_event_loop()
+    fake = FakeKst()
+    loop.run_until_complete(fake.start())
+    import threading, time
+    threading.Thread(target=loop.run_forever, daemon=True).start()
+    monkeypatch.setattr(kst, "HOST", "127.0.0.1")
+    monkeypatch.setattr(kst, "PORT", fake.port)
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        admin = c.post("/api/setup", json={"password": "admin1"}).json()["token"]
+        H = {"X-Admin-Token": admin}
+        cid = c.post("/api/contests", json={"name": "T"}, headers=H).json()["id"]
+        sid = c.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH", "locator": "JO31AA", "band": "432MHz"}, headers=H).json()["id"]
+        c.post(f"/api/stations/{sid}/qsos", json={"call": "DL8NAS", "locator": "JN59LE"}, headers=H)  # schon gearbeitet
+        c.post("/api/settings", json={"kst_user": "DN2LH", "kst_pass": "secret", "kst_room": "2"}, headers=H)
+        c.post("/api/kst/start", headers=H)
+        for _ in range(60):
+            time.sleep(0.05)
+            if c.get("/api/kst/status").json().get("users"):
+                break
+        cand = c.get("/api/kst/candidates", params={"station_id": sid, "max_km": 500}).json()
+        assert [u["call"] for u in cand] == []  # DF7KF ist abwesend, DL8NAS gearbeitet, VU2CPL zu weit
+        cand = c.get("/api/kst/candidates", params={"station_id": sid, "max_km": 500, "include_away": 1}).json()
+        assert [u["call"] for u in cand] == ["DF7KF"] and cand[0]["km"] == 135
+        r = c.post("/api/kst/broadcast", json={"calls": ["DF7KF", "VU2CPL"], "text": "GA {name}, QRV {band}? loc {myloc}", "station_id": sid}).json()
+        assert r["queued"] == 2
+        time.sleep(0.5)
+        assert any(x == "/CQ DF7KF GA Peter, QRV 432 MHz? loc JO31AA" for x in fake.received)
+        c.post("/api/kst/stop", headers=H)
+    loop.call_soon_threadsafe(loop.stop)

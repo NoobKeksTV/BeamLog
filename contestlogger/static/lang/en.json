@@ -322,5 +322,22 @@
  "Lädt die offiziellen Ergebnislisten (result.csv) vom DARC-Contest-Hub": "Loads the official results lists (result.csv) from the DARC contest hub",
  "– alle Teilnehmer mit Locator, dazu die ODX-Gegenstationen. Pro Contest 500–900 Rufzeichen. Braucht Internet auf dem Server.": "– all participants with locator, plus the ODX counterparts. 500–900 callsigns per contest. Needs internet on the server.",
  "Verbindet den Server mit dem KST-Chat (Telnet,": "Connects the server to the KST chat (telnet,",
- "). Alle Browser sehen und nutzen den Chat über den Reiter „KST“ im Chat-Fenster; gesendet wird unter dem hier eingetragenen Rufzeichen. Das Passwort geht im Klartext über das Netz – ein eigenes KST-Passwort verwenden. Nutzer mit Locator wandern automatisch in die Stationsdatenbank.": "). All browsers see and use the chat via the “KST” tab in the chat window; messages are sent under the callsign entered here. The password crosses the network in clear text – use a dedicated KST password. Users with locator automatically go into the station database."
+ "). Alle Browser sehen und nutzen den Chat über den Reiter „KST“ im Chat-Fenster; gesendet wird unter dem hier eingetragenen Rufzeichen. Das Passwort geht im Klartext über das Netz – ein eigenes KST-Passwort verwenden. Nutzer mit Locator wandern automatisch in die Stationsdatenbank.": "). All browsers see and use the chat via the “KST” tab in the chat window; messages are sent under the callsign entered here. The password crosses the network in clear text – use a dedicated KST password. Users with locator automatically go into the station database.",
+ "Rundruf": "Broadcast",
+ "Nutzer im Umkreis anschreiben, die noch nicht im Log sind": "Message nearby users not yet in the log",
+ "← Gespräche": "← conversations",
+ "Noch keine Gespräche – Nachrichten an dich oder von dir per /CQ erscheinen hier.": "No conversations yet – messages to you or from you via /CQ appear here.",
+ "Rundruf – noch nicht gearbeitete Stationen anschreiben": "Broadcast – message stations not yet worked",
+ "KST-Nutzer mit Locator im Umkreis von {loc}, die in diesem Log noch fehlen. Jeder Empfänger bekommt eine eigene /CQ-Nachricht, gesendet mit 2 s Abstand.": "KST users with locator around {loc} that are still missing in this log. Each recipient gets its own /CQ message, sent 2 s apart.",
+ "Umkreis km": "Radius km",
+ "max. Anzahl": "max. count",
+ "abwesende (Klammer) auch": "include away (brackets)",
+ "Text (Platzhalter {call} {name} {loc} {mycall} {myloc} {band})": "Text (placeholders {call} {name} {loc} {mycall} {myloc} {band})",
+ "An ausgewählte senden": "Send to selected",
+ "Niemand gefunden – Nutzerliste aktuell? (Knopf „Nutzer“, max. 1 Abfrage/Minute)": "Nobody found – user list up to date? (button “Users”, max. 1 query/minute)",
+ "Kandidaten": "candidates",
+ "vorausgewählt": "preselected",
+ "Empfänger und Text angeben": "Specify recipients and text",
+ "Sende an": "Sending to",
+ "gesendet": "sent"
 }

@@ -110,7 +110,7 @@
               <button data-ctab="local" class="active">Chat</button>
               <button data-ctab="kst">KST <span id="kst-badge" class="cnt hidden"></span></button>
               <button data-ctab="me">An mich <span id="kst-me-badge" class="cnt hidden"></span></button>
-              <button data-ctab="dm">DM</button>
+              <button data-ctab="dm">DM <span id="kst-dm-badge" class="cnt hidden"></span></button>
             </div>
             <span class="grow"></span>
             <button id="btn-chat-pop" class="ghost small" title="Chat in eigenem Fenster öffnen">↗</button>
@@ -121,9 +121,10 @@
             <form id="chat-form" class="row"><input id="chat-input" placeholder="Nachricht …" maxlength="500"><button class="primary">Senden</button></form>
           </div>
           <div id="ctab-kst" class="ctab">
-            <div class="row small kst-status"><span id="kst-state" class="tag">KST: aus</span><span id="kst-room" class="muted"></span><span class="grow"></span><button id="btn-kst-users" class="ghost small">Nutzer</button></div>
+            <div class="row small kst-status"><span id="kst-state" class="tag">KST: aus</span><span id="kst-room" class="muted"></span><span class="grow"></span><button id="btn-kst-rundruf" class="ghost small" title="Nutzer im Umkreis anschreiben, die noch nicht im Log sind">Rundruf</button><button id="btn-kst-users" class="ghost small">Nutzer</button></div>
             <div id="kst-users" class="kst-users hidden"></div>
-            <div id="kst-dm-bar" class="row small hidden"><span class="muted">DM mit</span><b id="kst-dm-call"></b><button id="btn-kst-dm-off" class="ghost small">× alle</button></div>
+            <div id="kst-dm-bar" class="row small hidden"><span class="muted">DM mit</span><b id="kst-dm-call"></b><button id="btn-kst-dm-off" class="ghost small">← Gespräche</button></div>
+            <div id="kst-dm-list" class="dm-list hidden"></div>
             <div id="kst-log" class="chat-log kst-log"></div>
             <div id="kst-macros" class="kst-macros"></div>
             <form id="kst-form" class="row"><input id="kst-input" placeholder="Nachricht an den KST-Chat … (/CQ CALL Text für gezielt)" maxlength="300"><button class="primary">Senden</button></form>
