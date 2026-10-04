@@ -281,13 +281,22 @@ table.fixed td.actions button, table.fixed td.actions .button { margin-left: 2px
 .card > h3:not(:first-child) { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); }
 .card form.stack, .card .table-wrap, .card > pre.result { margin-bottom: 8px; }
 .card-head h3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dm-list { background: var(--bg2); border-radius: 8px; padding: 4px; margin-bottom: 8px; max-height: 420px; overflow: auto; }
-.dm-list .dm { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+/* DM wie ein Messenger: Kontakte links, Gespräch rechts */
+.dm-pane { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px; margin-bottom: 8px; height: 420px; }
+.dm-contacts { background: var(--bg2); border-radius: 8px; padding: 4px; overflow: auto; display: flex; flex-direction: column; }
+.dm-contacts-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 6px 4px; }
+.dm-list .dm { padding: 6px 8px; border-radius: 6px; cursor: pointer; display: flex; flex-direction: column; gap: 1px; }
 .dm-list .dm:hover { background: var(--card2); }
-.dm-list .dm b { font-family: var(--mono); color: var(--accent); min-width: 90px; }
-.dm-list .dm .snip { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }
-.dm-list .dm .t { color: var(--muted); font-size: 11.5px; font-family: var(--mono); }
+.dm-list .dm.active { background: var(--card2); outline: 1px solid var(--accent); }
+.dm-list .dm b { font-family: var(--mono); color: var(--accent); display: flex; justify-content: space-between; align-items: center; }
+.dm-list .dm .snip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.dm-list .dm .t { color: var(--muted); font-size: 10.5px; font-family: var(--mono); }
 .dm-list .dm .new { background: var(--warn); color: #04121f; border-radius: 999px; padding: 0 6px; font-size: 11px; font-weight: 700; }
+.dm-chat { display: flex; flex-direction: column; min-width: 0; }
+.dm-head { padding: 4px 6px; }
+.dm-msgs { flex: 1; height: auto; margin-bottom: 0; }
+.dm-msgs .m.own { background: rgba(63,179,255,.12); opacity: 1; }
+body.popup .dm-pane { height: calc(100vh - 230px); grid-template-columns: 170px minmax(0, 1fr); }
 .rundruf-list { max-height: 40vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 4px; }
 .rundruf-list label { flex-direction: row; align-items: center; gap: 8px; padding: 3px 6px; font-size: 13.5px; color: var(--text); }
 .rundruf-list label b { font-family: var(--mono); min-width: 90px; }

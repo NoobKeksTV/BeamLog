@@ -909,9 +909,11 @@
   function renderDmList() {
     const box = $("#kst-dm-list"); box.innerHTML = "";
     const list = dmConversations();
-    for (const c of list) box.append(el("div", { class: "dm", onclick: () => setDm(c.call, true) },
-      el("b", {}, c.call), el("span", { class: "snip" }, `${c.last.own ? "→ " : ""}${c.last.text}`), el("span", { class: "t" }, c.last.time), c.unread ? el("span", { class: "new" }, c.unread) : null));
-    if (!list.length) box.append(el("div", { class: "muted small", style: "padding:8px" }, t("Noch keine Gespräche – Nachrichten an dich oder von dir per /CQ erscheinen hier.")));
+    if (S.kst.dm && !list.find((c) => coreOf(c.call) === coreOf(S.kst.dm))) list.unshift({ call: S.kst.dm, last: { text: "", time: "" }, unread: 0 });
+    for (const c of list) box.append(el("div", { class: "dm" + (S.kst.dm && coreOf(c.call) === coreOf(S.kst.dm) ? " active" : ""), onclick: () => setDm(c.call) },
+      el("b", {}, c.call, c.unread ? el("span", { class: "new" }, c.unread) : null),
+      el("span", { class: "snip" }, `${c.last.own ? "→ " : ""}${c.last.text}`), el("span", { class: "t" }, c.last.time)));
+    if (!list.length) box.append(el("div", { class: "muted small", style: "padding:8px" }, t("Noch keine Kontakte – „+“ oder DM an einer Nachricht.")));
   }
   function kstFiltered() {
     const my = S.kst.msgs;
@@ -934,24 +936,35 @@
     }
     if (!list.length) log.append(el("div", { class: "sys" }, t("Keine Nachrichten.")));
     if (atBottom || true) log.scrollTop = log.scrollHeight;
-    const dmOverview = S.kst.tab === "dm" && !S.kst.dm;
-    $("#kst-dm-bar").classList.toggle("hidden", !(S.kst.tab === "dm" && S.kst.dm));
-    $("#kst-dm-list").classList.toggle("hidden", !dmOverview);
-    log.classList.toggle("hidden", dmOverview);
-    if (dmOverview) renderDmList();
-    if (S.kst.tab === "dm" && S.kst.dm) { S.kst.seen[coreOf(S.kst.dm)] = new Date().toISOString(); localStorage.setItem("cl.dmseen", JSON.stringify(S.kst.seen)); }
-    $("#kst-dm-call").textContent = S.kst.dm;
+    const dmMode = S.kst.tab === "dm";
+    $("#kst-dm-pane").classList.toggle("hidden", !dmMode);
+    log.classList.toggle("hidden", dmMode);
+    if (dmMode) {
+      renderDmList();
+      const msgs = $("#kst-dm-msgs"); msgs.innerHTML = "";
+      const u = S.kst.dm ? kstUser(S.kst.dm) : null;
+      $("#kst-dm-head").innerHTML = "";
+      if (S.kst.dm) {
+        $("#kst-dm-head").append(el("b", { class: "c", style: "cursor:pointer", onclick: () => fillFromKst(S.kst.dm, u?.locator) }, S.kst.dm), ` ${u?.name || ""} ${u?.locator || ""}${u?.km != null ? ` · ${u.km} km ${u.bearing}°` : ""}`);
+        for (const m of list) msgs.append(el("div", { class: "m" + (m.own ? " own" : "") }, el("span", { class: "t" }, m.time), el("span", { class: "c" }, m.own ? t("ich") : m.call), el("span", { class: "txt" }, m.text)));
+        if (!list.length) msgs.append(el("div", { class: "sys" }, t("Noch keine Nachrichten in diesem Gespräch.")));
+        msgs.scrollTop = msgs.scrollHeight;
+        S.kst.seen[coreOf(S.kst.dm)] = new Date().toISOString(); localStorage.setItem("cl.dmseen", JSON.stringify(S.kst.seen));
+      } else $("#kst-dm-head").textContent = t("Kontakt wählen");
+      $("#kst-input").placeholder = S.kst.dm ? t("Nachricht an {call} …", { call: S.kst.dm }) : t("Erst Kontakt wählen");
+    } else $("#kst-input").placeholder = t("Nachricht an den KST-Chat … (/CQ CALL Text für gezielt)");
     renderKstBadges();
   }
-  function replyTo(call) { const i = $("#kst-input"); i.value = `/CQ ${call} `; i.focus(); if (S.kst.tab === "dm") setDm(call, true); }
-  function setDm(call, keep) { S.kst.dm = call; if (S.kst.tab !== "dm") setChatTab("dm"); renderKst(); const i = $("#kst-input"); if (!i.value) i.value = `/CQ ${call} `; i.focus(); }
-  $("#btn-kst-dm-off").addEventListener("click", () => { S.kst.dm = ""; renderKst(); });
+  function replyTo(call) { const i = $("#kst-input"); i.value = `/CQ ${call} `; i.focus(); }
+  function setDm(call) { S.kst.dm = call; if (S.kst.tab !== "dm") setChatTab("dm"); renderKst(); $("#kst-input").focus(); }
+  $("#btn-dm-new").addEventListener("click", () => { const c = (prompt(t("Rufzeichen für neues Gespräch:")) || "").trim().toUpperCase(); if (c) setDm(c); });
   $("#kst-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const text = $("#kst-input").value.trim(); if (!text) return;
+    let text = $("#kst-input").value.trim(); if (!text) return;
+    if (S.kst.tab === "dm") { if (!S.kst.dm) return toast(t("Erst Kontakt wählen"), "err"); if (!text.startsWith("/")) text = `/CQ ${S.kst.dm} ${text}`; }
     try { await api("POST", "/api/kst/send", { text }); $("#kst-input").value = ""; } catch (err) { toast(err.message, "err"); }
   });
-  function kstTarget() { return S.kst.dm || ($("#kst-input").value.match(/^\/CQ\s+(\S+)/i) || [])[1] || F.call.value.trim() || ""; }
+  function kstTarget() { return (S.kst.tab === "dm" && S.kst.dm) || ($("#kst-input").value.match(/^\/CQ\s+(\S+)/i) || [])[1] || F.call.value.trim() || ""; }
   function expandKst(text) {
     const st = station() || {}; const call = kstTarget(); const u = call ? kstUser(call) : null;
     return text.replace(/\{(\w+)\}/g, (_, k) => ({ call, name: u?.name?.split(" ")[0] || "", loc: u?.locator || "", mycall: st.call || "", myloc: st.locator || "", band: (st.band || "").replace("MHz", " MHz"), nick: S.nick })[k] ?? `{${k}}`);

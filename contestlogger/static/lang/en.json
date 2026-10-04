@@ -339,5 +339,14 @@
  "vorausgewählt": "preselected",
  "Empfänger und Text angeben": "Specify recipients and text",
  "Sende an": "Sending to",
- "gesendet": "sent"
+ "gesendet": "sent",
+ "Kontakte": "Contacts",
+ "Neues Gespräch": "New conversation",
+ "Kontakt wählen": "Choose a contact",
+ "Noch keine Kontakte – „+“ oder DM an einer Nachricht.": "No contacts yet – “+” or DM on a message.",
+ "ich": "me",
+ "Noch keine Nachrichten in diesem Gespräch.": "No messages in this conversation yet.",
+ "Nachricht an {call} …": "Message to {call} …",
+ "Erst Kontakt wählen": "Choose a contact first",
+ "Rufzeichen für neues Gespräch:": "Callsign for a new conversation:"
 }

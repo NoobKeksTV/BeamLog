@@ -123,8 +123,16 @@
           <div id="ctab-kst" class="ctab">
             <div class="row small kst-status"><span id="kst-state" class="tag">KST: aus</span><span id="kst-room" class="muted"></span><span class="grow"></span><button id="btn-kst-rundruf" class="ghost small" title="Nutzer im Umkreis anschreiben, die noch nicht im Log sind">Rundruf</button><button id="btn-kst-users" class="ghost small">Nutzer</button></div>
             <div id="kst-users" class="kst-users hidden"></div>
-            <div id="kst-dm-bar" class="row small hidden"><span class="muted">DM mit</span><b id="kst-dm-call"></b><button id="btn-kst-dm-off" class="ghost small">← Gespräche</button></div>
-            <div id="kst-dm-list" class="dm-list hidden"></div>
+            <div id="kst-dm-pane" class="dm-pane hidden">
+              <div class="dm-contacts">
+                <div class="dm-contacts-head"><span class="muted small">Kontakte</span><button id="btn-dm-new" class="ghost small" title="Neues Gespräch">+</button></div>
+                <div id="kst-dm-list" class="dm-list"></div>
+              </div>
+              <div class="dm-chat">
+                <div id="kst-dm-head" class="dm-head muted small">Kontakt wählen</div>
+                <div id="kst-dm-msgs" class="chat-log kst-log dm-msgs"></div>
+              </div>
+            </div>
             <div id="kst-log" class="chat-log kst-log"></div>
             <div id="kst-macros" class="kst-macros"></div>
             <form id="kst-form" class="row"><input id="kst-input" placeholder="Nachricht an den KST-Chat … (/CQ CALL Text für gezielt)" maxlength="300"><button class="primary">Senden</button></form>
