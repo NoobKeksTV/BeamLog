@@ -201,7 +201,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         core = prefixes.core_call(call)
         known = db.lookup_call(core)
         if known and known.get("locator"):
-            return {"source": "local", **{k: known[k] for k in ("call", "locator", "name")}}
+            alts = [a for a in (known.get("alt_locators") or "").split(",") if a and a != known["locator"]]
+            return {"source": "local", **{k: known[k] for k in ("call", "locator", "name")}, "alt_locators": alts}
         client = lookup_client()
         if not client.enabled or not prefixes.is_plausible_call(core):
             return {"source": "none"}
@@ -645,6 +646,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if not st or not c:
             return []
         worked = {q["core_call"] for q in db.list_qsos(station_id)}
+        st_full = db.get_station(station_id, secrets=True) or {}
+        mine = {prefixes.core_call(st["call"]), prefixes.core_call(st_full.get("kst_user") or "")} | {prefixes.core_call(x) for x in kst_my_calls(st_full)}
         out = []
         for u in c.users.values():
             if not u.get("locator") or not geo.is_valid_locator(u["locator"]):
@@ -652,7 +655,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             if u.get("away") and not include_away:
                 continue
             core = prefixes.core_call(u["call"])
-            if core in worked or core == prefixes.core_call(st["call"]):
+            if core in worked or core in mine:
                 continue
             km = geo.distance_km_int(st["locator"], u["locator"])
             if km > max_km:

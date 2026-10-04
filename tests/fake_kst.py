@@ -19,6 +19,12 @@ class FakeKst:
         self.server.close()
         await self.server.wait_closed()
 
+    async def drop_all(self):
+        """Simuliert Internetausfall: alle Client-Verbindungen hart schließen, Server läuft weiter."""
+        for w in self.writers:
+            w.close()
+        self.writers.clear()
+
     async def push(self, line: str):
         for w in self.writers:
             w.write((line + "\r\n").encode("latin-1"))
@@ -48,7 +54,7 @@ class FakeKst:
             line = raw.decode("latin-1").strip()
             self.received.append(line)
             if line.upper() == "/SHOW USER":
-                writer.write(b"DL8NAS           JN59LE Klaus\r\n(DF7KF)          JO30XX Peter\r\nVU2CPL           MK83TE Manoj\r\n")
+                writer.write(b"DL8NAS           JN59LE Klaus\r\n(DF7KF)          JO30XX Peter\r\nVU2CPL           MK83TE Manoj\r\nDN2LH-2          JO31AA Lars\r\n")
                 writer.write(f"1201Z {user} 144/432 MHz chat>\r\n".encode())
             elif line.upper() == "/FAKEMSGS":
                 writer.write(f"1203Z DL8NAS Klaus> ({user})  hallo an dich\r\n".encode())

@@ -308,3 +308,12 @@ body.popup .dm-pane { height: calc(100vh - 230px); grid-template-columns: 170px 
 .result details { margin-top: 4px; }
 .result details summary { cursor: pointer; color: var(--muted); }
 .result details > div { margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--line); }
+
+#hint-altloc button.active { border-color: var(--accent); color: var(--accent); }
+.rundruf-sent { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.rundruf-list label.sent { opacity: .55; text-decoration: line-through; }
+.rr-top { align-items: flex-end; }
+.rr-top label.check { flex-direction: row; align-items: center; gap: 6px; padding-bottom: 9px; }
+.rr-top > button { margin-bottom: 1px; }
+.rr-bottom { margin-top: 10px; align-items: center; }
+.rr-bottom button { white-space: nowrap; }

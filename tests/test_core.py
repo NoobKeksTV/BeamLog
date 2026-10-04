@@ -28,6 +28,7 @@ def test_invalid_locator():
 
 def test_prefixes():
     assert prefixes.core_call("DL1ABC/P") == "DL1ABC"
+    assert prefixes.core_call("DN2LH-2") == "DN2LH" and prefixes.core_call("DN2LH/P-3") == "DN2LH"
     assert prefixes.core_call("OE/DL1ABC") == "DL1ABC"
     assert prefixes.country("OE/DL1ABC") == "Österreich"
     assert prefixes.country("M1CRO/P") == "England"

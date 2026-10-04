@@ -329,7 +329,6 @@
  "Umkreis km": "Radius km",
  "max. Anzahl": "max. count",
  "abwesende (Klammer) auch": "include away (brackets)",
- "Text (Platzhalter {call} {name} {loc} {mycall} {myloc} {band})": "Text (placeholders {call} {name} {loc} {mycall} {myloc} {band})",
  "An ausgewählte senden": "Send to selected",
  "Niemand gefunden – Nutzerliste aktuell? (Knopf „Nutzer“, max. 1 Abfrage/Minute)": "Nobody found – user list up to date? (button “Users”, max. 1 query/minute)",
  "Kandidaten": "candidates",
@@ -371,5 +370,12 @@
  "Alle Bänder als EDI-ZIP": "All bands as EDI ZIP",
  "nur Logs, die die Prüfung bestehen; Details in NICHT_EXPORTIERT.txt im ZIP": "only logs that pass the check; details in NICHT_EXPORTIERT.txt inside the ZIP",
  "Keine Stationen im gewählten Contest.": "No stations in the selected contest.",
- "EDI (REG1TEST) je Station/Band für die Abgabe – vor dem Export läuft die Log-Prüfung. Das ZIP enthält die EDI-Dateien aller geprüften Stationen des Contests.": "EDI (REG1TEST) per station/band for submission – the log check runs before export. The ZIP contains the EDI files of all checked stations of the contest."
+ "EDI (REG1TEST) je Station/Band für die Abgabe – vor dem Export läuft die Log-Prüfung. Das ZIP enthält die EDI-Dateien aller geprüften Stationen des Contests.": "EDI (REG1TEST) per station/band for submission – the log check runs before export. The ZIP contains the EDI files of all checked stations of the contest.",
+ "Standorte": "Locations",
+ "weitere bekannte Standorte": "other known locations",
+ "Textbaustein": "Text snippet",
+ "– eigener Text –": "– own text –",
+ "Text (Platzhalter {call} {name} {loc} {mycall} {myloc} {band}) – jeder Empfänger bekommt ihn als /CQ-Nachricht": "Text (placeholders {call} {name} {loc} {mycall} {myloc} {band}) – each recipient gets it as a /CQ message",
+ "fertig": "done",
+ "Weitere bekannte Standorte dieses Rufzeichens – anklicken zum Übernehmen": "Other known locations of this callsign – click to use"
 }

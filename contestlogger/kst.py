@@ -41,8 +41,13 @@ def parse_message(line: str) -> dict | None:
     if not m or PROMPT_RE.match(line.strip()):
         return None
     hhmm, call, name, to, text = m.groups()
-    return {"time": f"{hhmm[:2]}:{hhmm[2:]}", "call": call.upper(), "name": html.unescape(name.strip()),
-            "to": (to or "").upper(), "text": html.unescape(text.strip())}
+    return {"time": f"{hhmm[:2]}:{hhmm[2:]}", "call": _base(call), "name": html.unescape(name.strip()),
+            "to": _base(to or ""), "text": html.unescape(text.strip())}
+
+
+def _base(call: str) -> str:
+    """KST hängt bei Mehrfach-Anmeldung -2, -3 an (DN2LH-2) – das ist kein Teil des Rufzeichens."""
+    return re.sub(r"-\d{1,2}$", "", (call or "").strip().upper())
 
 
 def parse_user(line: str) -> dict | None:
@@ -50,7 +55,7 @@ def parse_user(line: str) -> dict | None:
     if not m or not m.group(2):
         return None
     call, loc, name = m.groups()
-    return {"call": call.upper(), "locator": loc, "name": html.unescape(name.strip()), "away": line.lstrip().startswith("(")}
+    return {"call": _base(call), "locator": loc, "name": html.unescape(name.strip()), "away": line.lstrip().startswith("(")}
 
 
 class KstClient:
@@ -70,7 +75,9 @@ class KstClient:
         self._task: asyncio.Task | None = None
         self._cmd_queue: asyncio.Queue[str] = asyncio.Queue()
         self._last_cmd = 0.0
+        self._last_rx = 0.0
         self._stop = False
+        self._disconnected: asyncio.Event | None = None
 
     # ------------------------------------------------------------ Steuerung
     def start(self) -> None:
@@ -118,12 +125,14 @@ class KstClient:
         except Exception:  # noqa: BLE001
             pass
 
+    RECONNECT_WAIT = 5.0  # Sekunden bis zum ersten Neuverbinden (verdoppelt sich bis 120 s)
+
     async def _run(self) -> None:
-        backoff = 5
+        backoff = self.RECONNECT_WAIT
         while not self._stop:
             try:
                 await self._session()
-                backoff = 5
+                backoff = self.RECONNECT_WAIT
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # noqa: BLE001
@@ -165,12 +174,24 @@ class KstClient:
         await self.writer.drain()
         self.state = "verbunden"
         await self._emit({"type": "kst_status", "state": self.state, "error": ""})
+        self._last_cmd = 0.0  # neue Sitzung: Kommandodrossel gilt je Verbindung
         await self._cmd_queue.put("/SHOW USER")
+        self._disconnected = asyncio.Event()
+        self._last_rx = time.time()
         reader_task = asyncio.create_task(self._reader_loop())
         roster_task = asyncio.create_task(self._roster_loop())
         try:
             while not self._stop:
-                cmd = await self._cmd_queue.get()
+                # auf nächstes Kommando ODER Verbindungsabbruch warten – sonst würde die Sitzung nach einem
+                # Internetausfall ewig auf ein Kommando warten und sich nie neu verbinden
+                get_task = asyncio.create_task(self._cmd_queue.get())
+                dead_task = asyncio.create_task(self._disconnected.wait())
+                done, _ = await asyncio.wait({get_task, dead_task}, return_when=asyncio.FIRST_COMPLETED)
+                if dead_task in done:
+                    get_task.cancel()
+                    raise ConnectionError(self.error or "Verbindung verloren")
+                dead_task.cancel()
+                cmd = get_task.result()
                 wait = 61 - (time.time() - self._last_cmd)
                 if wait > 0:
                     await asyncio.sleep(wait)
@@ -194,20 +215,42 @@ class KstClient:
 
     async def _roster_loop(self) -> None:
         while not self._stop:
-            await asyncio.sleep(self.ROSTER_INTERVAL)
-            if self.state == "verbunden" and self._cmd_queue.empty():
+            await asyncio.sleep(min(self.ROSTER_INTERVAL, 30))
+            if self.state != "verbunden":
+                continue
+            # Wächter: kommt deutlich länger als ein Abfrage-Intervall nichts mehr vom Server, gilt die
+            # Verbindung als tot (stiller Ausfall ohne TCP-Reset, z. B. Router/Internet weg)
+            if time.time() - self._last_rx > self.ROSTER_INTERVAL + 180:
+                self.error = "keine Antwort vom Server – verbinde neu"
+                self._mark_dead()
+                continue
+            if time.time() - self._last_cmd >= self.ROSTER_INTERVAL and self._cmd_queue.empty():
                 await self._cmd_queue.put("/SHOW USER")
+
+    def _mark_dead(self) -> None:
+        self.state = "getrennt"
+        if self.writer:
+            try:
+                self.writer.close()
+            except Exception:  # noqa: BLE001
+                pass
+        if self._disconnected:
+            self._disconnected.set()
 
     async def _reader_loop(self) -> None:
         self._roster_buf = {}
         while True:
-            raw = await self.reader.readline()  # type: ignore[union-attr]
+            try:
+                raw = await self.reader.readline()  # type: ignore[union-attr]
+            except Exception as e:  # noqa: BLE001  (ConnectionReset, OSError bei Netzausfall)
+                raw = b""
+                self.error = str(e) or "Verbindung verloren"
             if not raw:
-                self.state = "getrennt"
-                await self._emit({"type": "kst_status", "state": self.state, "error": "Verbindung geschlossen"})
-                if self.writer:
-                    self.writer.close()
+                self.error = self.error or "Verbindung geschlossen"
+                await self._emit({"type": "kst_status", "state": "getrennt", "error": self.error})
+                self._mark_dead()
                 return
+            self._last_rx = time.time()
             line = raw.decode("latin-1", "replace").rstrip("\r\n")
             await self._handle_line(line)
 

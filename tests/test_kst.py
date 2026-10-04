@@ -62,6 +62,16 @@ async def _client_against_fake_server(monkeypatch):
     assert not msgs[1]["to_me"]
     assert msgs[2]["own"] and msgs[2]["to"] == "DL8NAS"
     assert "/CQ DL8NAS yes, calling now" in fake.received
+    # Internetausfall: Verbindung bricht weg -> Client verbindet sich von selbst neu und holt die Nutzerliste erneut
+    c.RECONNECT_WAIT = 0.2
+    n_logins = fake.received.count("/SHOW USER")
+    await fake.drop_all()
+    for _ in range(100):
+        await asyncio.sleep(0.05)
+        if c.state == "verbunden" and fake.received.count("/SHOW USER") > n_logins:
+            break
+    assert c.state == "verbunden" and fake.received.count("/SHOW USER") > n_logins
+    assert any(e["type"] == "kst_status" and e["state"] == "getrennt" for e in events)
     await c.stop()
     await fake.stop()
 
@@ -93,7 +103,7 @@ def test_kst_endpoints(tmp_path, monkeypatch):
             st = c.get("/api/kst/status", params={"station_id": sid}).json()
             if st["state"] == "verbunden" and st["users"]:
                 break
-        assert st["state"] == "verbunden" and st["users"] == 3 and st["macros"]
+        assert st["state"] == "verbunden" and st["users"] == 4 and st["macros"]  # DN2LH-2 wird als DN2LH geführt
         assert c.get("/api/kst/status", params={"station_id": sid2}).json()["state"] == "aus"  # andere Station: eigene Verbindung
         assert c.get("/api/callbook", params={"q": "VU2CPL"}).json()["rows"][0]["locator"] == "MK83TE"  # aus Nutzerliste gelernt
         users = c.get("/api/kst/users", params={"station_id": sid, "my": "JO31AA"}).json()
@@ -133,7 +143,7 @@ def test_candidates_and_broadcast(tmp_path, monkeypatch):
             if c.get("/api/kst/status", params={"station_id": sid}).json().get("users"):
                 break
         cand = c.get("/api/kst/candidates", params={"station_id": sid, "max_km": 500}).json()
-        assert [u["call"] for u in cand] == []  # DF7KF ist abwesend, DL8NAS gearbeitet, VU2CPL zu weit
+        assert [u["call"] for u in cand] == []  # DF7KF ist abwesend, DL8NAS gearbeitet, VU2CPL zu weit, DN2LH(-2) bin ich selbst
         cand = c.get("/api/kst/candidates", params={"station_id": sid, "max_km": 500, "include_away": 1}).json()
         assert [u["call"] for u in cand] == ["DF7KF"] and cand[0]["km"] == 135
         r = c.post("/api/kst/broadcast", json={"calls": ["DF7KF", "VU2CPL"], "text": "GA {name}, QRV {band}? loc {myloc}", "station_id": sid}).json()

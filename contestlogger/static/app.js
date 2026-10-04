@@ -493,9 +493,18 @@
     try {
       const r = await GET(`/api/lookup?call=${encodeURIComponent(call)}`);
       if (call !== F.call.value.trim()) return;
-      if (r && r.locator) { setAutoLocator(r.locator); if (r.source !== "local") toast(`${r.call}: ${r.locator}${r.name ? " · " + r.name : ""} (${r.source === "hamqth" ? "HamQTH" : "QRZ"})`); }
-      else if (r && r.source === "error") toast(r.error, "err");
+      if (r && r.locator) { setAutoLocator(r.locator); showAltLocators(r.locator, r.alt_locators || []); if (r.source !== "local") toast(`${r.call}: ${r.locator}${r.name ? " · " + r.name : ""} (${r.source === "hamqth" ? "HamQTH" : "QRZ"})`); }
+      else { showAltLocators("", []); if (r && r.source === "error") toast(r.error, "err"); }
     } catch (_) { /* */ }
+  }
+  function showAltLocators(main, alts) {
+    // Mehrere bekannte Standorte (z. B. Portabel-QTHs): als anklickbare Auswahl unter dem Formular
+    const box = $("#hint-altloc"); box.innerHTML = "";
+    const all = [main, ...alts].filter((x, i, a) => x && a.indexOf(x) === i);
+    if (all.length < 2) return box.classList.add("hidden");
+    box.append(t("Standorte") + ": ");
+    for (const l of all) box.append(el("button", { type: "button", class: "ghost small" + (l === F.loc.value.trim() ? " active" : ""), onclick: () => { F.loc.value = l; S.locAuto = false; F.loc.classList.remove("auto"); updateHints(); showAltLocators(main, alts); F.loc.focus(); } }, l), " ");
+    box.classList.remove("hidden");
   }
   F.loc.addEventListener("input", () => { S.locAuto = false; F.loc.classList.remove("auto"); });
   F.call.addEventListener("blur", lookupCall);
@@ -547,6 +556,7 @@
   function updateHints() {
     const st = station(); const call = F.call.value.trim(); const loc = F.loc.value.trim();
     const dupeBox = $("#hint-dupe");
+    if (call.length < 3) $("#hint-altloc").classList.add("hidden");
     const core = call.split("/").sort((a, b) => b.length - a.length)[0] || "";
     const prev = S.qsos.filter((q) => q.core_call === core && q.id !== S.editingId);
     if (call.length >= 3 && prev.length) {
@@ -798,7 +808,11 @@
       }
       else if (m.type === "kst_users") { S.kst.users = m.users; renderKstUsers(); renderKst(); }
       else if (m.type === "kst_status") { S.kst.status = { ...S.kst.status, state: m.state, error: m.error }; renderKstStatus(); }
-      else if (m.type === "kst_broadcast") { const s_ = $("#rr-status"); if (s_) s_.textContent = `${m.done}/${m.total} ${t("gesendet")} (${m.call})`; }
+      else if (m.type === "kst_broadcast") {
+        const s_ = $("#rr-status"); if (s_) s_.textContent = m.done < m.total ? `${m.done}/${m.total} ${t("gesendet")} – ${t("zuletzt")} ${m.call} …` : `${t("fertig")}: ${m.total} ${t("gesendet")}`;
+        const sent = $("#rr-sent"); if (sent) sent.append(el("span", { class: "tag me" }, `✓ ${m.call}`), " ");
+        const cb = $(`#rr-list .rr-sel[value="${m.call}"]`); if (cb) { cb.checked = false; cb.closest("label").classList.add("sent"); }
+      }
       else if (m.type === "rig") { S.rig[m.station_id] = { freq: m.freq, mode: m.mode, ts: m.ts }; if (m.station_id === S.stationId) renderStationBar(); renderScoreboard(); }
       else if (m.type === "presence") renderPresence(m.users);
       else if (m.type === "update") {
@@ -1003,14 +1017,20 @@
     const st = station(); if (!st) return toast(t("Keine Station gewählt"), "err");
     const box = modal(el("div", {}, el("h3", {}, t("Rundruf – noch nicht gearbeitete Stationen anschreiben")),
       el("p", { class: "muted small" }, t("KST-Nutzer mit Locator im Umkreis von {loc}, die in diesem Log noch fehlen. Jeder Empfänger bekommt eine eigene /CQ-Nachricht, gesendet mit 2 s Abstand.", { loc: st.locator })),
-      el("div", { class: "row" },
+      el("div", { class: "row rr-top" },
         lab(t("Umkreis km"), el("input", { id: "rr-km", type: "number", value: localStorage.getItem("cl.rr.km") || 300, min: 10, max: 2000, style: "width:90px" })),
         lab(t("max. Anzahl"), el("input", { id: "rr-n", type: "number", value: localStorage.getItem("cl.rr.n") || 10, min: 1, max: 60, style: "width:80px" })),
-        lab(t("abwesende (Klammer) auch"), el("input", { id: "rr-away", type: "checkbox" })),
+        el("label", { class: "check" }, el("input", { id: "rr-away", type: "checkbox" }), t("abwesende (Klammer) auch")),
         el("button", { type: "button", class: "ghost", onclick: loadCands }, t("Liste laden"))),
-      lab(t("Text (Platzhalter {call} {name} {loc} {mycall} {myloc} {band})"), el("input", { id: "rr-text", value: localStorage.getItem("cl.rr.text") || "/CQ {call} GA {name}, QRV {band}? pse QSO, my loc {myloc}" })),
+      el("div", { class: "row" },
+        lab(t("Textbaustein"), el("select", { id: "rr-tpl", onchange: (e) => { if (e.target.value) { box.querySelector("#rr-text").value = e.target.value; } } },
+          el("option", { value: "" }, t("– eigener Text –")),
+          ...S.kst.macros.map((m) => el("option", { value: m.text }, `${m.label}: ${m.text}`)),
+          ...(localStorage.getItem("cl.rr.text") ? [el("option", { value: localStorage.getItem("cl.rr.text") }, `${t("zuletzt")}: ${localStorage.getItem("cl.rr.text")}`)] : [])))),
+      lab(t("Text (Platzhalter {call} {name} {loc} {mycall} {myloc} {band}) – jeder Empfänger bekommt ihn als /CQ-Nachricht"), el("input", { id: "rr-text", value: localStorage.getItem("cl.rr.text") || "GA {name}, QRV {band}? pse QSO, my loc {myloc}" })),
       el("div", { id: "rr-list", class: "rundruf-list stack" }, el("div", { class: "muted small" }, "…")),
-      el("div", { class: "row" }, el("button", { type: "button", class: "primary", id: "rr-send" }, t("An ausgewählte senden")), el("span", { id: "rr-status", class: "muted small" }), el("span", { class: "grow" }), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")))));
+      el("div", { class: "row rr-bottom" }, el("button", { type: "button", class: "primary", id: "rr-send" }, t("An ausgewählte senden")), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")), el("span", { id: "rr-status", class: "muted small grow" })),
+      el("div", { id: "rr-sent", class: "rundruf-sent muted small" })));
     async function loadCands() {
       const km = Number(box.querySelector("#rr-km").value) || 300, n = Number(box.querySelector("#rr-n").value) || 10, away = box.querySelector("#rr-away").checked ? 1 : 0;
       localStorage.setItem("cl.rr.km", km); localStorage.setItem("cl.rr.n", n);
@@ -1026,7 +1046,9 @@
       const calls = $$("#rr-list .rr-sel:checked").map((c) => c.value); const text = box.querySelector("#rr-text").value.trim();
       if (!calls.length || !text) return toast(t("Empfänger und Text angeben"), "err");
       localStorage.setItem("cl.rr.text", text);
-      try { await api("POST", "/api/kst/broadcast", { calls, text, station_id: st.id }); box.querySelector("#rr-status").textContent = `${t("Sende an")} ${calls.length} …`; } catch (err) { toast(err.message, "err"); }
+      box.querySelector("#rr-sent").innerHTML = "";
+      box.querySelector("#rr-status").textContent = `${t("Sende an")} ${calls.length}: ${calls.join(", ")} …`;
+      try { await api("POST", "/api/kst/broadcast", { calls, text, station_id: st.id }); } catch (err) { box.querySelector("#rr-status").textContent = err.message; toast(err.message, "err"); }
     });
     loadCands();
   }
@@ -1334,7 +1356,7 @@
       const r = await GET(`/api/callbook?q=${encodeURIComponent($("#cb-search").value.trim())}&limit=300`);
       $("#cb-count").textContent = r.total;
       for (const c of r.rows) tb.append(el("tr", {},
-        el("td", {}, el("b", {}, c.call)), el("td", {}, c.locator), el("td", { class: "muted small" }, c.name || ""),
+        el("td", {}, el("b", {}, c.call)), el("td", {}, c.locator, c.alt_locators ? el("span", { class: "muted small", title: t("weitere bekannte Standorte") }, ` (${c.alt_locators.split(",").join(", ")})`) : null), el("td", { class: "muted small" }, c.name || ""),
         el("td", { class: "num muted small" }, c.qso_count ? `${c.qso_count}×` : ""), el("td", { class: "muted small" }, c.last_seen ? fmtDate(c.last_seen) : ""),
         el("td", { class: "actions" }, el("button", { class: "ghost", onclick: () => { $("#cb-call").value = c.call; $("#cb-loc").value = c.locator; $("#cb-name").value = c.name || ""; } }, "✎"), " ",
           el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("{call} aus der Stationsdatenbank löschen?", c))) { await api("DELETE", `/api/callbook/${encodeURIComponent(c.call)}`); renderCallbook(); } } }, "✕"))));

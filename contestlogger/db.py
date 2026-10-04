@@ -155,6 +155,14 @@ class Database:
                                       (g["kst_user"], g["kst_pass"], int(g["kst_room"] or 2), int(g["kst_autostart"] == "1")))
             if "station_id" not in kcols:
                 self.conn.execute("ALTER TABLE kst_messages ADD COLUMN station_id INTEGER NOT NULL DEFAULT 0")
+            # Einträge wie DN2LH-2 (KST-Mehrfachanmeldung) mit dem Basis-Rufzeichen zusammenführen
+            for r in self.conn.execute("SELECT call, locator FROM callbook WHERE call GLOB '*-[0-9]' OR call GLOB '*-[0-9][0-9]'").fetchall():
+                base = prefixes.core_call(r["call"])
+                if base and base != r["call"]:
+                    if self.conn.execute("SELECT 1 FROM callbook WHERE call=?", (base,)).fetchone():
+                        self.conn.execute("DELETE FROM callbook WHERE call=?", (r["call"],))
+                    else:
+                        self.conn.execute("UPDATE callbook SET call=? WHERE call=?", (base, r["call"]))
 
     def backup_to(self, path: str | os.PathLike) -> None:
         """Konsistente Kopie der Datenbank (auch bei laufendem Betrieb), atomar über eine temporäre Datei."""
