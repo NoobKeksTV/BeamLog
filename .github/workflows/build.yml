@@ -17,6 +17,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # komplette Historie für die Release-Notes
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -30,12 +32,13 @@ jobs:
         with:
           name: ContestLogger-${{ matrix.os }}
           path: dist/*.zip
+      - name: Release-Notes (Änderungen + Commit-Historie seit dem letzten Release)
+        shell: bash
+        run: python build_tools/release_notes.py "v${{ steps.ver.outputs.version }}" > RELEASE_NOTES.md && cat RELEASE_NOTES.md
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
           tag_name: v${{ steps.ver.outputs.version }}
           name: ContestLogger ${{ steps.ver.outputs.version }}
-          body: |
-            Portable Versionen (kein Python nötig): ZIP entpacken, `ContestLogger.exe` bzw. `./ContestLogger` starten.
-            Siehe START.txt im Paket.
+          body_path: RELEASE_NOTES.md
