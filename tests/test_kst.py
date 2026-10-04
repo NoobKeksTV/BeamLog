@@ -45,7 +45,7 @@ async def _client_against_fake_server(monkeypatch):
 
     async def on_event(ev):
         events.append(ev)
-    c = kst.KstClient("DN2LH", "secret", 2, on_event, my_calls=["DN2LH/P"])
+    c = kst.KstClient("DN2LH", "secret", 2, on_event, my_calls=["DN2LH/P", "DL0ABC"])
     c._last_cmd = 0
     c.start()
     for _ in range(100):
@@ -55,13 +55,15 @@ async def _client_against_fake_server(monkeypatch):
     assert c.state == "verbunden" and "DL8NAS" in c.users and c.users["DF7KF"]["away"]
     await fake.push("1203Z DL8NAS Klaus> (DN2LH/P)  hi Lars, qrv 70cm?")
     await fake.push("1203Z OK1ABC Pepa> cq all")
-    await fake.push("1203Z ON4KST Server> Welcome, please read the rules")  # Systemmeldung -> wird verworfen
+    await fake.push("1203Z DF7KF Peter> dn2lh/p pse qsy 432.200")  # Call im Text, andere Schreibweise -> an mich
+    await fake.push("1203Z DF7KF Peter> (DL0ABC-2)  hi")  # Zusatz-Call aus der Liste mit KST-Anhängsel -> an mich
     await c.send_text("/CQ DL8NAS yes, calling now")
     await asyncio.sleep(0.3)
     msgs = [e["msg"] for e in events if e["type"] == "kst"]
     assert msgs[0]["to_me"] and msgs[0]["locator"] == "JN59LE"
     assert not msgs[1]["to_me"]
-    assert msgs[2]["own"] and msgs[2]["to"] == "DL8NAS"
+    assert msgs[2]["to_me"] and msgs[3]["to_me"] and msgs[3]["to"] == "DL0ABC"
+    assert msgs[4]["own"] and msgs[4]["to"] == "DL8NAS" and not msgs[4]["to_me"]
     assert "/CQ DL8NAS yes, calling now" in fake.received
     # Internetausfall: Verbindung bricht weg -> Client verbindet sich von selbst neu und holt die Nutzerliste erneut
     c.RECONNECT_WAIT = 0.2
@@ -104,7 +106,7 @@ def test_kst_endpoints(tmp_path, monkeypatch):
             st = c.get("/api/kst/status", params={"station_id": sid}).json()
             if st["state"] == "verbunden" and st["users"]:
                 break
-        assert st["state"] == "verbunden" and st["users"] == 4 and st["macros"]  # DN2LH-2 wird als DN2LH geführt
+        assert st["state"] == "verbunden" and st["users"] == 5 and st["macros"]  # DN2LH-2 wird als DN2LH geführt
         assert c.get("/api/kst/status", params={"station_id": sid2}).json()["state"] == "aus"  # andere Station: eigene Verbindung
         assert c.get("/api/callbook", params={"q": "VU2CPL"}).json()["rows"][0]["locator"] == "MK83TE"  # aus Nutzerliste gelernt
         users = c.get("/api/kst/users", params={"station_id": sid, "my": "JO31AA"}).json()
@@ -146,7 +148,9 @@ def test_candidates_and_broadcast(tmp_path, monkeypatch):
         cand = c.get("/api/kst/candidates", params={"station_id": sid, "max_km": 500}).json()
         assert [u["call"] for u in cand] == []  # DF7KF ist abwesend, DL8NAS gearbeitet, VU2CPL zu weit, DN2LH(-2) bin ich selbst
         cand = c.get("/api/kst/candidates", params={"station_id": sid, "max_km": 500, "include_away": 1}).json()
-        assert [u["call"] for u in cand] == ["DF7KF"] and cand[0]["km"] == 135
+        assert [u["call"] for u in cand] == ["DF7KF"] and cand[0]["km"] == 135  # ON4KST (Server) nie dabei
+        assert c.post("/api/kst/rundruf_texts", json={"texts": ["GA {name}, QRV?", " "]}).json() == ["GA {name}, QRV?"]
+        assert c.get("/api/kst/rundruf_texts").json() == ["GA {name}, QRV?"]
         r = c.post("/api/kst/broadcast", json={"calls": ["DF7KF", "VU2CPL"], "text": "GA {name}, QRV {band}? loc {myloc}", "station_id": sid}).json()
         assert r["queued"] == 2
         time.sleep(0.5)

@@ -101,7 +101,9 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return kst_state.get(int(station_id or 0))
 
     def kst_my_calls(st: dict) -> list[str]:
-        return [c for c in re.split(r"[\s,;]+", (st.get("kst_my_calls") or "").upper()) if c] or [st.get("kst_user", "")]
+        """Rufzeichen, bei denen eine KST-Nachricht als 'an mich' gilt: KST-Login, Stations-Call und die 'An mich'-Liste."""
+        extra = [c for c in re.split(r"[\s,;]+", (st.get("kst_my_calls") or "").upper()) if c]
+        return [c for c in [st.get("kst_user") or "", st.get("call") or "", *extra] if c]
 
     async def kst_start(station_id: int) -> dict:
         st = db.get_station(station_id, secrets=True)
@@ -655,7 +657,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             if u.get("away") and not include_away:
                 continue
             core = prefixes.core_call(u["call"])
-            if core in worked or core in mine:
+            if core in worked or core in mine or core in kst.SYSTEM_SENDERS:
                 continue
             km = geo.distance_km_int(st["locator"], u["locator"])
             if km > max_km:
@@ -663,6 +665,17 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             out.append({**u, "km": km, "bearing": round(geo.bearing_deg(st["locator"], u["locator"])) % 360})
         out.sort(key=lambda u: u["km"])
         return out
+
+    @app.get("/api/kst/rundruf_texts")
+    def rundruf_texts_get():
+        return json.loads(db.get_setting("rundruf_texts", "") or "[]")
+
+    @app.post("/api/kst/rundruf_texts")
+    def rundruf_texts_set(body: dict):
+        """Eigene Rundruf-Texte, gemeinsam für alle Operatoren (kein Admin nötig)."""
+        texts = [str(x).strip() for x in (body.get("texts") or []) if str(x).strip()][:30]
+        db.set_setting("rundruf_texts", json.dumps(texts))
+        return texts
 
     @app.post("/api/kst/broadcast")
     async def kst_broadcast(body: dict, x_nick: str | None = Header(default=None)):
@@ -705,7 +718,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.get("/api/kst/messages")
     def kst_messages(station_id: int = 0, limit: int = 300):
-        rows = db.rows("SELECT * FROM kst_messages WHERE station_id=? AND call NOT IN ('ON4KST','KST','SYSOP','ADMIN') ORDER BY id DESC LIMIT ?", (station_id, min(int(limit), 2000)))
+        rows = db.rows("SELECT * FROM kst_messages WHERE station_id=? ORDER BY id DESC LIMIT ?", (station_id, min(int(limit), 2000)))
         c = kst_client(station_id)
         users = c.users if c else {}
         out = []

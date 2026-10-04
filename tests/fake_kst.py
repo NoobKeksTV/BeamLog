@@ -54,7 +54,7 @@ class FakeKst:
             line = raw.decode("latin-1").strip()
             self.received.append(line)
             if line.upper() == "/SHOW USER":
-                writer.write(b"DL8NAS           JN59LE Klaus\r\n(DF7KF)          JO30XX Peter\r\nVU2CPL           MK83TE Manoj\r\nDN2LH-2          JO31AA Lars\r\n")
+                writer.write(b"DL8NAS           JN59LE Klaus\r\n(DF7KF)          JO30XX Peter\r\nVU2CPL           MK83TE Manoj\r\nDN2LH-2          JO31AA Lars\r\nON4KST           JO20AA Server\r\n")
                 writer.write(f"1201Z {user} 144/432 MHz chat>\r\n".encode())
             elif line.upper() == "/FAKEMSGS":
                 writer.write(f"1203Z DL8NAS Klaus> ({user})  hallo an dich\r\n".encode())

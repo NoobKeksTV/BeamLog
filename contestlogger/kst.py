@@ -32,7 +32,7 @@ ROOMS = {1: "50/70 MHz", 2: "144/432 MHz", 3: "Microwave", 4: "EME/JT65", 5: "Lo
 MSG_RE = re.compile(r"^(\d{4})Z\s+([A-Z0-9/\-]+)\s+(.*?)>\s*(?:\(([A-Z0-9/\-]+)\)\s*)?(.*)$")
 PROMPT_RE = re.compile(r"^(\d{4})Z\s+([A-Z0-9/\-]+)\s+.*chat>\s*$")
 USER_RE = re.compile(r"^\(?([A-Z0-9/\-]{3,12})\)?\s{2,}([A-R]{2}\d{2}[A-X]{2})?\s*(.*)$")
-SYSTEM_SENDERS = {"ON4KST", "KST", "SYSOP", "ADMIN"}
+SYSTEM_SENDERS = {"ON4KST", "KST", "SYSOP", "ADMIN"}  # Chat-Server selbst – wird beim Rundruf nie angeschrieben
 CALL_IN_TEXT = re.compile(r"\b([A-Z0-9]{1,3}[0-9][A-Z0-9]{0,4}[A-Z](?:/[A-Z0-9]{1,3})?)\b")
 
 
@@ -65,8 +65,9 @@ class KstClient:
     def __init__(self, user: str, password: str, room: int, on_event: Callable[[dict], Awaitable[None]], my_calls: list[str] | None = None):
         self.user, self.password, self.room = user.strip().upper(), password, int(room or 2)
         self.on_event = on_event
-        # Nachrichten "an mich": Zielcall (oder Call im Text) steht in dieser Liste – Standard ist nur der KST-Login
-        self.my_calls = {c.strip().upper() for c in (my_calls or []) if c.strip()} or {self.user}
+        # Nachrichten "an mich": Kern-Rufzeichen (ohne /P, -2 …) des Ziels oder eines Calls im Text steht in dieser Liste;
+        # der KST-Login ist immer dabei, der Server ergänzt Stations-Call und die "An mich"-Liste
+        self.my_calls = {prefixes.core_call(c) for c in [*(my_calls or []), self.user] if c and c.strip()}
         self.reader: asyncio.StreamReader | None = None
         self.writer: asyncio.StreamWriter | None = None
         self.state = "aus"
@@ -266,12 +267,11 @@ class KstClient:
                 await self._emit({"type": "kst_users", "users": list(self.users.values())})
             return
         msg = parse_message(line)
-        if msg and msg["call"] in SYSTEM_SENDERS:
-            return  # Systemmeldungen des Chat-Servers (ON4KST) nicht als Nachricht führen
         if msg:
             msg["ts"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            msg["own"] = msg["call"] == self.user
-            msg["to_me"] = bool(msg["to"] and msg["to"] in self.my_calls) or any(c in self.my_calls for c in CALL_IN_TEXT.findall(msg["text"].upper()))
+            msg["own"] = prefixes.core_call(msg["call"]) == prefixes.core_call(self.user)
+            msg["to_me"] = (not msg["own"]) and (bool(msg["to"] and prefixes.core_call(msg["to"]) in self.my_calls)
+                                                or any(prefixes.core_call(c) in self.my_calls for c in CALL_IN_TEXT.findall(msg["text"].upper())))
             u = self.users.get(msg["call"])
             msg["locator"] = u["locator"] if u else ""
             self.messages.append(msg)

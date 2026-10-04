@@ -933,7 +933,7 @@
     if (!list.length) box.append(el("div", { class: "muted small", style: "padding:8px" }, t("Noch keine Kontakte – „+“ oder DM an einer Nachricht.")));
   }
   function kstFiltered() {
-    const my = S.kst.msgs.filter((m) => !["ON4KST", "KST", "SYSOP", "ADMIN"].includes(m.call));
+    const my = S.kst.msgs;
     if (S.kst.tab === "dm" && S.kst.dm) { const c = coreOf(S.kst.dm); return my.filter((m) => (m.own ? coreOf(m.to) === c : (m.to_me && coreOf(m.call) === c))); }
     return my;
   }
@@ -1022,15 +1022,25 @@
         lab(t("max. Anzahl"), el("input", { id: "rr-n", type: "number", value: localStorage.getItem("cl.rr.n") || 10, min: 1, max: 60, style: "width:80px" })),
         el("label", { class: "check" }, el("input", { id: "rr-away", type: "checkbox" }), t("abwesende (Klammer) auch")),
         el("button", { type: "button", class: "ghost", onclick: loadCands }, t("Liste laden"))),
-      el("div", { class: "row" },
-        lab(t("Textbaustein"), el("select", { id: "rr-tpl", onchange: (e) => { if (e.target.value) { box.querySelector("#rr-text").value = e.target.value; } } },
-          el("option", { value: "" }, t("– eigener Text –")),
-          ...S.kst.macros.map((m) => el("option", { value: m.text }, `${m.label}: ${m.text}`)),
-          ...(localStorage.getItem("cl.rr.text") ? [el("option", { value: localStorage.getItem("cl.rr.text") }, `${t("zuletzt")}: ${localStorage.getItem("cl.rr.text")}`)] : [])))),
-      lab(t("Text (Platzhalter {call} {name} {loc} {mycall} {myloc} {band}) – jeder Empfänger bekommt ihn als /CQ-Nachricht"), el("input", { id: "rr-text", value: localStorage.getItem("cl.rr.text") || "GA {name}, QRV {band}? pse QSO, my loc {myloc}" })),
+      el("div", { class: "row rr-top" },
+        lab(t("Gespeicherte Rundruf-Texte"), el("select", { id: "rr-tpl", style: "max-width:420px", onchange: (e) => { if (e.target.value) box.querySelector("#rr-text").value = e.target.value; } }, el("option", { value: "" }, t("– Text wählen –")))),
+        el("button", { type: "button", class: "ghost", title: t("aktuellen Text in die Liste aufnehmen"), onclick: () => saveTexts([...rrTexts.filter((x) => x !== box.querySelector("#rr-text").value.trim()), box.querySelector("#rr-text").value.trim()]) }, t("Text speichern")),
+        el("button", { type: "button", class: "ghost danger", title: t("gewählten Text aus der Liste entfernen"), onclick: () => { const v = box.querySelector("#rr-tpl").value; if (v) saveTexts(rrTexts.filter((x) => x !== v)); } }, "✕")),
+      lab(t("Text (Platzhalter {call} {name} {loc} {mycall} {myloc} {band}) – jeder Empfänger bekommt ihn als /CQ-Nachricht"), el("input", { id: "rr-text", value: localStorage.getItem("cl.rr.text") || "" })),
       el("div", { id: "rr-list", class: "rundruf-list stack" }, el("div", { class: "muted small" }, "…")),
       el("div", { class: "row rr-bottom" }, el("button", { type: "button", class: "primary", id: "rr-send" }, t("An ausgewählte senden")), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")), el("span", { id: "rr-status", class: "muted small grow" })),
       el("div", { id: "rr-sent", class: "rundruf-sent muted small" })));
+    let rrTexts = [];
+    function renderTexts() {
+      const sel = box.querySelector("#rr-tpl"); const cur = box.querySelector("#rr-text").value.trim(); sel.innerHTML = "";
+      sel.append(el("option", { value: "" }, rrTexts.length ? t("– Text wählen –") : t("– noch keine gespeichert –")));
+      for (const x of rrTexts) sel.append(el("option", { value: x, selected: x === cur ? 1 : null }, x));
+    }
+    async function saveTexts(list) {
+      if (!list.length && !rrTexts.length) return;
+      try { rrTexts = await api("POST", "/api/kst/rundruf_texts", { texts: list }); renderTexts(); toast(t("Rundruf-Texte gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
+    }
+    GET("/api/kst/rundruf_texts").then((l) => { rrTexts = l; renderTexts(); if (!box.querySelector("#rr-text").value && l.length) box.querySelector("#rr-text").value = l[0]; }).catch(() => {});
     async function loadCands() {
       const km = Number(box.querySelector("#rr-km").value) || 300, n = Number(box.querySelector("#rr-n").value) || 10, away = box.querySelector("#rr-away").checked ? 1 : 0;
       localStorage.setItem("cl.rr.km", km); localStorage.setItem("cl.rr.n", n);
@@ -1305,12 +1315,12 @@
         el("details", {}, el("summary", { class: "muted" }, t("Angaben für die EDI-Abgabe (Standort, Verantwortlicher, Technik)")),
           el("div", { class: "grid2" }, INFO_FIELDS.map(([k, l]) => lab(l, el("input", { id: `i-${k}`, value: info[k] ?? prevInfo[k] ?? "" }))))),
         el("details", { open: s?.kst_user ? 1 : null }, el("summary", { class: "muted" }, t("ON4KST-Chat dieser Station")),
-          el("p", { class: "muted small" }, t("Eigene KST-Verbindung je Station. „An mich“: Rufzeichen (Komma-getrennt), bei denen Nachrichten als an dich gerichtet gelten – Standard ist nur der KST-Login, z. B. DN2LH, DN2LH/P.")),
+          el("p", { class: "muted small" }, t("Eigene KST-Verbindung je Station. Nachrichten an den KST-Login oder das Stations-Call gelten immer als „an mich“ (Zusätze wie /P oder -2 werden ignoriert); weitere Rufzeichen Komma-getrennt eintragen.")),
           el("div", { class: "grid2" },
             lab(t("KST-Rufzeichen"), el("input", { id: "s-kuser", value: s?.kst_user || "", placeholder: "DN2LH", autocomplete: "off" })),
             lab(s?.kst_pass_set ? t("KST-Passwort (leer = unverändert)") : t("KST-Passwort"), el("input", { id: "s-kpass", type: "password", autocomplete: "new-password" })),
             lab(t("Raum"), el("select", { id: "s-kroom" }, Object.entries(S.kstRooms || { 2: "144/432 MHz" }).map(([n, name]) => el("option", { value: n, selected: Number(n) === (s?.kst_room || 2) ? 1 : null }, `${n} – ${name}`)))),
-            lab(t("„An mich“-Rufzeichen"), el("input", { id: "s-kmy", value: s?.kst_my_calls || "", placeholder: s?.kst_user || "DN2LH, DN2LH/P" })),
+            lab(t("„An mich“-Rufzeichen"), el("input", { id: "s-kmy", value: s?.kst_my_calls || "", placeholder: t("weitere, z. B. DL0ABC") })),
             lab(t("beim Serverstart verbinden"), el("input", { id: "s-kauto", type: "checkbox", checked: s?.kst_autostart ? 1 : null }))),
           s ? el("div", { class: "row" },
             el("button", { type: "button", class: "ghost", onclick: async () => { try { await api("POST", "/api/kst/start", { station_id: s.id }); toast(t("KST: verbinde …")); } catch (err) { toast(err.message, "err"); } } }, t("Verbinden")),
