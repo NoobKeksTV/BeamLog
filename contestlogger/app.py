@@ -669,6 +669,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if not st or not c:
             return []
         worked = {q["core_call"] for q in db.list_qsos(station_id)}
+        # wer von dieser Station schon eine gerichtete Nachricht bekommen hat (Rundruf, DM, anderer Client), fällt raus
+        messaged = {prefixes.core_call(r["to_call"]) for r in db.rows("SELECT DISTINCT to_call FROM kst_messages WHERE station_id=? AND own=1 AND to_call<>''", (station_id,))}
         st_full = db.get_station(station_id, secrets=True) or {}
         mine = {prefixes.core_call(st["call"]), prefixes.core_call(st_full.get("kst_user") or "")} | {prefixes.core_call(x) for x in kst_my_calls(st_full)}
         out = []
@@ -678,7 +680,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             if u.get("away") and not include_away:
                 continue
             core = prefixes.core_call(u["call"])
-            if core in worked or core in mine or core in kst.SYSTEM_SENDERS:
+            if core in worked or core in mine or core in messaged or core in kst.SYSTEM_SENDERS:
                 continue
             km = geo.distance_km_int(st["locator"], u["locator"])
             if km > max_km:

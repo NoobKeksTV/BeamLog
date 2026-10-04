@@ -157,6 +157,9 @@ def test_candidates_and_broadcast(tmp_path, monkeypatch):
         assert r["queued"] == 2
         time.sleep(0.5)
         assert any(x == "/CQ DF7KF GA Peter, QRV 432 MHz? loc JO31AA" for x in fake.received)
+        time.sleep(0.3)
+        cand = c.get("/api/kst/candidates", params={"station_id": sid, "max_km": 500, "include_away": 1}).json()
+        assert [u["call"] for u in cand] == []  # DF7KF hat schon eine Nachricht bekommen -> nicht mehr dabei
         c.post("/api/kst/stop", headers=H)
     loop.call_soon_threadsafe(loop.stop)
 

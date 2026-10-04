@@ -1077,7 +1077,7 @@
   async function rundrufDialog() {
     const st = station(); if (!st) return toast(t("Keine Station gewählt"), "err");
     const box = modal(el("div", {}, el("h3", {}, t("Rundruf – noch nicht gearbeitete Stationen anschreiben")),
-      el("p", { class: "muted small" }, t("KST-Nutzer mit Locator im Umkreis von {loc}, die in diesem Log noch fehlen. Jeder Empfänger bekommt eine eigene /CQ-Nachricht, gesendet mit 2 s Abstand.", { loc: st.locator })),
+      el("p", { class: "muted small" }, t("KST-Nutzer mit Locator im Umkreis von {loc}, die in diesem Log noch fehlen und von dieser Station noch keine Nachricht bekommen haben. Jeder Empfänger bekommt eine eigene /CQ-Nachricht, gesendet mit 2 s Abstand.", { loc: st.locator })),
       el("div", { class: "row rr-top" },
         lab(t("Umkreis km"), el("input", { id: "rr-km", type: "number", value: localStorage.getItem("cl.rr.km") || 300, min: 10, max: 2000, style: "width:90px" })),
         lab(t("max. Anzahl"), el("input", { id: "rr-n", type: "number", value: localStorage.getItem("cl.rr.n") || 10, min: 1, max: 60, style: "width:80px" })),
