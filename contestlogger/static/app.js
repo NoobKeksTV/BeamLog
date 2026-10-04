@@ -1008,11 +1008,9 @@
     const log = $("#kst-log"); const snap = Scroll.snapshot(log);
     log.innerHTML = "";
     const list = kstFiltered().slice(-400);
-    const partners = new Set(S.kst.msgs.filter((m) => m.own && m.to).map((m) => coreOf(m.to)));  // wen ich angeschrieben habe
     for (const m of list) {
       const u = kstUser(m.call);
-      const partner = !m.own && !m.to_me && partners.has(coreOf(m.call));
-      log.append(el("div", { class: "m" + (m.to_me ? " me" : "") + (m.own ? " own" : "") + (partner ? " partner" : "") },
+      log.append(el("div", { class: "m" + (m.to_me ? " me" : "") + (m.own ? " own" : "") },
         el("span", { class: "t" }, m.time),
         el("span", { class: "c", title: (u?.locator || m.locator || "") + " " + (m.name || ""), onclick: () => fillFromKst(m.call, u?.locator || m.locator) }, m.call),
         m.to ? el("span", { class: "to" }, `(${m.to})`) : null,
@@ -1436,7 +1434,8 @@
             lab(t("beim Serverstart verbinden"), el("input", { id: "s-kauto", type: "checkbox", checked: s?.kst_autostart ? 1 : null }))),
           s ? el("div", { class: "row" },
             el("button", { type: "button", class: "ghost", onclick: async () => { try { await api("POST", "/api/kst/start", { station_id: s.id }); toast(t("KST: verbinde …")); } catch (err) { toast(err.message, "err"); } } }, t("Verbinden")),
-            el("button", { type: "button", class: "ghost", onclick: async () => { try { await api("POST", "/api/kst/stop", { station_id: s.id }); toast(t("KST getrennt")); } catch (err) { toast(err.message, "err"); } } }, t("Trennen"))) : null),
+            el("button", { type: "button", class: "ghost", onclick: async () => { try { await api("POST", "/api/kst/stop", { station_id: s.id }); toast(t("KST getrennt")); } catch (err) { toast(err.message, "err"); } } }, t("Trennen")),
+            el("button", { type: "button", class: "ghost small", title: t("Rohdaten der Verbindung (zur Fehlersuche)"), onclick: async () => { try { const r = await GET(`/api/kst/raw?station_id=${s.id}`); const w = window.open("", "kstraw"); w.document.write("<pre style=\"font:12px monospace;white-space:pre-wrap\">" + r.lines.map((l) => l.replace(/</g, "&lt;")).join("\n") + "</pre>"); } catch (err) { toast(err.message, "err"); } } }, t("Rohdaten"))) : null),
         el("div", { class: "row" }, el("button", { class: "primary" }, t("Speichern")), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Abbrechen"))))));
     box.querySelector("#s-form").addEventListener("submit", async (e) => {
       e.preventDefault();

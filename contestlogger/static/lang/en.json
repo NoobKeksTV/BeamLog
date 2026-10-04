@@ -429,5 +429,7 @@
  "Alle {n} offenen Kandidaten sind schon ausgewählt – Umkreis vergrößern oder erst senden.": "All {n} open candidates are already selected – increase the radius or send first.",
  "Alle Kandidaten wurden bereits angeschrieben – Umkreis vergrößern oder Liste neu laden.": "All candidates have already been contacted – increase the radius or reload the list.",
  "Ende der Liste – wieder von vorn": "End of list – starting over",
- "KST-Nutzer mit Locator im Umkreis von {loc}, die in diesem Log noch fehlen und von dieser Station noch keine Nachricht bekommen haben. Jeder Empfänger bekommt eine eigene /CQ-Nachricht, gesendet mit 2 s Abstand.": "KST users with locator around {loc} that are still missing in this log and have not received a message from this station yet. Each recipient gets its own /CQ message, sent 2 s apart."
+ "KST-Nutzer mit Locator im Umkreis von {loc}, die in diesem Log noch fehlen und von dieser Station noch keine Nachricht bekommen haben. Jeder Empfänger bekommt eine eigene /CQ-Nachricht, gesendet mit 2 s Abstand.": "KST users with locator around {loc} that are still missing in this log and have not received a message from this station yet. Each recipient gets its own /CQ message, sent 2 s apart.",
+ "Rohdaten": "Raw data",
+ "Rohdaten der Verbindung (zur Fehlersuche)": "Raw data of the connection (for troubleshooting)"
 }

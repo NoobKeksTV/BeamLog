@@ -189,5 +189,18 @@ def test_kst_history_not_duplicated(tmp_path, monkeypatch):
         time.sleep(0.5)
         msgs = c.get("/api/kst/messages", params={"station_id": sid}).json()
         assert len([m for m in msgs if m["text"] == "hi Lars"]) == 1
+        # Neuanmeldung (z. B. nach Server-Neustart): der Server zeigt den Verlauf nochmal, leicht anders formatiert
+        fake.history = ["1203Z DL8NAS Klaus> (DN2LH)   hi  Lars\r\n"]
+        for cl in list(app.state.kst_clients.values()) if hasattr(app.state, "kst_clients") else []:
+            cl.RECONNECT_WAIT = 0.2
+        asyncio.run_coroutine_threadsafe(fake.drop_all(), loop).result()
+        for _ in range(100):
+            time.sleep(0.05)
+            st = c.get("/api/kst/status", params={"station_id": sid}).json()
+            if st.get("state") == "verbunden" and st.get("messages", 0) >= 2:
+                break
+        time.sleep(0.3)
+        msgs = c.get("/api/kst/messages", params={"station_id": sid}).json()
+        assert len([m for m in msgs if m["text"] == "hi Lars"]) == 1  # Wiederholung erkannt, nicht doppelt
         c.post("/api/kst/stop", json={"station_id": sid}, headers=H)
     loop.call_soon_threadsafe(loop.stop)

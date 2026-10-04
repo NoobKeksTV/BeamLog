@@ -255,7 +255,6 @@ body.bigscreen .kpis.big .kpi b { font-size: 56px; }
 .kst-log .m { display: block; padding: 2px 4px; border-radius: 4px; line-height: 1.35; }
 .kst-log .m > span { margin-right: 5px; }
 .kst-log .m.me { background: rgba(255,179,71,.22); border-left: 3px solid var(--warn); }           /* an mich (Antworten) */
-.kst-log .m.partner { background: rgba(80,200,120,.12); border-left: 3px solid #4fc87a; }           /* von jemandem, den ich angeschrieben habe (an andere) */
 .kst-log .m.own { background: rgba(63,179,255,.14); border-left: 3px solid var(--accent); }
 .kst-log .m.own .c { color: var(--text); }
 .kst-log .m .c { font-weight: 700; color: var(--accent); cursor: pointer; font-family: var(--mono); }
@@ -299,7 +298,7 @@ table.fixed td.actions button, table.fixed td.actions .button { margin-left: 2px
 .dm-head .c, .dm-msgs .c { cursor: pointer; }
 .dm-head .c:hover, .dm-msgs .c:hover { text-decoration: underline; }
 .dm-msgs { flex: 1; height: auto; min-height: 0; margin-bottom: 0; overflow: auto; }
-.dm-msgs .m, .dm-msgs .m.own, .dm-msgs .m.me, .dm-msgs .m.partner { background: none; border-left: 0; opacity: 1; }  /* im Gespräch keine Markierungen */
+.dm-msgs .m, .dm-msgs .m.own, .dm-msgs .m.me { background: none; border-left: 0; opacity: 1; }  /* im Gespräch keine Markierungen */
 .dm-msgs .m.own .c { color: var(--muted); }
 body.popup .dm-pane { height: calc(100vh - 230px); grid-template-columns: 170px minmax(0, 1fr); }
 .rundruf-list { max-height: 40vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 4px; }

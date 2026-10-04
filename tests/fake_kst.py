@@ -8,6 +8,7 @@ class FakeKst:
         self.port = 0
         self.received: list[str] = []
         self.writers: list[asyncio.StreamWriter] = []
+        self.history: list[str] = []
 
     async def start(self):
         self.server = await asyncio.start_server(self.handle, "127.0.0.1", 0)
@@ -45,6 +46,9 @@ class FakeKst:
         writer.write(b"50/70 MHz..............1\r\n144/432 MHz............2\r\nMicrowave..............3\r\nYour choice           :")
         await writer.drain()
         room = (await reader.readline()).decode().strip()
+        # wie der echte Server: beim Anmelden den letzten Verlauf nochmal zeigen
+        for h in self.history:
+            writer.write(h.encode("latin-1"))
         writer.write(f"1200Z {user} 144/432 MHz chat>\r\n".encode())
         await writer.drain()
         while True:
@@ -57,10 +61,10 @@ class FakeKst:
                 writer.write(b"DL8NAS           JN59LE Klaus\r\n(DF7KF)          JO30XX Peter\r\nVU2CPL           MK83TE Manoj\r\nDN2LH-2          JO31AA Lars\r\nON4KST           JO20AA Server\r\n")
                 writer.write(f"1201Z {user} 144/432 MHz chat>\r\n".encode())
             elif line.upper() == "/FAKEMSGS":
-                writer.write(f"1203Z DL8NAS Klaus> ({user})  hallo an dich\r\n".encode())
-                writer.write(b"1204Z DL8NAS Klaus> (DF7KF)  an peter, nicht an dich\r\n")
-                writer.write(b"1205Z DL8NAS Klaus> cq cq oeffentlich\r\n")
-                writer.write(f"1206Z {user}-2 Lars> (OK1ABC)  aus anderem Client\r\n".encode())
+                self.history = [f"1203Z DL8NAS Klaus> ({user})  hallo an dich\r\n", "1204Z DL8NAS Klaus> (DF7KF)  an peter, nicht an dich\r\n",
+                                "1205Z DL8NAS Klaus> cq cq oeffentlich\r\n", f"1206Z {user}-2 Lars> (OK1ABC)  aus anderem Client\r\n"]
+                for h in self.history:
+                    writer.write(h.encode("latin-1"))
             elif line.upper().startswith("/CQ "):
                 _, to, *rest = line.split(" ")
                 writer.write(f"1202Z {user} Lars> ({to})  {' '.join(rest)}\r\n".encode())

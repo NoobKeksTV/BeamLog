@@ -84,6 +84,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     rig: dict[int, dict] = {}  # station_id -> {"freq": "432.200", "mode": "USB", "ts": ...}
     cw_queue: dict[int, list[str]] = {}  # station_id -> Texte, die die CAT-Bridge als CW senden soll
     kst_state: dict[int, kst.KstClient] = {}  # station_id -> Verbindung (eine je Station)
+    app.state.kst_clients = kst_state
 
     def kst_event_for(station_id: int):
         async def kst_event(ev: dict) -> None:
@@ -97,8 +98,13 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 # Nachrichten (gleiche Uhrzeit, Absender, Ziel, Text) nicht doppelt speichern und nicht erneut melden
                 dup = db.row("SELECT 1 FROM kst_messages WHERE station_id=? AND time=? AND call=? AND to_call=? AND text=? AND id > (SELECT COALESCE(MAX(id),0) FROM kst_messages) - 400",
                              (station_id, m["time"], m["call"], m["to"], m["text"]))
+                if not dup and m.get("replay"):
+                    # wiederholter Verlauf nach (Neu-)Anmeldung: toleranter vergleichen (Uhrzeit + Absender + Text, Leerzeichen egal)
+                    dup = db.row("SELECT 1 FROM kst_messages WHERE station_id=? AND time=? AND call=? AND REPLACE(text,' ','')=? AND id > (SELECT COALESCE(MAX(id),0) FROM kst_messages) - 1000",
+                                 (station_id, m["time"], m["call"], m["text"].replace(" ", "")))
                 if dup:
                     return
+                m.pop("replay", None)
                 with db.conn:
                     db.conn.execute("INSERT INTO kst_messages(ts_utc,time,call,name,to_call,text,own,to_me,station_id) VALUES(?,?,?,?,?,?,?,?,?)",
                                     (m["ts"], m["time"], m["call"], m["name"], m["to"], m["text"], int(m["own"]), int(m["to_me"]), station_id))
@@ -688,6 +694,12 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             out.append({**u, "km": km, "bearing": round(geo.bearing_deg(st["locator"], u["locator"])) % 360})
         out.sort(key=lambda u: u["km"])
         return out
+
+    @app.get("/api/kst/raw", dependencies=[Depends(require_admin)])
+    def kst_raw(station_id: int = 0):
+        """Rohzeilen der KST-Verbindung (letzte 500) – zur Fehlersuche."""
+        c = kst_client(station_id)
+        return {"lines": list(c.raw) if c else [], "state": c.state if c else "aus"}
 
     @app.get("/api/kst/rundruf_texts")
     def rundruf_texts_get():

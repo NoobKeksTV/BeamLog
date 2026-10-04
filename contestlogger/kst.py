@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import html
+from collections import deque
 import re
 import time
 from datetime import datetime, timezone
@@ -43,7 +44,7 @@ def parse_message(line: str) -> dict | None:
         return None
     hhmm, call, name, to, text = m.groups()
     return {"time": f"{hhmm[:2]}:{hhmm[2:]}", "call": _base(call), "name": html.unescape(name.strip()),
-            "to": _base(to or ""), "text": html.unescape(text.strip())}
+            "to": _base(to or ""), "text": " ".join(html.unescape(text).split())}
 
 
 def _base(call: str) -> str:
@@ -79,6 +80,8 @@ class KstClient:
         self._last_cmd = 0.0
         self._last_rx = 0.0
         self._stop = False
+        self._got_prompt = False  # vor dem ersten Prompt einer Sitzung kommt der vom Server wiederholte Verlauf
+        self.raw: deque[str] = deque(maxlen=500)  # Rohzeilen zur Fehlersuche (Verwaltung)
         self._disconnected: asyncio.Event | None = None
 
     # ------------------------------------------------------------ Steuerung
@@ -177,6 +180,7 @@ class KstClient:
         self.state = "verbunden"
         await self._emit({"type": "kst_status", "state": self.state, "error": ""})
         self._last_cmd = 0.0  # neue Sitzung: Kommandodrossel gilt je Verbindung
+        self._got_prompt = False
         await self._cmd_queue.put("/SHOW USER")
         self._disconnected = asyncio.Event()
         self._last_rx = time.time()
@@ -259,7 +263,9 @@ class KstClient:
     async def _handle_line(self, line: str) -> None:
         if not line.strip():
             return
+        self.raw.append(f"{datetime.now(timezone.utc).strftime('%H:%M:%S')} {line.rstrip()}")
         if PROMPT_RE.match(line.strip()):
+            self._got_prompt = True
             if self._in_roster and self._roster_buf:
                 self.users = self._roster_buf
                 self._roster_buf = {}
@@ -269,6 +275,7 @@ class KstClient:
         msg = parse_message(line)
         if msg:
             msg["ts"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            msg["replay"] = not self._got_prompt  # Verlauf, den der Server beim Anmelden nochmal zeigt
             msg["own"] = prefixes.core_call(msg["call"]) == prefixes.core_call(self.user)
             msg["to_me"] = (not msg["own"]) and (bool(msg["to"] and prefixes.core_call(msg["to"]) in self.my_calls)
                                                 or any(prefixes.core_call(c) in self.my_calls for c in CALL_IN_TEXT.findall(msg["text"].upper())))
