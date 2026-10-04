@@ -1000,9 +1000,11 @@
     const log = $("#kst-log"); const snap = Scroll.snapshot(log);
     log.innerHTML = "";
     const list = kstFiltered().slice(-400);
+    const partners = new Set(S.kst.msgs.filter((m) => m.own && m.to).map((m) => coreOf(m.to)));  // wen ich angeschrieben habe
     for (const m of list) {
       const u = kstUser(m.call);
-      log.append(el("div", { class: "m" + (m.to_me ? " me" : "") + (m.own ? " own" : "") },
+      const partner = !m.own && !m.to_me && partners.has(coreOf(m.call));
+      log.append(el("div", { class: "m" + (m.to_me ? " me" : "") + (m.own ? " own" : "") + (partner ? " partner" : "") },
         el("span", { class: "t" }, m.time),
         el("span", { class: "c", title: (u?.locator || m.locator || "") + " " + (m.name || ""), onclick: () => fillFromKst(m.call, u?.locator || m.locator) }, m.call),
         m.to ? el("span", { class: "to" }, `(${m.to})`) : null,
@@ -1090,6 +1092,7 @@
       el("div", { id: "rr-list", class: "rundruf-list stack" }, el("div", { class: "muted small" }, "…")),
       el("div", { class: "row rr-bottom" }, el("button", { type: "button", class: "primary", id: "rr-send" }, t("An ausgewählte senden")), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")), el("span", { id: "rr-status", class: "muted small grow" })),
       el("div", { id: "rr-sent", class: "rundruf-sent muted small" })));
+    box.classList.add("wide");
     let rrTexts = [];
     function renderTexts() {
       const sel = box.querySelector("#rr-tpl"); const cur = box.querySelector("#rr-text").value.trim(); sel.innerHTML = "";
@@ -1126,7 +1129,14 @@
         selectWindow();
       } catch (err) { list.append(el("div", { class: "muted small" }, err.message)); }
     }
-    box.querySelector("#rr-next").addEventListener("click", () => { if (!cands.length) return loadCands(); rrOffset += Number(box.querySelector("#rr-n").value) || 10; selectWindow(); });
+    box.querySelector("#rr-next").addEventListener("click", () => {
+      if (!cands.length) return loadCands();
+      const n = Number(box.querySelector("#rr-n").value) || 10, open = cands.filter((u) => !sentSet.has(u.call)).length;
+      if (open <= n) { selectWindow(); return toast(open ? t("Alle {n} offenen Kandidaten sind schon ausgewählt – Umkreis vergrößern oder erst senden.", { n: open }) : t("Alle Kandidaten wurden bereits angeschrieben – Umkreis vergrößern oder Liste neu laden."), "err"); }
+      rrOffset += n;
+      if (rrOffset >= open) { rrOffset = 0; toast(t("Ende der Liste – wieder von vorn")); }
+      selectWindow();
+    });
     box.querySelector("#rr-send").addEventListener("click", async () => {
       const calls = $$("#rr-list .rr-sel:checked").map((c) => c.value); const text = box.querySelector("#rr-text").value.trim();
       if (!calls.length || !text) return toast(t("Empfänger und Text angeben"), "err");
