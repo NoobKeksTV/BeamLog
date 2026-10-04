@@ -50,6 +50,20 @@ echo "15 3 * * * root /usr/local/bin/contestlogger-backup" | sudo tee /etc/cron.
 Öffentliche Adresse (QR-Code, Links) in `/etc/systemd/system/contestlogger.service` bei `--public-url` eintragen,
 danach `sudo systemctl daemon-reload && sudo systemctl restart contestlogger`.
 
+## Ohne nginx: Dienst direkt auf Port 80
+
+Ein normaler Nutzer darf Port 80 nicht öffnen (`[Errno 13] permission denied`). Die Unit `contestlogger-port80.service`
+gibt dem Dienst über `AmbientCapabilities=CAP_NET_BIND_SERVICE` genau diese Berechtigung und lauscht auf `0.0.0.0:80`:
+
+```bash
+sudo systemctl disable --now nginx            # falls nginx Port 80 belegt
+sudo cp /opt/contestlogger/deploy/contestlogger-port80.service /etc/systemd/system/contestlogger.service
+sudo systemctl daemon-reload
+sudo systemctl restart contestlogger
+```
+
+Mit nginx dagegen bleibt der Dienst auf `127.0.0.1:8000` (Standard-Unit), nginx übernimmt Port 80.
+
 ## Dienst bedienen
 
 ```bash
