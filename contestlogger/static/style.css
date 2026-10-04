@@ -320,3 +320,8 @@ body.popup .dm-pane { height: calc(100vh - 230px); grid-template-columns: 170px 
 .nowrap { white-space: nowrap; }
 .audit-details { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 tr.audit-fail td { color: var(--warn); }
+.logwrap { position: relative; min-width: 0; }
+.dm-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.dm-wrap .dm-msgs { flex: 1; }
+.jump-down { position: absolute; right: 14px; bottom: 16px; padding: 4px 10px; font-size: 12px; border-radius: 999px; background: var(--accent); color: #fff; border: 0; box-shadow: 0 2px 8px rgba(0,0,0,.35); cursor: pointer; opacity: .92; }
+.jump-down:hover { opacity: 1; }

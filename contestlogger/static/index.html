@@ -117,7 +117,7 @@
           </div>
           <div id="ctab-local" class="ctab active">
             <div id="online" class="muted small"></div>
-            <div id="chat-log" class="chat-log"></div>
+            <div class="logwrap"><div id="chat-log" class="chat-log"></div><button type="button" class="jump-down hidden" title="Zum Ende">↓ Neueste</button></div>
             <form id="chat-form" class="row"><input id="chat-input" placeholder="Nachricht …" maxlength="500"><button class="primary">Senden</button></form>
           </div>
           <div id="ctab-kst" class="ctab">
@@ -130,10 +130,10 @@
               </div>
               <div class="dm-chat">
                 <div id="kst-dm-head" class="dm-head muted small">Kontakt wählen</div>
-                <div id="kst-dm-msgs" class="chat-log kst-log dm-msgs"></div>
+                <div class="logwrap dm-wrap"><div id="kst-dm-msgs" class="chat-log kst-log dm-msgs"></div><button type="button" class="jump-down hidden" title="Zum Ende">↓ Neueste</button></div>
               </div>
             </div>
-            <div id="kst-log" class="chat-log kst-log"></div>
+            <div class="logwrap" id="kst-log-wrap"><div id="kst-log" class="chat-log kst-log"></div><button type="button" class="jump-down hidden" title="Zum Ende">↓ Neueste</button></div>
             <div id="kst-macros" class="kst-macros"></div>
             <form id="kst-form" class="row"><input id="kst-input" placeholder="Nachricht an den KST-Chat … (/CQ CALL Text für gezielt)" maxlength="300"><button class="primary">Senden</button></form>
           </div>

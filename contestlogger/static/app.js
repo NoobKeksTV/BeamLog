@@ -214,7 +214,7 @@
     },
     last: {}, bootAt: Date.now(), quietUntil: 0,
     play(kind) {
-      if (!this.on) return;
+      if (!this.on || POPUP) return;  // im ausgepoppten Chatfenster keine Töne – sonst klingt alles doppelt
       // Drossel: bei Nachrichtenschüben (z. B. Verlauf nach Neuverbinden, Import) nur ein Ton je Art pro 1,5 s,
       // und in den ersten Sekunden nach Seitenstart/Neuverbindung gar keine Hinweistöne
       const now = Date.now();
@@ -809,6 +809,7 @@
           if (Date.now() - (S.kst.lastToast || 0) > 1500) { S.kst.lastToast = Date.now(); toast(`KST ${m.msg.call}: ${m.msg.text}`.slice(0, 120)); }
         }
         renderKst();
+        if (m.msg.own) { Scroll.toBottom($("#kst-log")); Scroll.toBottom($("#kst-dm-msgs")); }  // eigene Nachricht: immer ans Ende
       }
       else if (m.type === "kst_users") { S.kst.users = m.users; renderKstUsers(); renderKst(); }
       else if (m.type === "kst_status") { S.kst.status = { ...S.kst.status, state: m.state, error: m.error }; renderKstStatus(); }
@@ -837,14 +838,26 @@
     const names = users.map((u) => { const st = S.contests.flatMap((c) => c.stations).find((s) => s.id === u.station_id); return st ? `${u.nick}@${st.call}` : u.nick; });
     $("#online").textContent = `· ${t("online")}: ${names.join(", ")}`;
   }
+  // Scrollverhalten der Chat-Listen: wer hochgescrollt hat, bleibt oben (kein Zwangsscroll); ein Knopf „↓ Neueste“ führt ans Ende
+  const Scroll = {
+    atBottom: (el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 30,
+    btn: (el) => el.parentElement?.querySelector(".jump-down"),
+    update(el) { const b = this.btn(el); if (b) b.classList.toggle("hidden", this.atBottom(el) || el.scrollHeight <= el.clientHeight); },
+    toBottom(el) { el.scrollTop = el.scrollHeight; this.update(el); },
+    // vor dem Neuaufbau merken, danach wiederherstellen: unten bleibt unten, oben bleibt an derselben Stelle
+    snapshot(el) { return { bottom: this.atBottom(el) || !el.childElementCount, top: el.scrollTop }; },
+    restore(el, snap, force) { if (force || snap.bottom) el.scrollTop = el.scrollHeight; else el.scrollTop = snap.top; this.update(el); },
+  };
+  $$(".logwrap").forEach((w) => { const log = w.querySelector(".chat-log"); log.addEventListener("scroll", () => Scroll.update(log)); w.querySelector(".jump-down").addEventListener("click", () => Scroll.toBottom(log)); });
   async function loadChat() {
     const log = $("#chat-log"); log.innerHTML = "";
     try { (await GET("/api/chat")).forEach(appendChat); } catch (_) { /* */ }
+    Scroll.toBottom(log);
   }
   function appendChat(m) {
-    const log = $("#chat-log");
+    const log = $("#chat-log"); const snap = Scroll.snapshot(log);
     log.append(el("div", { class: "m" }, el("span", { class: "t" }, fmtTime(m.ts_utc)), el("span", { class: "n" }, m.nick + ": "), m.text));
-    log.scrollTop = log.scrollHeight;
+    Scroll.restore(log, snap, m.nick === S.nick);
   }
   $("#chat-form").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -865,7 +878,8 @@
   function renderKstBadges() {
     const b = $("#kst-badge");
     b.textContent = S.kst.unread; b.classList.toggle("hidden", !S.kst.unread);
-    const bd = $("#kst-dm-badge"); bd.textContent = S.kst.unreadDm; bd.classList.toggle("hidden", !S.kst.unreadDm);
+    const nDm = dmConversations().reduce((a, c) => a + c.unread, 0);
+    const bd = $("#kst-dm-badge"); bd.textContent = nDm; bd.classList.toggle("hidden", !nDm);
   }
   $("#btn-chat-pop").addEventListener("click", () => window.open(`${location.pathname}?popup=chat`, "clchat", "width=480,height=780,resizable=yes"));
   if (POPUP) setChatTab(localStorage.getItem("cl.chattab") || "kst");
@@ -923,7 +937,7 @@
       if (!partner) continue;
       const c = conv[partner] || (conv[partner] = { call: m.own ? m.to : m.call, last: m, unread: 0 });
       c.last = m; if (!m.own) c.call = m.call;
-      if (!m.own && m.ts > (S.kst.seen[partner] || "")) c.unread++;
+      if (!m.own && m.ts > (S.kst.seen[partner] || "")) c.unread++;  // gelesen = bis zur zuletzt angezeigten Nachricht
     }
     return Object.values(conv).sort((a, b) => (b.last.ts || "").localeCompare(a.last.ts || ""));
   }
@@ -942,7 +956,7 @@
     return my;
   }
   function renderKst() {
-    const log = $("#kst-log"); const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+    const log = $("#kst-log"); const snap = Scroll.snapshot(log);
     log.innerHTML = "";
     const list = kstFiltered().slice(-400);
     for (const m of list) {
@@ -955,13 +969,14 @@
         el("span", { class: "act" }, el("button", { class: "ghost", title: "DM", onclick: () => setDm(m.call) }, "DM"))));
     }
     if (!list.length) log.append(el("div", { class: "sys" }, t("Keine Nachrichten.")));
-    if (atBottom || true) log.scrollTop = log.scrollHeight;
+    Scroll.restore(log, snap, false);
     const dmMode = S.kst.tab === "dm";
     $("#kst-dm-pane").classList.toggle("hidden", !dmMode);
-    log.classList.toggle("hidden", dmMode);
+    $("#kst-log-wrap").classList.toggle("hidden", dmMode);
     if (dmMode) {
+      if (S.kst.dm) { const lastIn = [...list].reverse().find((m) => !m.own); if (lastIn) { S.kst.seen[coreOf(S.kst.dm)] = lastIn.ts; localStorage.setItem("cl.dmseen", JSON.stringify(S.kst.seen)); } }
       renderDmList();
-      const msgs = $("#kst-dm-msgs"); msgs.innerHTML = "";
+      const msgs = $("#kst-dm-msgs"); const dmSnap = Scroll.snapshot(msgs); const dmChanged = S.kst.dmShown !== S.kst.dm; S.kst.dmShown = S.kst.dm; msgs.innerHTML = "";
       const u = S.kst.dm ? kstUser(S.kst.dm) : null;
       $("#kst-dm-head").innerHTML = "";
       if (S.kst.dm) {
@@ -971,8 +986,7 @@
         for (const m of list) msgs.append(el("div", { class: "m" + (m.own ? " own" : "") }, el("span", { class: "t" }, m.time),
           m.own ? el("span", { class: "c" }, t("ich")) : el("span", { class: "c", title: t("ins Log übernehmen"), onclick: () => fillFromKst(m.call, m.locator || dmLoc) }, m.call), el("span", { class: "txt" }, m.text)));
         if (!list.length) msgs.append(el("div", { class: "sys" }, t("Noch keine Nachrichten in diesem Gespräch.")));
-        msgs.scrollTop = msgs.scrollHeight;
-        S.kst.seen[coreOf(S.kst.dm)] = new Date().toISOString(); localStorage.setItem("cl.dmseen", JSON.stringify(S.kst.seen));
+        Scroll.restore(msgs, dmSnap, dmChanged);
       } else $("#kst-dm-head").textContent = t("Kontakt wählen");
       $("#kst-input").placeholder = S.kst.dm ? t("Nachricht an {call} …", { call: S.kst.dm }) : t("Erst Kontakt wählen");
     } else $("#kst-input").placeholder = t("Nachricht an alle im KST-Chat …");
