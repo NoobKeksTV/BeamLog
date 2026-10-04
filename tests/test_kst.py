@@ -32,8 +32,11 @@ def test_darc_parsers():
     assert idx[3]["csv"].endswith("/2024/2024-05/result/result.csv") and idx[3]["status"] == "Endergebnis"
 
 
-@pytest.mark.asyncio
-async def test_client_against_fake_server(monkeypatch):
+def test_client_against_fake_server(monkeypatch):
+    asyncio.run(_client_against_fake_server(monkeypatch))
+
+
+async def _client_against_fake_server(monkeypatch):
     fake = FakeKst()
     await fake.start()
     monkeypatch.setattr(kst, "HOST", "127.0.0.1")
