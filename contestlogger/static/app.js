@@ -295,6 +295,7 @@
     const st = station();
     if (S.kst.sid !== S.stationId && S.kst.sid !== undefined) loadKst();  // KST-Chat ist je Station
     if (S.chatContest !== undefined && S.chatContest !== S.contestId) loadChat();  // lokaler Chat ist je Contest
+    if (S.opnoteSid !== S.stationId) { S.opnoteSid = S.stationId; loadOpnote(); }
     if (st && !st.has_password && !canLog()) autoUnlock(st);
     if (st) {
       const rig = S.rig[st.id];
@@ -582,6 +583,28 @@
   }
 
   $("#qso-form").addEventListener("submit", (e) => { e.preventDefault(); submitQso(); });
+
+  // ------------------------------------------------------------ Operator-Fenster (zweiter Monitor)
+  $("#btn-operator").addEventListener("click", () => { if (!S.stationId) return toast(t("Keine Station gewählt"), "err"); window.open(`/operator?station=${S.stationId}`, "cloperator", "width=1000,height=760,resizable=yes"); });
+  function sendOpnote(text) { if (S.ws?.readyState === 1 && S.stationId) S.ws.send(JSON.stringify({ type: "opnote", station_id: S.stationId, text })); }
+  $("#btn-opnote").addEventListener("click", () => { sendOpnote($("#opnote").value.trim()); toast(t("Hinweis an das Operator-Fenster gesendet"), "ok"); });
+  $("#opnote").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("#btn-opnote").click(); } });
+  $("#btn-opnote-clear").addEventListener("click", () => { $("#opnote").value = ""; sendOpnote(""); });
+  async function loadOpnote() { try { $("#opnote").value = S.stationId ? (await GET(`/api/stations/${S.stationId}/opnote`)).text : ""; } catch (_) { /* */ } }
+  // Live-Eingabe an das Operator-Fenster (gedrosselt, nur bei Änderung)
+  let typingTimer, typingLast = "";
+  function sendTyping() {
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+      if (!S.stationId || S.ws?.readyState !== 1) return;
+      const data = { call: F.call.value.trim(), rs: F.rs.value.trim(), rr: F.rr.value.trim(), nr: F.nr.value.trim(), loc: F.loc.value.trim(), serial: F.ns.value, cmt: F.cmt.value.trim(),
+        geo: $("#hint-geo").textContent, dupe: $("#hint-dupe").classList.contains("hidden") ? "" : $("#hint-dupe").textContent, editing: !!S.editingId };
+      const key = JSON.stringify(data); if (key === typingLast) return; typingLast = key;
+      S.ws.send(JSON.stringify({ type: "typing", station_id: S.stationId, data }));
+    }, 150);
+  }
+  order.forEach((inp) => inp.addEventListener("input", sendTyping));
+  const _mo = new MutationObserver(sendTyping); _mo.observe($("#hint-geo"), { childList: true, characterData: true, subtree: true }); _mo.observe($("#hint-dupe"), { attributes: true, childList: true, subtree: true });
   async function submitQso() {
     if (!canLog()) return toast(t("Station ist nicht freigeschaltet"), "err");
     const body = { call: F.call.value.trim(), locator: F.loc.value.trim(), rst_sent: F.rs.value.trim() || "59", rst_rcvd: F.rr.value.trim() || "59", serial_rcvd: F.nr.value.trim(), comment: F.cmt.value.trim() };
@@ -706,7 +729,8 @@
         K(["DM"], t("Knopf an einer KST-Nachricht: Gespräch mit dem Absender öffnen. Die Eingabe geht dann nur an diesen Kontakt.")),
         K(["↓ Neueste"], t("Erscheint, wenn du hochgescrollt hast: springt ans Ende. Solange du oben bist, zieht nichts nach unten.")),
         K(["↗"], t("Chat als eigenes Fenster ausklinken (z. B. für den zweiten Bildschirm). Töne kommen nur aus dem Hauptfenster.")),
-        K(["Rundruf"], t("Noch nicht gearbeitete KST-Nutzer im Umkreis gezielt anschreiben: Liste laden, „Nächste →“ dreht die Auswahl weiter, bereits Angeschriebene werden übersprungen. Eigene Texte lassen sich speichern."))),
+        K(["Rundruf"], t("Noch nicht gearbeitete KST-Nutzer im Umkreis gezielt anschreiben: Liste laden, „Nächste →“ dreht die Auswahl weiter, bereits Angeschriebene werden übersprungen. Eigene Texte lassen sich speichern.")),
+        K(["🖥 Operator"], t("Operator-Fenster für den zweiten Monitor: zeigt live Rufzeichen, Nummern, RST, Locator, Entfernung/Richtung, eine Dupe-Warnung, den Hinweis des Loggers (Feld über der Karte, z. B. Frequenz) und die letzten QSOs. Läuft auch auf einem anderen PC im Netz über /operator?station=ID."))),
       ...H(t("Allgemein"),
         K(["Loggen", "Log", "Statistik", "Verwaltung"], t("Reiter oben: Eingabe, komplettes Log mit Suche und Log-Prüfung, Auswertung, Verwaltung (Admin).")),
         K(["Contest / Station"], t("Auswahl in der Leiste unter dem Kopf. Jede Station hat eigenes Rufzeichen, Band, Seriennummer und eigenen KST-Chat.")),
@@ -866,6 +890,8 @@
       }
       else if (m.type === "rig") { S.rig[m.station_id] = { freq: m.freq, mode: m.mode, ts: m.ts }; if (m.station_id === S.stationId) renderStationBar(); renderScoreboard(); }
       else if (m.type === "presence") renderPresence(m.users);
+      else if (m.type === "opnote") { if (m.station_id === S.stationId && m.by !== S.nick) $("#opnote").value = m.text; }
+      else if (m.type === "typing") { /* nur für das Operator-Fenster */ }
       else if (m.type === "update") {
         if (m.scope === "contests") await loadContests();
         else if (m.scope === "qsos") {

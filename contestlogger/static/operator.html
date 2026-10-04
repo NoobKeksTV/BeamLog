@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Operator – ContestLogger</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#0f1419; --bg2:#161c24; --card:#1b232d; --line:#2b3643; --text:#e6edf3; --muted:#8b98a8; --accent:#3fb3ff; --ok:#3ddc84; --warn:#ffb347; --bad:#ff5c6c; --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace; --sans:system-ui,Segoe UI,Roboto,sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); }
+  body { display:flex; flex-direction:column; padding:12px; gap:10px; }
+  header { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  header .st { font:700 26px var(--mono); }
+  header .meta { color:var(--muted); font-size:15px; }
+  header .dot { width:10px; height:10px; border-radius:50%; background:var(--bad); display:inline-block; }
+  header .dot.on { background:var(--ok); }
+  .note { background:rgba(255,179,71,.14); border:1px solid var(--warn); border-radius:12px; padding:12px 16px; font-size:clamp(20px, 3vw, 34px); font-weight:700; min-height:1.4em; }
+  .note:empty { display:none; }
+  .dupe { background:rgba(255,92,108,.18); border:2px solid var(--bad); border-radius:12px; padding:10px 16px; font-size:clamp(18px, 2.6vw, 30px); font-weight:800; color:#ffb3ba; }
+  .dupe.hidden { display:none; }
+  .tiles { display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1.4fr 1.4fr; gap:10px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; min-width:0; }
+  .tile span { display:block; color:var(--muted); font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
+  .tile b { display:block; font:700 clamp(28px, 4.2vw, 64px)/1.15 var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tile.call b { color:var(--accent); }
+  .tile.serial b { color:var(--warn); }
+  .tile.loc b { color:var(--ok); }
+  .tile.geo b { font-size:clamp(20px, 2.4vw, 36px); white-space:normal; }
+  .cmt { color:var(--muted); font-size:16px; min-height:1.3em; }
+  .list { flex:1; min-height:0; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:auto; }
+  table { width:100%; border-collapse:collapse; font:17px var(--mono); }
+  th, td { padding:6px 10px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { color:var(--muted); font-weight:600; font-size:13px; text-transform:uppercase; position:sticky; top:0; background:var(--card); }
+  td.num { text-align:right; }
+  tr.new td { background:rgba(61,220,132,.16); }
+  tr.dupe td { color:var(--muted); text-decoration:line-through; }
+  footer { color:var(--muted); font-size:12px; display:flex; gap:12px; }
+  @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(4, 1fr); } .tile.call { grid-column: span 4; } }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="conn" title="Verbindung"></span>
+  <span class="st" id="station">–</span>
+  <span class="meta" id="meta"></span>
+  <span class="meta" id="rig"></span>
+  <span style="flex:1"></span>
+  <span class="meta" id="clock"></span>
+</header>
+<div class="note" id="note"></div>
+<div class="dupe hidden" id="dupe"></div>
+<div class="tiles">
+  <div class="tile call"><span>Rufzeichen</span><b id="t-call">–</b></div>
+  <div class="tile serial"><span>Nr gegeben</span><b id="t-serial">–</b></div>
+  <div class="tile"><span>Nr erhalten</span><b id="t-nr">–</b></div>
+  <div class="tile"><span>RST geg.</span><b id="t-rs">–</b></div>
+  <div class="tile"><span>RST erh.</span><b id="t-rr">–</b></div>
+  <div class="tile loc"><span>Locator</span><b id="t-loc">–</b></div>
+  <div class="tile geo"><span>Entfernung · Richtung</span><b id="t-geo">–</b></div>
+</div>
+<div class="cmt" id="cmt"></div>
+<div class="list">
+  <table><thead><tr><th>UTC</th><th>Rufzeichen</th><th>Nr geg.</th><th>Nr erh.</th><th>Locator</th><th>km</th><th>°</th></tr></thead><tbody id="qsos"></tbody></table>
+</div>
+<footer><span id="count"></span><span id="by"></span><span style="flex:1"></span><span id="ver"></span></footer>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const sid = Number(new URLSearchParams(location.search).get("station")) || 0;
+  const pad3 = (n) => String(n ?? "").padStart(3, "0");
+  const fmtTime = (ts) => ts ? ts.slice(11, 16) : "";
+  let station = null, lastIds = new Set(), ws;
+
+  async function GET(u) { const r = await fetch(u); if (!r.ok) throw new Error(r.statusText); return r.json(); }
+  function tick() { const d = new Date(); $("#clock").textContent = d.toISOString().slice(11, 19) + " UTC"; }
+  setInterval(tick, 1000); tick();
+
+  async function loadStation() {
+    const contests = await GET("/api/contests");
+    for (const c of contests) for (const s of c.stations) if (s.id === sid) { station = s; station.contest = c.name; }
+    if (!station) { $("#station").textContent = "Station nicht gefunden"; return; }
+    $("#station").textContent = `${station.call} · ${station.band}`;
+    $("#meta").textContent = `${station.locator} · ${station.mode} · ${station.contest}`;
+    document.title = `Operator ${station.call} ${station.band} – ContestLogger`;
+    $("#t-serial").textContent = pad3(station.serial_next);
+    try { const r = await GET(`/api/stations/${sid}/rig`); showRig(r); } catch (_) { /* */ }
+    try { $("#note").textContent = (await GET(`/api/stations/${sid}/opnote`)).text || ""; } catch (_) { /* */ }
+    try { $("#ver").textContent = "ContestLogger " + (await GET("/api/info")).version; } catch (_) { /* */ }
+  }
+  function showRig(r) { $("#rig").textContent = r && r.freq ? `📻 ${r.freq} MHz ${r.mode || ""}` : ""; }
+  async function loadQsos(flash) {
+    const qs = await GET(`/api/stations/${sid}/qsos?limit=40`);
+    const tb = $("#qsos"); tb.innerHTML = "";
+    const recent = qs.slice(-40).reverse();
+    for (const q of recent) {
+      const tr = document.createElement("tr");
+      if (flash && !lastIds.has(q.id)) tr.className = "new";
+      if (q.dupe) tr.className += " dupe";
+      tr.innerHTML = `<td>${fmtTime(q.ts_utc)}</td><td><b>${q.call}</b></td><td class="num">${pad3(q.serial_sent)}</td><td class="num">${pad3(q.serial_rcvd)}</td><td>${q.locator}</td><td class="num">${q.km ?? ""}</td><td class="num">${q.bearing ?? ""}</td>`;
+      tb.append(tr);
+    }
+    lastIds = new Set(qs.map((q) => q.id));
+    $("#count").textContent = `${qs.filter((q) => !q.dupe).length} QSOs`;
+    const next = Math.max(...qs.map((q) => q.serial_sent || 0), 0) + 1;
+    if (!$("#t-call").textContent || $("#t-call").textContent === "–") $("#t-serial").textContent = pad3(Math.max(next, station?.serial_next || 1));
+  }
+  function showTyping(d, by) {
+    $("#t-call").textContent = d.call || "–";
+    $("#t-serial").textContent = d.serial || $("#t-serial").textContent;
+    $("#t-nr").textContent = d.nr || "–";
+    $("#t-rs").textContent = d.rs || "–";
+    $("#t-rr").textContent = d.rr || "–";
+    $("#t-loc").textContent = d.loc || "–";
+    $("#t-geo").textContent = (d.geo && !d.geo.startsWith("—")) ? d.geo : "–";
+    $("#cmt").textContent = d.cmt ? `Kommentar: ${d.cmt}` : "";
+    const dupe = $("#dupe");
+    if (d.dupe) { dupe.textContent = d.dupe.replace(/\s*–\s*DUPE!?$/, "").replace(/^⚠\s*/, "⚠ ") ; dupe.classList.remove("hidden"); } else dupe.classList.add("hidden");
+    $("#by").textContent = by ? `Logger: ${by}${d.editing ? " (bearbeitet ein QSO)" : ""}` : "";
+  }
+  function connect() {
+    ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?nick=${encodeURIComponent("Operator")}`);
+    ws.onopen = () => { $("#conn").classList.add("on"); ws.send(JSON.stringify({ type: "status", station_id: sid })); };
+    ws.onclose = () => { $("#conn").classList.remove("on"); setTimeout(connect, 2000); };
+    ws.onmessage = (ev) => {
+      const m = JSON.parse(ev.data);
+      if (m.station_id !== undefined && m.station_id !== null && m.station_id !== sid && m.type !== "update") return;
+      if (m.type === "typing") showTyping(m.data || {}, m.by);
+      else if (m.type === "opnote") $("#note").textContent = m.text || "";
+      else if (m.type === "rig") showRig(m);
+      else if (m.type === "update" && (m.scope === "qsos" ? m.station_id === sid : m.scope === "contests")) { loadStation().then(() => loadQsos(true)); }
+    };
+  }
+  loadStation().then(() => loadQsos(false)).catch((e) => { $("#station").textContent = e.message; });
+  connect();
+})();
+</script>
+</body>
+</html>

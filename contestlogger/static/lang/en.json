@@ -432,5 +432,12 @@
  "KST-Nutzer mit Locator im Umkreis von {loc}, die in diesem Log noch fehlen und von dieser Station noch keine Nachricht bekommen haben. Jeder Empfänger bekommt eine eigene /CQ-Nachricht, gesendet mit 2 s Abstand.": "KST users with locator around {loc} that are still missing in this log and have not received a message from this station yet. Each recipient gets its own /CQ message, sent 2 s apart.",
  "Rohdaten": "Raw data",
  "Rohdaten der Verbindung (zur Fehlersuche)": "Raw data of the connection (for troubleshooting)",
- "Karte aller QSOs und Großfelder": "Map of all QSOs and squares"
+ "Karte aller QSOs und Großfelder": "Map of all QSOs and squares",
+ "🖥 Operator": "🖥 Operator",
+ "Operator-Fenster für den zweiten Monitor: zeigt live Rufzeichen, Nummern, Locator, Hinweise und die letzten QSOs": "Operator window for a second monitor: shows callsign, numbers, locator, notes and recent QSOs live",
+ "Hinweis für das Operator-Fenster (z. B. 432.200 CQ, QSY nach 432.250, Antenne 90°) …": "Note for the operator window (e.g. 432.200 CQ, QSY to 432.250, antenna 90°) …",
+ "Anzeigen": "Show",
+ "Hinweis löschen": "Clear note",
+ "Hinweis an das Operator-Fenster gesendet": "Note sent to the operator window",
+ "Operator-Fenster für den zweiten Monitor: zeigt live Rufzeichen, Nummern, RST, Locator, Entfernung/Richtung, eine Dupe-Warnung, den Hinweis des Loggers (Feld über der Karte, z. B. Frequenz) und die letzten QSOs. Läuft auch auf einem anderen PC im Netz über /operator?station=ID.": "Operator window for a second monitor: shows callsign, numbers, RST, locator, distance/bearing, a dupe warning, the logger's note (field above the map, e.g. frequency) and recent QSOs live. Also runs on another PC in the network via /operator?station=ID."
 }

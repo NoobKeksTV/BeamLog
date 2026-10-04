@@ -955,6 +955,15 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         raise HTTPException(404, "Unbekanntes Format")
 
     # ------------------------------------------------------------ Chat / WS
+    @app.get("/api/stations/{sid}/opnote")
+    def opnote_get(sid: int):
+        return {"text": db.get_setting(f"opnote:{sid}", "") or ""}
+
+    @app.get("/operator")
+    def operator_page():
+        """Operator-Fenster (zweiter Monitor): zeigt live die Eingabe des Loggers, Hinweise und die letzten QSOs."""
+        return FileResponse(STATIC / "operator.html")
+
     @app.get("/api/chat")
     def chat_history(contest_id: int = 0):
         return db.recent_chat(contest_id)
@@ -985,6 +994,13 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 elif msg.get("type") == "status":
                     hub.set_status(socket, msg.get("station_id"))
                     await hub.broadcast_presence()
+                elif msg.get("type") == "typing" and msg.get("station_id"):
+                    # Live-Eingabe des Loggers für das Operator-Fenster (nicht gespeichert)
+                    await hub.broadcast({"type": "typing", "station_id": int(msg["station_id"]), "by": nick, "data": msg.get("data") or {}})
+                elif msg.get("type") == "opnote" and msg.get("station_id"):
+                    text = str(msg.get("text") or "").strip()[:300]
+                    db.set_setting(f"opnote:{int(msg['station_id'])}", text)
+                    await hub.broadcast({"type": "opnote", "station_id": int(msg["station_id"]), "text": text, "by": nick})
         except WebSocketDisconnect:
             pass
         finally:

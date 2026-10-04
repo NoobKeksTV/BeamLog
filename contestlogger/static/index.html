@@ -44,6 +44,7 @@
   </label>
   <span id="station-state" class="muted"></span>
   <span id="countdown" class="tag"></span>
+  <button id="btn-operator" class="ghost small" title="Operator-Fenster für den zweiten Monitor: zeigt live Rufzeichen, Nummern, Locator, Hinweise und die letzten QSOs">🖥 Operator</button>
   <span class="grow"></span>
   <span id="station-meta" class="meta"></span>
 </div>
@@ -84,6 +85,7 @@
 
         <div class="statline" id="kpis"></div>
         <div class="card map-card">
+          <div class="row opnote-row"><input id="opnote" placeholder="Hinweis für das Operator-Fenster (z. B. 432.200 CQ, QSY nach 432.250, Antenne 90°) …" maxlength="300"><button type="button" id="btn-opnote" class="ghost small">Anzeigen</button><button type="button" id="btn-opnote-clear" class="ghost small" title="Hinweis löschen">✕</button></div>
           <div class="card-head"><h3>Karte / Antennenrichtung</h3><span id="map-info" class="muted small"></span></div>
           <div id="map-log" class="map"></div>
         </div>
