@@ -43,6 +43,7 @@
   </label>
   <span id="station-state" class="muted"></span>
   <span id="countdown" class="tag"></span>
+  <button id="btn-export-jump" class="ghost small" title="Zur Export-/Abgabe-Karte (EDI, ADIF, CSV, ZIP)">📤 Export</button>
   <span class="grow"></span>
   <span id="station-meta" class="meta"></span>
 </div>
@@ -197,6 +198,9 @@
         <div class="card-head"><h3>Stationen <span id="admin-contest-name" class="muted"></span></h3><button id="btn-new-station" class="primary small">+ Station</button></div>
         <p class="muted small">Jede Station hat eigenes Rufzeichen, Locator, Band und Passwort. Operatoren schalten die Station mit dem Passwort frei und loggen darunter. Die Stations-ID (für die CAT-Bridge <code>tools/cat_bridge.py</code>) steht in der Tabelle.</p>
         <div class="table-wrap"><table id="admin-stations" class="compact fixed"><tbody></tbody></table></div>
+        <h3>Export / Abgabe <span id="admin-export-name" class="muted"></span></h3>
+        <p class="muted small">EDI (REG1TEST) je Station/Band für die Abgabe – vor dem Export läuft die Log-Prüfung. Das ZIP enthält die EDI-Dateien aller geprüften Stationen des Contests.</p>
+        <div id="admin-export" class="stack"></div>
       </div>
       <div class="card">
         <h3>WinContest-Ordner (DD3KU) übernehmen</h3>

@@ -408,6 +408,7 @@
     if (res.ok && thenExport) { closeModal(); dl(false); }
   }
   $("#btn-check").addEventListener("click", () => runCheck(false));
+  $("#btn-export-jump").addEventListener("click", () => { showView("fulllog"); setTimeout(() => $(".export-card").scrollIntoView({ behavior: "smooth", block: "start" }), 50); });
   $("#exp-edi").addEventListener("click", () => runCheck(true));
 
   function renderKpis(summary) {
@@ -1184,7 +1185,7 @@
         el("td", { class: "muted small" }, `${c.stations.length} ${t("Stationen")}${c.archived ? " · " + t("Archiv") : ""}`),
         el("td", { class: "actions" },
           el("button", { class: "ghost", onclick: () => { S.contestId = c.id; S.stationId = c.stations[0]?.id || null; save(); renderStationBar(); loadQsos(); renderScoreboard(); renderAdmin(); } }, t("wählen")), " ",
-          el("a", { class: "button ghost", href: `/api/contests/${c.id}/export.zip`, download: 1, title: t("Alle Stationen/Bänder dieses Contests als EDI-Dateien") }, "ZIP"), " ",
+          el("a", { class: "button ghost", href: `/api/contests/${c.id}/export.zip`, download: 1, title: t("Alle Stationen/Bänder dieses Contests als EDI-Dateien") }, "EDI-ZIP"), " ",
           el("button", { class: "ghost", onclick: () => contestDialog(c) }, "✎"), " ",
           el("button", { class: "ghost", onclick: async () => { await api("PATCH", `/api/contests/${c.id}`, { archived: c.archived ? 0 : 1 }); } }, c.archived ? t("aktivieren") : t("archivieren")), " ",
           el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("Contest „{name}“ mit allen Stationen und QSOs löschen?", c))) await api("DELETE", `/api/contests/${c.id}`); } }, "✕"))));
@@ -1203,6 +1204,16 @@
           el("button", { class: "ghost", onclick: async () => { const v = prompt("Nächste Seriennummer:", s.serial_next); if (v && /^\d+$/.test(v)) await api("POST", `/api/stations/${s.id}/serial`, { start: Number(v) }); } }, t("Nr.")), " ",
           el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("Station {call} mit allen QSOs löschen?", s))) await api("DELETE", `/api/stations/${s.id}`); } }, "✕"))));
     }
+    // Export / Abgabe des gewählten Contests
+    $("#admin-export-name").textContent = c ? `– ${c.name}` : "";
+    const ex = $("#admin-export"); ex.innerHTML = "";
+    for (const s of c?.stations || []) ex.append(el("div", { class: "row" },
+      el("b", { style: "min-width:160px" }, `${s.call} · ${s.band}`),
+      el("button", { class: "primary small", onclick: () => { S.stationId = s.id; save(); renderStationBar(); loadQsos(); showView("fulllog"); setTimeout(() => runCheck(true), 300); } }, t("EDI (mit Prüfung)")),
+      el("a", { class: "button ghost small", href: `/api/stations/${s.id}/export.adi`, download: 1 }, "ADIF"),
+      el("a", { class: "button ghost small", href: `/api/stations/${s.id}/export.csv`, download: 1 }, "CSV")));
+    if (c) ex.append(el("div", { class: "row" }, el("a", { class: "button primary", href: `/api/contests/${c.id}/export.zip`, download: 1 }, t("Alle Bänder als EDI-ZIP")), el("span", { class: "muted small" }, t("nur Logs, die die Prüfung bestehen; Details in NICHT_EXPORTIERT.txt im ZIP"))));
+    if (!c?.stations?.length) ex.append(el("div", { class: "muted small" }, t("Keine Stationen im gewählten Contest.")));
     const is = $("#imp-station"); is.innerHTML = "";
     S.contests.forEach((cc) => cc.stations.forEach((s) => is.append(el("option", { value: s.id }, `${cc.name} · ${s.call} ${s.band}`))));
     const inf = await GET("/api/info"); $("#cb-count").textContent = inf.callbook_count; $("#tile-url").value = inf.tile_url || "";

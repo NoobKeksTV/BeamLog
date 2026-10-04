@@ -364,5 +364,12 @@
  "je Station": "per station",
  "verbunden: Zugangsdaten, Raum und Autostart stehen bei der Station (Stationen → ✎). Jede Station hat so ihren eigenen Chat; die Nutzerliste wird alle 10 Minuten geholt und Nutzer mit Locator wandern automatisch in die Stationsdatenbank. Das Passwort geht im Klartext über das Netz – ein eigenes KST-Passwort verwenden.": ": login, room and autostart are stored with the station (Stations → ✎). Each station thus has its own chat; the user list is fetched every 10 minutes and users with locator automatically go into the station database. The password crosses the network in clear text – use a dedicated KST password.",
  "ins Log übernehmen": "copy into log",
- "Log": "Log"
+ "Log": "Log",
+ "📤 Export": "📤 Export",
+ "Zur Export-/Abgabe-Karte (EDI, ADIF, CSV, ZIP)": "Go to the export / submission card (EDI, ADIF, CSV, ZIP)",
+ "EDI (mit Prüfung)": "EDI (with check)",
+ "Alle Bänder als EDI-ZIP": "All bands as EDI ZIP",
+ "nur Logs, die die Prüfung bestehen; Details in NICHT_EXPORTIERT.txt im ZIP": "only logs that pass the check; details in NICHT_EXPORTIERT.txt inside the ZIP",
+ "Keine Stationen im gewählten Contest.": "No stations in the selected contest.",
+ "EDI (REG1TEST) je Station/Band für die Abgabe – vor dem Export läuft die Log-Prüfung. Das ZIP enthält die EDI-Dateien aller geprüften Stationen des Contests.": "EDI (REG1TEST) per station/band for submission – the log check runs before export. The ZIP contains the EDI files of all checked stations of the contest."
 }
