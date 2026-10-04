@@ -918,7 +918,7 @@
   function kstFiltered() {
     const my = S.kst.msgs;
     if (S.kst.tab === "me") return my.filter((m) => m.to_me && !m.own);
-    if (S.kst.tab === "dm" && S.kst.dm) { const c = coreOf(S.kst.dm); return my.filter((m) => coreOf(m.call) === c || (m.own && coreOf(m.to) === c)); }
+    if (S.kst.tab === "dm" && S.kst.dm) { const c = coreOf(S.kst.dm); return my.filter((m) => (m.own ? coreOf(m.to) === c : (m.to_me && coreOf(m.call) === c))); }
     return my;
   }
   function renderKst() {

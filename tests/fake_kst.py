@@ -50,6 +50,10 @@ class FakeKst:
             if line.upper() == "/SHOW USER":
                 writer.write(b"DL8NAS           JN59LE Klaus\r\n(DF7KF)          JO30XX Peter\r\nVU2CPL           MK83TE Manoj\r\n")
                 writer.write(f"1201Z {user} 144/432 MHz chat>\r\n".encode())
+            elif line.upper() == "/FAKEMSGS":
+                writer.write(f"1203Z DL8NAS Klaus> ({user})  hallo an dich\r\n".encode())
+                writer.write(b"1204Z DL8NAS Klaus> (DF7KF)  an peter, nicht an dich\r\n")
+                writer.write(b"1205Z DL8NAS Klaus> cq cq oeffentlich\r\n")
             elif line.upper().startswith("/CQ "):
                 _, to, *rest = line.split(" ")
                 writer.write(f"1202Z {user} Lars> ({to})  {' '.join(rest)}\r\n".encode())
