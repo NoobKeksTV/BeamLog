@@ -100,6 +100,14 @@ def main() -> None:
     else:
         (pkg / "start.sh").write_text('#!/usr/bin/env bash\ncd "$(dirname "$0")"\n./ContestLogger "$@"\n')
         os.chmod(pkg / "start.sh", 0o755)
+    if platform.system() == "Linux":
+        # Deploy-Paket für Debian-Server (nginx + systemd) liegt im Linux-ZIP immer bei
+        shutil.copytree(ROOT / "deploy" / "portable", pkg / "deploy")
+        for f in (pkg / "deploy").glob("*.sh"):
+            os.chmod(f, 0o755)
+        with open(pkg / "START.txt", "a", encoding="utf-8") as fh:
+            fh.write("\nServer-Installation (Debian/Ubuntu/Raspberry Pi, nginx + systemd):  sudo bash deploy/install.sh\n"
+                     "   Einzelheiten in deploy/README.md\n")
 
     if not a.no_zip:
         osname = {"Windows": "windows", "Linux": "linux", "Darwin": "macos"}.get(platform.system(), platform.system().lower())

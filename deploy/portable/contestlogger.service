@@ -1,0 +1,27 @@
+# systemd-Unit für die portable Linux-Version des ContestLoggers (Binary aus dem Release-ZIP)
+# Installation über deploy/install.sh – oder von Hand:
+#   sudo cp deploy/contestlogger.service /etc/systemd/system/ && sudo systemctl enable --now contestlogger
+[Unit]
+Description=ContestLogger – Amateurfunk-Contest-Logger (portable)
+After=network.target
+
+[Service]
+Type=simple
+User=contestlogger
+Group=contestlogger
+WorkingDirectory=/opt/contestlogger
+# Der Server lauscht nur lokal; nginx reicht die Anfragen auf Port 80 durch.
+# --public-url: Adresse, die im QR-Code und in Links angezeigt wird (Hostname oder IP des Servers).
+ExecStart=/opt/contestlogger/ContestLogger --host 127.0.0.1 --port 8000 --db /var/lib/contestlogger/contestlogger.db --backup-min 15 --public-url http://contest.local/
+Restart=always
+RestartSec=3
+
+# Härtung (das Binary entpackt sich beim Start nach /tmp – PrivateTmp hält das getrennt)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/contestlogger
+
+[Install]
+WantedBy=multi-user.target
