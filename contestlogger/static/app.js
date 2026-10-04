@@ -156,7 +156,7 @@
     await loadLanguage();
     renderLangSelect();
     $("#version").textContent = "v" + S.info.version;
-    $("#footer-text").textContent = `${S.info.app} ${S.info.version} · ${S.info.copyright} · ${t("lokal, offline, im LAN")}`;
+    $("#footer-text").textContent = `${S.info.app} ${S.info.version} · ${S.info.copyright}`;
     if (!S.info.admin_configured) await askSetup();
     if (!S.nick) await askNick();
     $("#nick-badge").textContent = S.nick;
@@ -1085,6 +1085,34 @@
         r.files.map((f) => `${f.file}: ${f.kind}, ${f.qsos} QSOs, ${f.imported} ${t("neu")}${f.note ? " – " + f.note : ""}`).join("\n") + (r.skipped.length ? `\n\n${t("Hinweise")}:\n${r.skipped.join("\n")}` : "");
       toast(t("Import abgeschlossen"), "ok"); await loadContests(); renderAdmin();
     } catch (err) { out.textContent = t("Fehler: ") + err.message; toast(err.message, "err"); }
+  });
+  let resPairs = [];
+  $("#results-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData();
+    if ($("#res-file").files[0]) fd.append("file", $("#res-file").files[0]);
+    fd.append("url", $("#res-url").value.trim()); fd.append("text", $("#res-text").value); fd.append("commit", "0");
+    $("#res-summary").textContent = t("Importiere …");
+    try {
+      const r = await api("POST", "/api/import/results", fd);
+      resPairs = r.pairs;
+      const tb = $("#res-table tbody"); tb.innerHTML = "";
+      for (const p of r.pairs) tb.append(el("tr", { class: p.status === "gleich" ? "muted" : "" },
+        el("td", {}, el("input", { type: "checkbox", class: "res-sel", "data-call": p.call, checked: p.status !== "gleich" ? 1 : null })),
+        el("td", {}, el("b", {}, p.call)), el("td", {}, p.locator), el("td", { class: "muted small" }, p.status === "neu" ? t("neu") : p.status === "gleich" ? t("bekannt") : `${t("bisher")} ${p.known}`)));
+      $("#res-wrap").classList.toggle("hidden", !r.pairs.length); $("#res-actions").classList.toggle("hidden", !r.pairs.length);
+      const nNew = r.pairs.filter((p) => p.status !== "gleich").length;
+      $("#res-summary").textContent = `${r.count} ${t("Rufzeichen mit Locator gefunden")}, ${nNew} ${t("neu / geändert")}` + (r.warnings.length ? ` · ${r.warnings.length} ${t("Hinweise")}: ${r.warnings.slice(0, 3).join("; ")}` : "");
+    } catch (err) { $("#res-summary").textContent = err.message; toast(err.message, "err"); }
+  });
+  $("#res-only-new").addEventListener("change", (e) => { $$(".res-sel").forEach((cb) => { const p = resPairs.find((x) => x.call === cb.dataset.call); cb.checked = e.target.checked ? p.status !== "gleich" : true; }); });
+  $("#btn-res-commit").addEventListener("click", async () => {
+    const sel = $$(".res-sel:checked").map((cb) => cb.dataset.call);
+    if (!sel.length) return toast(t("Nichts ausgewählt"), "err");
+    const fd = new FormData();
+    if ($("#res-file").files[0]) fd.append("file", $("#res-file").files[0]);
+    fd.append("url", $("#res-url").value.trim()); fd.append("text", $("#res-text").value); fd.append("commit", "1"); fd.append("selected", sel.join(","));
+    try { const r = await api("POST", "/api/import/results", fd); toast(`${r.imported} ${t("Rufzeichen übernommen")}`, "ok"); $("#res-wrap").classList.add("hidden"); $("#res-actions").classList.add("hidden"); $("#res-summary").textContent = ""; renderCallbook(); } catch (err) { toast(err.message, "err"); }
   });
   $("#cb-form").addEventListener("submit", async (e) => {
     e.preventDefault();

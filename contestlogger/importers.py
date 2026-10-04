@@ -330,3 +330,65 @@ def parse_file(filename: str, data: bytes) -> ImportResult:
     if head.startswith("Version") or re.match(r"^N,\d\d\.\d\d\.\d\d,", text.lstrip()):
         return parse_dd3ku_txt(text)
     return parse_callbook_csv(text)
+
+
+# ---------------------------------------------------------------- Ergebnislisten (DARC/IARU/UKW-CC)
+_CALL_TOKEN = re.compile(r"(?<![A-Z0-9/])((?:[A-Z0-9]{1,3}/)?[A-Z0-9]{1,3}[0-9][A-Z0-9]{0,4}[A-Z](?:/[A-Z0-9]{1,3})?)(?![A-Z0-9/])")
+_LOC_TOKEN = re.compile(r"(?<![A-Z0-9])([A-R]{2}[0-9]{2}[A-X]{2})(?![A-Z0-9])")
+_NOT_CALLS = {"MHZ", "GHZ", "KHZ", "QSO", "QSOS", "ODX", "PKT", "KM", "NR", "DOK", "UKW", "SSB", "CW", "FM", "PLATZ", "RANG", "NAME", "CALL"}
+
+
+def html_to_text(data: bytes) -> str:
+    text = _decode(data)
+    if "<" in text and (">" in text):
+        text = re.sub(r"(?is)<(script|style).*?</\1>", " ", text)
+        text = re.sub(r"(?i)</(tr|p|div|li|h\d|table)>|<br\s*/?>", "\n", text)
+        text = re.sub(r"(?i)</t[dh]>", " \t ", text)
+        text = re.sub(r"<[^>]+>", " ", text)
+        import html as _html
+        text = _html.unescape(text)
+    return text
+
+
+def pdf_to_text(data: bytes) -> str:
+    try:
+        from pypdf import PdfReader
+    except ImportError as e:  # pragma: no cover
+        raise ValueError("PDF-Import braucht das Paket pypdf") from e
+    import io as _io
+    reader = PdfReader(_io.BytesIO(data))
+    return "\n".join((page.extract_text() or "") for page in reader.pages)
+
+
+def parse_results_list(text: str) -> ImportResult:
+    """Erkennt in Ergebnislisten (DARC, IARU, UKW-Contest-Club …) zeilenweise Rufzeichen + Locator.
+
+    Zeilen ohne 6-stelligen Locator werden ignoriert; pro Zeile zählt das erste plausible Rufzeichen.
+    """
+    res = ImportResult("results")
+    seen: set[str] = set()
+    for raw in text.splitlines():
+        line = raw.upper()
+        locs = _LOC_TOKEN.findall(line)
+        if not locs:
+            continue
+        call = ""
+        for m in _CALL_TOKEN.finditer(line):
+            tok = m.group(1)
+            if tok in _NOT_CALLS or _LOC_TOKEN.fullmatch(tok) or not prefixes.is_plausible_call(tok):
+                continue
+            if prefixes.country(tok) == "?" and len(tok) < 4:
+                continue
+            call = tok
+            break
+        if not call:
+            continue
+        core = prefixes.core_call(call)
+        if core in seen:
+            continue
+        seen.add(core)
+        pl = prefixes.check_plausibility(call, locs[0])
+        res.callbook.append((call, locs[0], ""))
+        if not pl["ok"]:
+            res.warnings.append(f"{call} {locs[0]}: {pl['msg'].split(' – ')[0]}")
+    return res

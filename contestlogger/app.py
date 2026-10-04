@@ -481,6 +481,54 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         await hub.broadcast({"type": "update", "scope": "contests"})
         return report
 
+    @app.post("/api/import/results", dependencies=[Depends(require_admin)])
+    async def import_results(file: UploadFile | None = File(None), text: str = Form(""), url: str = Form(""),
+                             commit: int = Form(0), selected: str = Form("")):
+        """Ergebnisliste (DARC/IARU/…) als Datei, Text oder URL: Vorschau (commit=0) oder Übernahme (commit=1)."""
+        raw = b""
+        name = ""
+        if file is not None and file.filename:
+            raw = await file.read()
+            name = file.filename
+        elif url.strip():
+            import urllib.request
+            try:
+                req = urllib.request.Request(url.strip(), headers={"User-Agent": "Mozilla/5.0 ContestLogger"})
+                with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310
+                    raw = r.read(20_000_000)
+                    name = url
+                    ctype = r.headers.get("Content-Type", "")
+                    if "pdf" in ctype.lower():
+                        name = url + ".pdf"
+            except Exception as e:  # noqa: BLE001
+                raise HTTPException(400, f"Abruf fehlgeschlagen: {e}")
+        elif text.strip():
+            raw = text.encode("utf-8")
+        else:
+            raise HTTPException(400, "Datei, Text oder URL angeben")
+        try:
+            content = importers.pdf_to_text(raw) if (name.lower().endswith(".pdf") or raw[:5] == b"%PDF-") else importers.html_to_text(raw)
+            res = importers.parse_results_list(content)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        pairs = [{"call": c, "locator": loc} for c, loc, _ in res.callbook]
+        if not commit:
+            known = {r["call"]: r["locator"] for r in db.rows("SELECT call, locator FROM callbook")}
+            from . import prefixes
+            for pr in pairs:
+                core = prefixes.core_call(pr["call"])
+                pr["known"] = known.get(core, "")
+                pr["status"] = "neu" if core not in known else ("gleich" if known[core] == pr["locator"] else "anders")
+            return {"pairs": pairs, "warnings": res.warnings[:100], "count": len(pairs)}
+        wanted = set(x.strip().upper() for x in selected.split(",") if x.strip()) if selected else None
+        n = 0
+        for pr in pairs:
+            if wanted is not None and pr["call"] not in wanted:
+                continue
+            db.learn_call(pr["call"], pr["locator"], source="results")
+            n += 1
+        return {"imported": n}
+
     @app.get("/api/callbook/export.csv")
     def callbook_export():
         rows = db.rows("SELECT * FROM callbook ORDER BY call")

@@ -182,6 +182,16 @@
           <button class="primary">Ordner importieren</button>
           <pre id="folder-result" class="result hidden"></pre>
         </form>
+        <h3>Ergebnisliste importieren (DARC / IARU / UKW-Contest-Club)</h3>
+        <p class="muted small">Die veröffentlichten Ergebnislisten enthalten Rufzeichen und Locator aller Teilnehmer – die größte frei verfügbare Quelle für die Stationsdatenbank. Datei (HTML, PDF, TXT, CSV), eingefügter Text oder Internetadresse der Ergebnisseite; vor der Übernahme gibt es eine Vorschau.</p>
+        <form id="results-form" class="stack">
+          <input type="file" id="res-file" accept=".htm,.html,.pdf,.txt,.csv">
+          <input id="res-url" placeholder="oder URL der Ergebnisseite, z. B. https://www.darc.de/…">
+          <textarea id="res-text" rows="3" placeholder="oder Text hier einfügen (Zeilen mit Rufzeichen und Locator)"></textarea>
+          <div class="row"><button class="primary">Vorschau</button><span id="res-summary" class="muted small"></span></div>
+          <div class="table-wrap hidden" id="res-wrap" style="max-height:260px"><table id="res-table" class="compact"><tbody></tbody></table></div>
+          <div class="row hidden" id="res-actions"><button type="button" id="btn-res-commit" class="primary">Ausgewählte übernehmen</button><label class="row small"><input type="checkbox" id="res-only-new" checked> nur neue / geänderte</label></div>
+        </form>
         <h3>Einzelne Datei importieren</h3>
         <p class="muted small">WinContest (DD3KU) <code>.txt</code>/<code>.EXP</code>/<code>.mdb</code>, EDI/REG1TEST, ADIF oder Call-Listen (<code>Call;Locator;Name</code>). Rufzeichen + Locator landen immer im Call-Buch.</p>
         <form id="import-form" class="stack">
@@ -213,7 +223,7 @@
         <p><button id="btn-backup" class="ghost">Jetzt sichern</button></p>
         <div class="table-wrap" style="max-height:180px"><table id="backup-list" class="compact"><tbody></tbody></table></div>
         <h3>Externe Rufzeichen-Abfrage</h3>
-        <p class="muted small">Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH (kostenloser Account) oder QRZ.com (XML-Abo) nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. Ohne Internet oder Zugangsdaten bleibt alles lokal.</p>
+        <p class="muted small">Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH oder QRZ.com nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. <b>HamQTH ist kostenlos, die Abfrage-Schnittstelle verlangt aber zwingend einen HamQTH-Account</b> (auf hamqth.com registrieren, dann hier Benutzername und Passwort eintragen und „Testen“ drücken). QRZ.com braucht ein XML-Abo. Ohne Internet oder Zugangsdaten bleibt alles lokal.</p>
         <form id="lookup-form" class="stack">
           <div class="row">
             <select id="lookup-provider"><option value="none">aus</option><option value="hamqth">HamQTH (kostenlos)</option><option value="qrz">QRZ.com (XML-Abo)</option></select>

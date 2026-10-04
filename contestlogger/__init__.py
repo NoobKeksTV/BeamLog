@@ -1,5 +1,5 @@
 """ContestLogger – lokaler, webbasierter Contest-Logger für UKW-Contests."""
 
-__version__ = "0.8.1"
+__version__ = "0.8.2"
 __copyright__ = "© 2026 Lars Hölker"
 __app_name__ = "ContestLogger"

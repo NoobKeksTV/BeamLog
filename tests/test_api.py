@@ -161,3 +161,16 @@ def test_seed_and_folder_import(client):
     assert r["contests"] == 1 and r["qsos"] == 1 and len(r["files"]) == 2
     assert any(c["archived"] for c in client.get("/api/contests").json())
     assert client.delete("/api/callbook/DL0GM", headers=H).json()["ok"]
+
+
+def test_results_import(client):
+    admin = client.post("/api/setup", json={"password": "admin1"}).json()["token"]
+    H = {"X-Admin-Token": admin}
+    html = b"<table><tr><td>1</td><td>DL0GM</td><td>JO31UB</td><td>312</td></tr><tr><td>2</td><td>OK9ZZZ</td><td>JN79FX</td><td>5</td></tr></table>"
+    r = client.post("/api/import/results", files={"file": ("ergebnis.html", html)}, data={"commit": "0"}, headers=H).json()
+    assert r["count"] == 2 and {p["call"] for p in r["pairs"]} == {"DL0GM", "OK9ZZZ"}
+    assert next(p for p in r["pairs"] if p["call"] == "DL0GM")["status"] == "gleich"  # aus Startdatenbank bekannt
+    r = client.post("/api/import/results", data={"text": "OK9ZZZ JN79FX 5", "commit": "1", "selected": "OK9ZZZ"}, headers=H).json()
+    assert r["imported"] == 1
+    assert client.get("/api/callbook", params={"q": "OK9ZZZ"}).json()["rows"][0]["locator"] == "JN79FX"
+    assert client.post("/api/import/results", data={"commit": "0"}, headers=H).status_code == 400

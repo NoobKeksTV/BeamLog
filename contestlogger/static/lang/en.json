@@ -272,5 +272,21 @@
  "Testen": "Test",
  "Einstellungen gespeichert": "Settings saved",
  "aus": "off",
- "Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH (kostenloser Account) oder QRZ.com (XML-Abo) nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. Ohne Internet oder Zugangsdaten bleibt alles lokal.": "If the local station database does not know a callsign, it is looked up online at HamQTH (free account) or QRZ.com (XML subscription) – locator, name and QTH are taken over and stored. Without internet or credentials everything stays local."
+ "Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH (kostenloser Account) oder QRZ.com (XML-Abo) nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. Ohne Internet oder Zugangsdaten bleibt alles lokal.": "If the local station database does not know a callsign, it is looked up online at HamQTH (free account) or QRZ.com (XML subscription) – locator, name and QTH are taken over and stored. Without internet or credentials everything stays local.",
+ "Ergebnisliste importieren (DARC / IARU / UKW-Contest-Club)": "Import results list (DARC / IARU / VHF contest club)",
+ "Vorschau": "Preview",
+ "Ausgewählte übernehmen": "Import selected",
+ "nur neue / geänderte": "only new / changed",
+ "Rufzeichen mit Locator gefunden": "callsigns with locator found",
+ "neu / geändert": "new / changed",
+ "bekannt": "known",
+ "bisher": "previously",
+ "Nichts ausgewählt": "Nothing selected",
+ "Rufzeichen übernommen": "callsigns imported",
+ "oder URL der Ergebnisseite, z. B. https://www.darc.de/…": "or URL of the results page, e.g. https://www.darc.de/…",
+ "oder Text hier einfügen (Zeilen mit Rufzeichen und Locator)": "or paste text here (lines with callsign and locator)",
+ "Die veröffentlichten Ergebnislisten enthalten Rufzeichen und Locator aller Teilnehmer – die größte frei verfügbare Quelle für die Stationsdatenbank. Datei (HTML, PDF, TXT, CSV), eingefügter Text oder Internetadresse der Ergebnisseite; vor der Übernahme gibt es eine Vorschau.": "Published results lists contain callsign and locator of all participants – the largest freely available source for the station database. File (HTML, PDF, TXT, CSV), pasted text or URL of the results page; a preview is shown before importing.",
+ "Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH oder QRZ.com nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert.": "If the local station database does not know a callsign, it is looked up online at HamQTH or QRZ.com – locator, name and QTH are taken over and stored.",
+ "HamQTH ist kostenlos, die Abfrage-Schnittstelle verlangt aber zwingend einen HamQTH-Account": "HamQTH is free, but its lookup interface strictly requires a HamQTH account",
+ "(auf hamqth.com registrieren, dann hier Benutzername und Passwort eintragen und „Testen“ drücken). QRZ.com braucht ein XML-Abo. Ohne Internet oder Zugangsdaten bleibt alles lokal.": "(register at hamqth.com, then enter username and password here and press “Test”). QRZ.com needs an XML subscription. Without internet or credentials everything stays local."
 }

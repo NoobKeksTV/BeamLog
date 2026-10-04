@@ -43,7 +43,8 @@ oder Handys im Browser. Kein Internet nötig, keine Accounts.
 - **Mehrsprachig** (Deutsch, Englisch); eigene Sprachen per JSON-Datei in `data/lang/` (Vorlage in der Verwaltung).
 - **Stationsdatenbank** mit Startdaten, wächst mit jedem QSO/Import; Locator/km/Grad werden beim Eingeben
   des Rufzeichens automatisch gesetzt. Optional **externe Abfrage** bei HamQTH oder QRZ.com (wie Wavelog),
-  Ergebnisse werden gespeichert. **Plausibilitätsprüfung** Rufzeichen-Land ↔ Locator (live und bei der Log-Prüfung).
+  Ergebnisse werden gespeichert. **Ergebnislisten-Import** (DARC/IARU/UKW-CC als HTML, PDF, Text oder URL) mit
+  Vorschau füllt die Stationsdatenbank. **Plausibilitätsprüfung** Rufzeichen-Land ↔ Locator (live und bei der Log-Prüfung).
 - Länderkennung weltweit (DXCC-Präfixe), responsives Layout (Fenster beliebig skalierbar, auch Handy), hell/dunkel.
 
 ## Installation und Start
