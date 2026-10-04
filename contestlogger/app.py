@@ -15,7 +15,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __version__, exporters, importers, logcheck, lookup
+from . import __app_name__, __copyright__, __version__, exporters, geo, importers, kst, logcheck, lookup
 from .db import Database
 
 STATIC = Path(__file__).parent / "static"
@@ -57,7 +57,14 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if n:
             print(f"Stationsdatenbank: {n} Rufzeichen aus der mitgelieferten Startdatei geladen.")
         task = asyncio.create_task(backup_loop()) if interval > 0 else None
+        if db.get_setting("kst_autostart", "0") == "1" and db.get_setting("kst_user") and db.get_setting("kst_pass"):
+            try:
+                await kst_start()
+            except HTTPException:
+                pass
         yield
+        if kst_client():
+            await kst_client().stop()
         if task:
             task.cancel()
         try:
@@ -72,6 +79,38 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     app.state.hub = hub
     rig: dict[int, dict] = {}  # station_id -> {"freq": "432.200", "mode": "USB", "ts": ...}
     cw_queue: dict[int, list[str]] = {}  # station_id -> Texte, die die CAT-Bridge als CW senden soll
+    kst_state: dict[str, Any] = {"client": None}
+
+    async def kst_event(ev: dict) -> None:
+        if ev.get("type") == "kst_users":
+            for u in ev["users"]:
+                if u.get("locator"):
+                    db.learn_call(u["call"], u["locator"], source="kst", name=u.get("name", ""))
+        if ev.get("type") == "kst":
+            m = ev["msg"]
+            with db.conn:
+                db.conn.execute("INSERT INTO kst_messages(ts_utc,time,call,name,to_call,text,own,to_me) VALUES(?,?,?,?,?,?,?,?)",
+                                (m["ts"], m["time"], m["call"], m["name"], m["to"], m["text"], int(m["own"]), int(m["to_me"])))
+        if ev.get("type") != "kst_raw":
+            await hub.broadcast(ev)
+
+    def kst_client() -> kst.KstClient | None:
+        return kst_state["client"]
+
+    async def kst_start() -> dict:
+        user = db.get_setting("kst_user", "") or ""
+        pw = db.get_setting("kst_pass", "") or ""
+        if not (user and pw):
+            raise HTTPException(400, "KST: Rufzeichen und Passwort in der Verwaltung eintragen")
+        c = kst_client()
+        if c:
+            await c.stop()
+        calls = [s["call"] for s in db.rows("SELECT DISTINCT call FROM stations")]
+        c = kst.KstClient(user, pw, int(db.get_setting("kst_room", "2") or 2), kst_event, my_calls=calls)
+        kst_state["client"] = c
+        c.start()
+        return c.status()
+
     lookup_state = {"client": None}
     lookup_cache: dict[str, float] = {}  # Call -> Zeitpunkt der letzten erfolglosen Abfrage
 
@@ -122,9 +161,9 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.post("/api/settings", dependencies=[Depends(require_admin)])
     def set_settings(body: dict):
-        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass"):
+        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_user", "kst_pass", "kst_room", "kst_autostart", "kst_macros"):
             if k in body:
-                db.set_setting(k, str(body[k] or ""))
+                db.set_setting(k, json.dumps(body[k]) if k == "kst_macros" else str(body[k] or ""))
         lookup_state["client"] = None
         lookup_cache.clear()
         return {"ok": True}
@@ -133,7 +172,10 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     def get_settings():
         return {"tile_url": db.get_setting("tile_url", ""), "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
                 "lookup_user": db.get_setting("lookup_user", ""), "lookup_pass_set": bool(db.get_setting("lookup_pass", "")),
-                "providers": lookup.PROVIDERS}
+                "providers": lookup.PROVIDERS,
+                "kst_user": db.get_setting("kst_user", ""), "kst_pass_set": bool(db.get_setting("kst_pass", "")),
+                "kst_room": int(db.get_setting("kst_room", "2") or 2), "kst_autostart": db.get_setting("kst_autostart", "0") == "1",
+                "kst_rooms": kst.ROOMS}
 
     @app.post("/api/lookup/test", dependencies=[Depends(require_admin)])
     async def lookup_test():
@@ -528,6 +570,127 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             db.learn_call(pr["call"], pr["locator"], source="results")
             n += 1
         return {"imported": n}
+
+    # ------------------------------------------------------------ ON4KST-Chat
+    @app.get("/api/kst/status")
+    def kst_status():
+        c = kst_client()
+        base = {"configured": bool(db.get_setting("kst_user") and db.get_setting("kst_pass")), "macros": json.loads(db.get_setting("kst_macros", "") or "null") or kst_default_macros()}
+        return {**base, **(c.status() if c else {"state": "aus", "error": "", "users": 0, "messages": 0, "room": int(db.get_setting("kst_room", "2") or 2)})}
+
+    def kst_default_macros() -> list[dict]:
+        return [{"label": "CQ", "text": "/CQ {call} GA {name}, QRV {band}? pse call, my loc {myloc}"},
+                {"label": "QRV", "text": "/CQ {call} QRV {band} ssb, calling you now, loc {myloc}"},
+                {"label": "TNX", "text": "/CQ {call} TNX QSO {name}, 73!"},
+                {"label": "NIL", "text": "/CQ {call} sri {name}, nil heard, try again later?"},
+                {"label": "SKED", "text": "/CQ {call} sked in 5 min on {band}?"}]
+
+    @app.post("/api/kst/start", dependencies=[Depends(require_admin)])
+    async def kst_start_ep():
+        return await kst_start()
+
+    @app.post("/api/kst/stop", dependencies=[Depends(require_admin)])
+    async def kst_stop_ep():
+        c = kst_client()
+        if c:
+            await c.stop()
+        return {"state": "aus"}
+
+    @app.post("/api/kst/send")
+    async def kst_send(body: dict, x_nick: str | None = Header(default=None)):
+        c = kst_client()
+        if not c or c.state != "verbunden":
+            raise HTTPException(409, "Nicht mit dem KST-Chat verbunden")
+        text = (body.get("text") or "").strip()[:300]
+        if not text:
+            raise HTTPException(400, "Leere Nachricht")
+        if text.startswith("/") and not text.upper().startswith("/CQ "):
+            await c.send_command(text)
+        else:
+            await c.send_text(text)
+        return {"ok": True}
+
+    @app.post("/api/kst/refresh_users")
+    async def kst_refresh_users():
+        c = kst_client()
+        if not c or c.state != "verbunden":
+            raise HTTPException(409, "Nicht verbunden")
+        await c.send_command("/SHOW USER")
+        return {"ok": True}
+
+    @app.get("/api/kst/messages")
+    def kst_messages(limit: int = 300):
+        rows = db.rows("SELECT * FROM kst_messages ORDER BY id DESC LIMIT ?", (min(int(limit), 2000),))
+        c = kst_client()
+        users = c.users if c else {}
+        out = []
+        for r in reversed(rows):
+            out.append({"ts": r["ts_utc"], "time": r["time"], "call": r["call"], "name": r["name"], "to": r["to_call"], "text": r["text"],
+                        "own": bool(r["own"]), "to_me": bool(r["to_me"]), "locator": (users.get(r["call"]) or {}).get("locator", "")})
+        return out
+
+    @app.get("/api/kst/users")
+    def kst_users(my: str = ""):
+        c = kst_client()
+        out = []
+        for u in (c.users.values() if c else []):
+            d = dict(u)
+            if my and geo.is_valid_locator(my) and u.get("locator"):
+                d["km"] = geo.distance_km_int(my, u["locator"])
+                d["bearing"] = round(geo.bearing_deg(my, u["locator"])) % 360
+            out.append(d)
+        out.sort(key=lambda u: u.get("km", 99999))
+        return out
+
+    # ------------------------------------------------------------ DARC-Contest-Hub
+    @app.get("/api/darc/contests", dependencies=[Depends(require_admin)])
+    async def darc_contests(year: int):
+        import urllib.request
+        url = importers.DARC_INDEX.format(year=year)
+        try:
+            def fetch():
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 ContestLogger"})
+                with urllib.request.urlopen(req, timeout=20) as r:  # noqa: S310
+                    return r.read().decode("utf-8", "replace")
+            text = await asyncio.to_thread(fetch)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(400, f"DARC-Contest-Hub nicht erreichbar: {e}")
+        return importers.parse_darc_index(text, year)
+
+    @app.post("/api/darc/import", dependencies=[Depends(require_admin)])
+    async def darc_import(body: dict):
+        """{'years': [2024, 2025]} oder {'csv_urls': [...]} – lädt die result.csv-Dateien und übernimmt Call+Locator."""
+        import urllib.request
+        urls: list[str] = list(body.get("csv_urls") or [])
+        years = body.get("years") or []
+        report: list[dict] = []
+
+        def fetch(url: str) -> str:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 ContestLogger"})
+            with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310
+                return r.read().decode("utf-8", "replace")
+
+        for y in years:
+            try:
+                idx = importers.parse_darc_index(await asyncio.to_thread(fetch, importers.DARC_INDEX.format(year=int(y))), int(y))
+                urls += [c["csv"] for c in idx]
+            except Exception as e:  # noqa: BLE001
+                report.append({"url": str(y), "error": str(e)})
+        total = 0
+        for url in urls:
+            if not url.startswith(importers.DARC_BASE):
+                report.append({"url": url, "error": "nur DARC-Contest-Hub-Adressen"})
+                continue
+            try:
+                res = importers.parse_darc_csv(await asyncio.to_thread(fetch, url))
+            except Exception as e:  # noqa: BLE001
+                report.append({"url": url, "error": str(e)})
+                continue
+            for call, loc, _ in res.callbook:
+                db.learn_call(call, loc, source="darc")
+            total += len(res.callbook)
+            report.append({"url": url, "calls": len(res.callbook)})
+        return {"total": total, "callbook_count": db.callbook_count(), "files": report}
 
     @app.get("/api/callbook/export.csv")
     def callbook_export():

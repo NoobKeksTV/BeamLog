@@ -18,7 +18,11 @@
     info: {},
     rig: {},
     locAuto: false,
+    kst: { msgs: [], users: [], status: {}, tab: "local", dm: "", unread: 0, unreadMe: 0, macros: [] },
   };
+  const POPUP = new URLSearchParams(location.search).get("popup") === "chat";
+  if (POPUP) document.body.classList.add("popup");
+  const BC = ("BroadcastChannel" in window) ? new BroadcastChannel("contestlogger") : null;
   // ------------------------------------------------------------ Sprache
   // Schlüssel = deutscher Originaltext; Übersetzungen kommen aus /static/lang/<code>.json bzw. data/lang/<code>.json.
   let LANG = {};
@@ -163,6 +167,7 @@
     await loadContests();
     connectWs();
     loadChat();
+    loadKst();
     $("#f-call").focus();
   }
 
@@ -777,6 +782,9 @@
     ws.onmessage = async (ev) => {
       const m = JSON.parse(ev.data);
       if (m.type === "chat") { appendChat(m.msg); if (m.msg.nick !== S.nick) Sound.play("chat"); }
+      else if (m.type === "kst") { S.kst.msgs.push(m.msg); S.kst.msgs.splice(0, S.kst.msgs.length - 800); if (S.kst.tab !== "kst" && S.kst.tab !== "me" && S.kst.tab !== "dm") { S.kst.unread++; if (m.msg.to_me) S.kst.unreadMe++; } if (m.msg.to_me && !m.msg.own) Sound.play("chat"); renderKst(); }
+      else if (m.type === "kst_users") { S.kst.users = m.users; renderKstUsers(); renderKst(); }
+      else if (m.type === "kst_status") { S.kst.status = { ...S.kst.status, state: m.state, error: m.error }; renderKstStatus(); }
       else if (m.type === "rig") { S.rig[m.station_id] = { freq: m.freq, mode: m.mode, ts: m.ts }; if (m.station_id === S.stationId) renderStationBar(); renderScoreboard(); }
       else if (m.type === "presence") renderPresence(m.users);
       else if (m.type === "update") {
@@ -811,6 +819,163 @@
     const t = $("#chat-input").value.trim();
     if (t && S.ws?.readyState === 1) { S.ws.send(JSON.stringify({ type: "chat", text: t })); $("#chat-input").value = ""; }
   });
+
+  // ------------------------------------------------------------ Chat-Reiter, Popup, ON4KST
+  $$(".chat-tabs button").forEach((b) => b.addEventListener("click", () => setChatTab(b.dataset.ctab)));
+  function setChatTab(tab) {
+    S.kst.tab = tab; localStorage.setItem("cl.chattab", tab);
+    $$(".chat-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.ctab === tab));
+    $("#ctab-local").classList.toggle("active", tab === "local");
+    $("#ctab-kst").classList.toggle("active", tab !== "local");
+    if (tab !== "local") { S.kst.unread = 0; if (tab === "me") S.kst.unreadMe = 0; renderKst(); $("#kst-input").focus(); }
+    renderKstBadges();
+  }
+  function renderKstBadges() {
+    const b = $("#kst-badge"), bm = $("#kst-me-badge");
+    b.textContent = S.kst.unread; b.classList.toggle("hidden", !S.kst.unread);
+    bm.textContent = S.kst.unreadMe; bm.classList.toggle("hidden", !S.kst.unreadMe);
+  }
+  $("#btn-chat-pop").addEventListener("click", () => window.open(`${location.pathname}?popup=chat`, "clchat", "width=480,height=780,resizable=yes"));
+  if (POPUP) setChatTab(localStorage.getItem("cl.chattab") || "kst");
+  async function loadKst() {
+    try {
+      S.kst.status = await GET("/api/kst/status");
+      S.kst.macros = S.kst.status.macros || [];
+      S.kst.msgs = await GET("/api/kst/messages?limit=300");
+      S.kst.users = await GET(`/api/kst/users?my=${station()?.locator || ""}`);
+    } catch (_) { /* */ }
+    renderKstStatus(); renderKstUsers(); renderKst(); renderKstMacros();
+  }
+  function renderKstStatus() {
+    const st = S.kst.status || {};
+    const el_ = $("#kst-state");
+    el_.textContent = `KST: ${st.state || "aus"}${st.error ? " – " + st.error : ""}`;
+    el_.className = "tag " + (st.state === "verbunden" ? "me" : "");
+    $("#kst-room").textContent = st.state === "verbunden" ? `${st.user} · ${st.room_name || st.room}` : (st.configured ? "" : t("in der Verwaltung einrichten"));
+    $("#kst-input").disabled = st.state !== "verbunden";
+    const a = $("#kst-admin-state"); if (a) a.textContent = `${st.state || "aus"}${st.error ? " – " + st.error : ""}`;
+  }
+  const kstUser = (call) => S.kst.users.find((u) => u.call === call) || S.kst.users.find((u) => coreOf(u.call) === coreOf(call));
+  function renderKstUsers() {
+    const box = $("#kst-users"); box.innerHTML = "";
+    const my = station()?.locator;
+    for (const u of S.kst.users) {
+      const km = u.km ?? (my && u.locator ? null : null);
+      box.append(el("span", { class: "u" + (u.away ? " away" : ""), title: `${u.name || ""} ${u.locator || ""}`, onclick: () => fillFromKst(u.call, u.locator) },
+        u.call, el("small", {}, `${u.locator || "?"}${u.km != null ? ` ${u.km}km ${u.bearing}°` : ""}`)));
+    }
+    if (!S.kst.users.length) box.append(el("span", { class: "muted small" }, t("Keine Nutzerliste – „Nutzer“ drücken (max. 1 Abfrage/Minute).")));
+  }
+  $("#btn-kst-users").addEventListener("click", async () => {
+    $("#kst-users").classList.toggle("hidden");
+    if (!$("#kst-users").classList.contains("hidden")) { try { S.kst.users = await GET(`/api/kst/users?my=${station()?.locator || ""}`); renderKstUsers(); if (!S.kst.users.length) await api("POST", "/api/kst/refresh_users", {}); } catch (_) { /* */ } }
+  });
+  function fillFromKst(call, locator) {
+    const payload = { type: "fill", call, locator: locator || "" };
+    if (POPUP && BC) { BC.postMessage(payload); toast(t("{call} an den Logger übergeben", { call }), "ok"); return; }
+    applyFill(payload);
+  }
+  function applyFill(p) {
+    showView("log");
+    F.call.value = p.call; S.locAuto = false; F.loc.classList.remove("auto");
+    if (p.locator) { F.loc.value = p.locator; S.locAuto = true; F.loc.classList.add("auto"); } else F.loc.value = "";
+    updateHints(); if (!p.locator) lookupCall(); F.nr.focus();
+  }
+  if (BC && !POPUP) BC.onmessage = (ev) => { if (ev.data?.type === "fill") applyFill(ev.data); };
+  function kstFiltered() {
+    const my = S.kst.msgs;
+    if (S.kst.tab === "me") return my.filter((m) => m.to_me || m.own && m.to);
+    if (S.kst.tab === "dm" && S.kst.dm) { const c = coreOf(S.kst.dm); return my.filter((m) => coreOf(m.call) === c || (m.own && coreOf(m.to) === c)); }
+    return my;
+  }
+  function renderKst() {
+    const log = $("#kst-log"); const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+    log.innerHTML = "";
+    const list = kstFiltered().slice(-400);
+    for (const m of list) {
+      const u = kstUser(m.call);
+      log.append(el("div", { class: "m" + (m.to_me ? " me" : "") + (m.own ? " own" : "") },
+        el("span", { class: "t" }, m.time),
+        el("span", { class: "c", title: (u?.locator || m.locator || "") + " " + (m.name || ""), onclick: () => fillFromKst(m.call, u?.locator || m.locator) }, m.call),
+        m.to ? el("span", { class: "to" }, `(${m.to})`) : null,
+        el("span", { class: "txt" }, m.text),
+        el("span", { class: "act" }, el("button", { class: "ghost", title: t("Antworten"), onclick: () => replyTo(m.call) }, "↩"), el("button", { class: "ghost", title: "DM", onclick: () => setDm(m.call) }, "DM"))));
+    }
+    if (!list.length) log.append(el("div", { class: "sys" }, S.kst.tab === "dm" && !S.kst.dm ? t("Im DM-Reiter einen Nutzer wählen (DM-Knopf an einer Nachricht oder Klick in der Nutzerliste).") : t("Keine Nachrichten.")));
+    if (atBottom || true) log.scrollTop = log.scrollHeight;
+    $("#kst-dm-bar").classList.toggle("hidden", !(S.kst.tab === "dm" && S.kst.dm));
+    $("#kst-dm-call").textContent = S.kst.dm;
+    renderKstBadges();
+  }
+  function replyTo(call) { const i = $("#kst-input"); i.value = `/CQ ${call} `; i.focus(); if (S.kst.tab === "dm") setDm(call, true); }
+  function setDm(call, keep) { S.kst.dm = call; if (!keep) setChatTab("dm"); renderKst(); if (!keep) replyTo(call); }
+  $("#btn-kst-dm-off").addEventListener("click", () => { S.kst.dm = ""; setChatTab("kst"); });
+  $("#kst-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = $("#kst-input").value.trim(); if (!text) return;
+    try { await api("POST", "/api/kst/send", { text }); $("#kst-input").value = ""; } catch (err) { toast(err.message, "err"); }
+  });
+  function kstTarget() { return S.kst.dm || ($("#kst-input").value.match(/^\/CQ\s+(\S+)/i) || [])[1] || F.call.value.trim() || ""; }
+  function expandKst(text) {
+    const st = station() || {}; const call = kstTarget(); const u = call ? kstUser(call) : null;
+    return text.replace(/\{(\w+)\}/g, (_, k) => ({ call, name: u?.name?.split(" ")[0] || "", loc: u?.locator || "", mycall: st.call || "", myloc: st.locator || "", band: (st.band || "").replace("MHz", " MHz"), nick: S.nick })[k] ?? `{${k}}`);
+  }
+  function renderKstMacros() {
+    const box = $("#kst-macros"); box.innerHTML = "";
+    for (const m of S.kst.macros) box.append(el("button", { type: "button", class: "ghost", title: m.text, onclick: async () => {
+      const text = expandKst(m.text);
+      if (/\{call\}|^\/CQ\s*$/.test(text) || (m.text.includes("{call}") && !kstTarget())) return toast(t("Erst Ziel-Rufzeichen wählen (DM, ↩ oder im Logger eintippen)"), "err");
+      try { await api("POST", "/api/kst/send", { text }); } catch (err) { toast(err.message, "err"); }
+    } }, m.label));
+    box.append(el("button", { type: "button", class: "ghost small", onclick: kstMacroEditor }, "✎"));
+  }
+  function kstMacroEditor() {
+    const rows = S.kst.macros.length ? S.kst.macros : [{ label: "", text: "" }];
+    const box = modal(el("div", {}, el("h3", {}, t("KST-Textbausteine")),
+      el("p", { class: "muted small" }, t("Platzhalter: {call} {name} {loc} (Ziel) · {mycall} {myloc} {band} (eigene Station). Beginnt der Text mit /CQ {call}, erscheint er beim Empfänger hervorgehoben. Gilt für alle Operatoren.")),
+      el("form", { id: "kst-macro-form", class: "stack" },
+        el("div", { id: "kst-macro-rows", class: "stack" }, rows.map((m) => macroRow(m))),
+        el("div", { class: "row" }, el("button", { class: "primary" }, t("Speichern")), el("button", { type: "button", class: "ghost", onclick: () => $("#kst-macro-rows").append(macroRow({ label: "", text: "" })) }, "+"), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Abbrechen"))))));
+    function macroRow(m) { return el("div", { class: "row" }, el("input", { class: "km-label", value: m.label, placeholder: t("Knopf"), style: "width:90px" }), el("input", { class: "km-text", value: m.text, placeholder: "/CQ {call} …", style: "flex:1" }), el("button", { type: "button", class: "ghost danger", onclick: (e) => e.target.closest(".row").remove() }, "✕")); }
+    box.querySelector("#kst-macro-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const out = $$("#kst-macro-rows .row").map((r) => ({ label: r.querySelector(".km-label").value.trim(), text: r.querySelector(".km-text").value.trim() })).filter((m) => m.label && m.text);
+      try { await api("POST", "/api/settings", { kst_macros: out }); S.kst.macros = out; renderKstMacros(); closeModal(); toast(t("Gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
+    });
+  }
+  // Verwaltung: KST
+  $("#kst-form-admin").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = { kst_user: $("#kst-user").value.trim(), kst_room: $("#kst-room-sel").value, kst_autostart: $("#kst-autostart").checked ? "1" : "0" };
+    if ($("#kst-pass").value) body.kst_pass = $("#kst-pass").value;
+    try { await api("POST", "/api/settings", body); $("#kst-pass").value = ""; toast(t("Einstellungen gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
+  });
+  $("#btn-kst-start").addEventListener("click", async () => { try { S.kst.status = { ...S.kst.status, ...(await api("POST", "/api/kst/start", {})) }; renderKstStatus(); toast(t("KST: verbinde …")); } catch (err) { toast(err.message, "err"); } });
+  $("#btn-kst-stop").addEventListener("click", async () => { try { await api("POST", "/api/kst/stop", {}); S.kst.status.state = "aus"; renderKstStatus(); } catch (err) { toast(err.message, "err"); } });
+  // Verwaltung: DARC-Contest-Hub
+  let darcList = [];
+  (function initDarcYears() { const sel = $("#darc-year"); const y = new Date().getUTCFullYear(); for (let i = y; i >= 2017; i--) sel.append(el("option", { value: i }, i)); })();
+  $("#btn-darc-list").addEventListener("click", async () => {
+    $("#darc-summary").textContent = "…";
+    try {
+      darcList = await GET(`/api/darc/contests?year=${$("#darc-year").value}`);
+      const tb = $("#darc-table tbody"); tb.innerHTML = "";
+      for (const c of darcList) tb.append(el("tr", {}, el("td", {}, el("input", { type: "checkbox", class: "darc-sel", "data-csv": c.csv, checked: 1 })), el("td", {}, c.id), el("td", {}, c.name), el("td", { class: "muted small" }, `${c.status} ${c.date}`)));
+      $("#darc-wrap").classList.toggle("hidden", !darcList.length); $("#darc-actions").classList.toggle("hidden", !darcList.length);
+      $("#darc-summary").textContent = `${darcList.length} ${t("Contests")}`;
+    } catch (err) { $("#darc-summary").textContent = err.message; toast(err.message, "err"); }
+  });
+  async function darcImport(body) {
+    $("#darc-summary").textContent = t("Importiere …");
+    try {
+      const r = await api("POST", "/api/darc/import", body);
+      const errs = r.files.filter((f) => f.error);
+      $("#darc-summary").textContent = `${r.total} ${t("Rufzeichen übernommen")} · ${t("Stationsdatenbank")}: ${r.callbook_count}` + (errs.length ? ` · ${errs.length} ${t("Fehler")}: ${errs[0].error}` : "");
+      toast(`${r.total} ${t("Rufzeichen übernommen")}`, "ok"); renderCallbook();
+    } catch (err) { $("#darc-summary").textContent = err.message; toast(err.message, "err"); }
+  }
+  $("#btn-darc-import").addEventListener("click", () => darcImport({ csv_urls: $$(".darc-sel:checked").map((c) => c.dataset.csv) }));
+  $("#btn-darc-all").addEventListener("click", () => { const y = new Date().getUTCFullYear(); const years = []; for (let i = 2017; i <= y; i++) years.push(i); if (confirm(t("Alle DARC-Ergebnislisten {a}–{b} laden? Das dauert ein bis zwei Minuten.", { a: 2017, b: y }))) darcImport({ years }); });
 
   // ------------------------------------------------------------ Statistik
   async function renderStats() {
@@ -964,7 +1129,11 @@
     const is = $("#imp-station"); is.innerHTML = "";
     S.contests.forEach((cc) => cc.stations.forEach((s) => is.append(el("option", { value: s.id }, `${cc.name} · ${s.call} ${s.band}`))));
     const inf = await GET("/api/info"); $("#cb-count").textContent = inf.callbook_count; $("#tile-url").value = inf.tile_url || "";
-    try { const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider; $("#lookup-user").value = cfg.lookup_user || ""; $("#lookup-pass").placeholder = cfg.lookup_pass_set ? t("Passwort (gespeichert)") : t("Passwort"); } catch (_) { /* */ }
+    try {
+      const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider; $("#lookup-user").value = cfg.lookup_user || ""; $("#lookup-pass").placeholder = cfg.lookup_pass_set ? t("Passwort (gespeichert)") : t("Passwort");
+      $("#kst-user").value = cfg.kst_user || ""; $("#kst-pass").placeholder = cfg.kst_pass_set ? t("Passwort (gespeichert)") : t("KST-Passwort"); $("#kst-autostart").checked = !!cfg.kst_autostart;
+      const rs = $("#kst-room-sel"); rs.innerHTML = ""; for (const [n, name] of Object.entries(cfg.kst_rooms || {})) rs.append(el("option", { value: n, selected: Number(n) === cfg.kst_room ? 1 : null }, `${n} – ${name}`));
+    } catch (_) { /* */ }
     renderBackups(); renderCallbook();
   }
   $("#admin-login-form").addEventListener("submit", async (e) => {

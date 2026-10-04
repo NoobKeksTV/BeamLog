@@ -45,6 +45,12 @@ oder Handys im Browser. Kein Internet nötig, keine Accounts.
   des Rufzeichens automatisch gesetzt. Optional **externe Abfrage** bei HamQTH oder QRZ.com (wie Wavelog),
   Ergebnisse werden gespeichert. **Ergebnislisten-Import** (DARC/IARU/UKW-CC als HTML, PDF, Text oder URL) mit
   Vorschau füllt die Stationsdatenbank. **Plausibilitätsprüfung** Rufzeichen-Land ↔ Locator (live und bei der Log-Prüfung).
+- **DARC-Contest-Hub direkt**: Verwaltung → „DARC-Contest-Hub“ lädt die offiziellen `result.csv` aller
+  UKW-Conteste (2017–heute, 500–900 Calls je Contest inkl. ODX-Gegenstationen) in die Stationsdatenbank.
+- **ON4KST-Chat** im Chat-Fenster (Reiter KST / An mich / DM): Server hält die Telnet-Verbindung, alle Browser
+  chatten unter dem Stations-Call; Nutzerliste mit km/Grad, Antworten per ↩ (`/CQ CALL`), DM-Ansicht je Nutzer,
+  Textbausteine mit Platzhaltern per Knopf, Klick auf ein Rufzeichen übernimmt Call + Locator in den Logger.
+- **Chat als eigenes Fenster** (↗) – auch von dort landen Klicks auf Rufzeichen im Logger des Hauptfensters.
 - Länderkennung weltweit (DXCC-Präfixe), responsives Layout (Fenster beliebig skalierbar, auch Handy), hell/dunkel.
 
 ## Installation und Start
@@ -130,11 +136,16 @@ python tools/cat_bridge.py --server http://192.168.1.10:8000 --station 1 --passw
 
 Die Stations-ID steht in der Verwaltung. Alternativ `--flrig http://localhost:12345` für flrig.
 
+## ON4KST-Chat
+
+Verwaltung → „ON4KST-Chat“: KST-Rufzeichen, Passwort (eigenes Passwort verwenden – Telnet überträgt es im
+Klartext), Raum (2 = 144/432 MHz, 3 = Mikrowelle …), optional „beim Start verbinden“, dann „Verbinden“.
+Im Chat-Fenster erscheinen die Reiter **KST** (alles), **An mich** (`/CQ` an das eigene Call oder Call im
+Text) und **DM** (nur ein Gesprächspartner). Der Server fragt die Nutzerliste automatisch ab (KST erlaubt
+ein Kommando pro Minute); jeder Nutzer mit Locator landet in der Stationsdatenbank.
+
 ## Roadmap
 
-- **ON4KST-Chat-Anbindung** (Telnet-Schnittstelle, Port 23000): Login, Räume (144/432/µW), Fenster „alle
-  Nachrichten“ und „an mich gerichtet“, Direktantwort, `/cq`-Vorlage mit dem aktuellen Rufzeichen,
-  gespeicherte und bearbeitbare Textbausteine mit Senden-Knopf.
 - Rotor-Steuerung (Hamlib `rotctld`), Lücken-Liste aus früheren Contests, weitere Wertungsregeln, Cabrillo.
 
 ## Technik

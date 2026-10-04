@@ -392,3 +392,46 @@ def parse_results_list(text: str) -> ImportResult:
         if not pl["ok"]:
             res.warnings.append(f"{call} {locs[0]}: {pl['msg'].split(' – ')[0]}")
     return res
+
+
+# ---------------------------------------------------------------- DARC-Contest-Hub (dxhf2.darc.de)
+DARC_BASE = "https://dxhf2.darc.de/~ukwlog/"
+DARC_INDEX = DARC_BASE + "user.cgi?fc=arch_rukw&form=referat&lang=de&year={year}"
+
+
+def parse_darc_csv(text: str) -> ImportResult:
+    """result.csv des DARC-Contest-Hubs: Rufzeichen (Basis) + Locator sowie ODX Call + ODX Locator."""
+    res = ImportResult("darc")
+    rows = list(csv.DictReader(io.StringIO(text), delimiter=";"))
+    seen: set[str] = set()
+    for r in rows:
+        for ck, lk in (("Rufzeichen (Basis)", "Locator"), ("Rufzeichen", "Locator"), ("ODX Call", "ODX Locator")):
+            call = (r.get(ck) or "").strip().upper()
+            loc = (r.get(lk) or "").strip().upper()
+            if not call or not geo.is_valid_locator(loc) or len(loc) < 6 or not prefixes.is_plausible_call(call):
+                continue
+            core = prefixes.core_call(call)
+            if core in seen:
+                continue
+            seen.add(core)
+            res.callbook.append((core, loc, ""))
+    return res
+
+
+def parse_darc_index(html_text: str, year: int) -> list[dict]:
+    """Archivseite -> [{id, year, name, status, date, csv}] aus den Tabellenzeilen
+    <td>2024-05</td><td>Name</td><td>Status</td><td><a href=…html>Datum</a></td><td><a href=…csv>Datum</a></td>."""
+    out: list[dict] = []
+    row_re = re.compile(r"<td>\s*(\d{4}-[\w]+)\s*</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>.*?href=\"([^\"]*?/result/result\.csv)\"[^>]*>([^<]*)<", re.S)
+    for m in row_re.finditer(html_text):
+        cid, name, status, csv_url, date = m.groups()
+        if any(o["id"] == cid for o in out):
+            continue
+        out.append({"id": cid, "year": year, "name": _html_unescape(re.sub(r"<[^>]+>", "", name)).strip(),
+                    "status": _html_unescape(re.sub(r"<[^>]+>", "", status)).strip(), "date": date.strip(), "csv": csv_url.strip()})
+    return out
+
+
+def _html_unescape(s: str) -> str:
+    import html as _h
+    return _h.unescape(s)

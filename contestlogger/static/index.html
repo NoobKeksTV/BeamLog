@@ -108,10 +108,30 @@
           <h3>Stationen im Contest</h3>
           <table id="scoreboard" class="compact"><tbody></tbody></table>
         </div>
-        <div class="card chat">
-          <h3>Chat <span id="online" class="muted small"></span></h3>
-          <div id="chat-log" class="chat-log"></div>
-          <form id="chat-form" class="row"><input id="chat-input" placeholder="Nachricht …" maxlength="500"><button class="primary">Senden</button></form>
+        <div class="card chat" id="chat-card">
+          <div class="chat-head">
+            <div class="chat-tabs">
+              <button data-ctab="local" class="active">Chat</button>
+              <button data-ctab="kst">KST <span id="kst-badge" class="cnt hidden"></span></button>
+              <button data-ctab="me">An mich <span id="kst-me-badge" class="cnt hidden"></span></button>
+              <button data-ctab="dm">DM</button>
+            </div>
+            <span class="grow"></span>
+            <button id="btn-chat-pop" class="ghost small" title="Chat in eigenem Fenster öffnen">↗</button>
+          </div>
+          <div id="ctab-local" class="ctab active">
+            <div id="online" class="muted small"></div>
+            <div id="chat-log" class="chat-log"></div>
+            <form id="chat-form" class="row"><input id="chat-input" placeholder="Nachricht …" maxlength="500"><button class="primary">Senden</button></form>
+          </div>
+          <div id="ctab-kst" class="ctab">
+            <div class="row small kst-status"><span id="kst-state" class="tag">KST: aus</span><span id="kst-room" class="muted"></span><span class="grow"></span><button id="btn-kst-users" class="ghost small">Nutzer</button></div>
+            <div id="kst-users" class="kst-users hidden"></div>
+            <div id="kst-dm-bar" class="row small hidden"><span class="muted">DM mit</span><b id="kst-dm-call"></b><button id="btn-kst-dm-off" class="ghost small">× alle</button></div>
+            <div id="kst-log" class="chat-log kst-log"></div>
+            <div id="kst-macros" class="kst-macros"></div>
+            <form id="kst-form" class="row"><input id="kst-input" placeholder="Nachricht an den KST-Chat … (/CQ CALL Text für gezielt)" maxlength="300"><button class="primary">Senden</button></form>
+          </div>
         </div>
       </aside>
     </div>
@@ -192,6 +212,16 @@
           <div class="table-wrap hidden" id="res-wrap" style="max-height:260px"><table id="res-table" class="compact"><tbody></tbody></table></div>
           <div class="row hidden" id="res-actions"><button type="button" id="btn-res-commit" class="primary">Ausgewählte übernehmen</button><label class="row small"><input type="checkbox" id="res-only-new" checked> nur neue / geänderte</label></div>
         </form>
+        <h3>DARC-Contest-Hub: Ergebnisse direkt laden</h3>
+        <p class="muted small">Lädt die offiziellen Ergebnislisten (result.csv) vom DARC-Contest-Hub <code>dxhf2.darc.de</code> – alle Teilnehmer mit Locator, dazu die ODX-Gegenstationen. Pro Contest 500–900 Rufzeichen. Braucht Internet auf dem Server.</p>
+        <div class="row">
+          <select id="darc-year"></select>
+          <button type="button" id="btn-darc-list" class="ghost">Liste laden</button>
+          <button type="button" id="btn-darc-all" class="primary">Alle Jahre importieren (2017–heute)</button>
+          <span id="darc-summary" class="muted small"></span>
+        </div>
+        <div class="table-wrap hidden" id="darc-wrap" style="max-height:220px"><table id="darc-table" class="compact"><tbody></tbody></table></div>
+        <div class="row hidden" id="darc-actions"><button type="button" id="btn-darc-import" class="primary">Ausgewählte importieren</button></div>
         <h3>Einzelne Datei importieren</h3>
         <p class="muted small">WinContest (DD3KU) <code>.txt</code>/<code>.EXP</code>/<code>.mdb</code>, EDI/REG1TEST, ADIF oder Call-Listen (<code>Call;Locator;Name</code>). Rufzeichen + Locator landen immer im Call-Buch.</p>
         <form id="import-form" class="stack">
@@ -233,6 +263,17 @@
             <button type="button" id="btn-lookup-test" class="ghost">Testen</button>
           </div>
           <div id="lookup-result" class="muted small"></div>
+        </form>
+        <h3>ON4KST-Chat</h3>
+        <p class="muted small">Verbindet den Server mit dem KST-Chat (Telnet, <code>www.on4kst.info:23000</code>). Alle Browser sehen und nutzen den Chat über den Reiter „KST“ im Chat-Fenster; gesendet wird unter dem hier eingetragenen Rufzeichen. Das Passwort geht im Klartext über das Netz – ein eigenes KST-Passwort verwenden. Nutzer mit Locator wandern automatisch in die Stationsdatenbank.</p>
+        <form id="kst-form-admin" class="stack">
+          <div class="row">
+            <input id="kst-user" placeholder="KST-Rufzeichen" autocomplete="off">
+            <input id="kst-pass" type="password" placeholder="KST-Passwort" autocomplete="new-password">
+            <select id="kst-room-sel"></select>
+            <label class="row small"><input type="checkbox" id="kst-autostart"> beim Start verbinden</label>
+          </div>
+          <div class="row"><button class="ghost">Speichern</button><button type="button" id="btn-kst-start" class="primary">Verbinden</button><button type="button" id="btn-kst-stop" class="ghost">Trennen</button><span id="kst-admin-state" class="muted small"></span></div>
         </form>
         <h3>Karte</h3>
         <form id="tile-form" class="row"><input id="tile-url" placeholder="https://tile.openstreetmap.org/{z}/{x}/{y}.png" style="flex:1;min-width:260px"><button class="ghost">Speichern</button></form>
