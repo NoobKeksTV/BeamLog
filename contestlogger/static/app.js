@@ -18,7 +18,7 @@
     info: {},
     rig: {},
     locAuto: false,
-    kst: { msgs: [], users: [], status: {}, tab: "local", dm: "", unread: 0, unreadMe: 0, unreadDm: 0, macros: [], seen: JSON.parse(localStorage.getItem("cl.dmseen") || "{}") },
+    kst: { msgs: [], users: [], status: {}, tab: "local", dm: "", sid: null, unread: 0, unreadDm: 0, macros: [], seen: JSON.parse(localStorage.getItem("cl.dmseen") || "{}") },
   };
   const POPUP = new URLSearchParams(location.search).get("popup") === "chat";
   if (POPUP) document.body.classList.add("popup");
@@ -285,6 +285,7 @@
     if (!c?.stations?.length) ss.append(el("option", { value: "" }, t("– keine Station –")));
     ss.value = S.stationId ?? "";
     const st = station();
+    if (S.kst.sid !== S.stationId && S.kst.sid !== undefined) loadKst();  // KST-Chat ist je Station
     if (st && !st.has_password && !canLog()) autoUnlock(st);
     if (st) {
       const rig = S.rig[st.id];
@@ -783,12 +784,12 @@
     ws.onmessage = async (ev) => {
       const m = JSON.parse(ev.data);
       if (m.type === "chat") { appendChat(m.msg); if (m.msg.nick !== S.nick) Sound.play("chat"); }
+      else if (m.type?.startsWith("kst") && m.station_id !== S.stationId) { /* KST-Ereignis einer anderen Station */ }
       else if (m.type === "kst") {
         S.kst.msgs.push(m.msg); S.kst.msgs.splice(0, S.kst.msgs.length - 800);
         const incoming = m.msg.to_me && !m.msg.own;
         if (S.kst.tab === "local") S.kst.unread++;
         if (incoming) {
-          if (S.kst.tab !== "me") S.kst.unreadMe++;
           if (!(S.kst.tab === "dm" && S.kst.dm && coreOf(S.kst.dm) === coreOf(m.msg.call))) S.kst.unreadDm++;
           Sound.play("chat"); toast(`KST ${m.msg.call}: ${m.msg.text}`.slice(0, 120));
         }
@@ -839,23 +840,24 @@
     $$(".chat-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.ctab === tab));
     $("#ctab-local").classList.toggle("active", tab === "local");
     $("#ctab-kst").classList.toggle("active", tab !== "local");
-    if (tab !== "local") { S.kst.unread = 0; if (tab === "me") S.kst.unreadMe = 0; if (tab === "dm") S.kst.unreadDm = 0; renderKst(); $("#kst-input").focus(); }
+    if (tab !== "local") { S.kst.unread = 0; if (tab === "dm") S.kst.unreadDm = 0; renderKst(); $("#kst-input").focus(); }
     renderKstBadges();
   }
   function renderKstBadges() {
-    const b = $("#kst-badge"), bm = $("#kst-me-badge");
+    const b = $("#kst-badge");
     b.textContent = S.kst.unread; b.classList.toggle("hidden", !S.kst.unread);
-    bm.textContent = S.kst.unreadMe; bm.classList.toggle("hidden", !S.kst.unreadMe);
     const bd = $("#kst-dm-badge"); bd.textContent = S.kst.unreadDm; bd.classList.toggle("hidden", !S.kst.unreadDm);
   }
   $("#btn-chat-pop").addEventListener("click", () => window.open(`${location.pathname}?popup=chat`, "clchat", "width=480,height=780,resizable=yes"));
   if (POPUP) setChatTab(localStorage.getItem("cl.chattab") || "kst");
+  const sidQ = () => `station_id=${S.stationId || 0}`;
   async function loadKst() {
+    S.kst.sid = S.stationId; S.kst.msgs = []; S.kst.users = []; S.kst.status = {};
     try {
-      S.kst.status = await GET("/api/kst/status");
+      S.kst.status = await GET(`/api/kst/status?${sidQ()}`);
       S.kst.macros = S.kst.status.macros || [];
-      S.kst.msgs = await GET("/api/kst/messages?limit=300");
-      S.kst.users = await GET(`/api/kst/users?my=${station()?.locator || ""}`);
+      S.kst.msgs = await GET(`/api/kst/messages?${sidQ()}&limit=300`);
+      S.kst.users = await GET(`/api/kst/users?${sidQ()}&my=${station()?.locator || ""}`);
     } catch (_) { /* */ }
     renderKstStatus(); renderKstUsers(); renderKst(); renderKstMacros();
   }
@@ -864,7 +866,7 @@
     const el_ = $("#kst-state");
     el_.textContent = `KST: ${st.state || "aus"}${st.error ? " – " + st.error : ""}`;
     el_.className = "tag " + (st.state === "verbunden" ? "me" : "");
-    $("#kst-room").textContent = st.state === "verbunden" ? `${st.user} · ${st.room_name || st.room}` : (st.configured ? "" : t("in der Verwaltung einrichten"));
+    $("#kst-room").textContent = st.state === "verbunden" ? `${st.user} · ${st.room_name || st.room}` : (st.configured ? (st.user || "") : t("KST-Zugang bei der Station eintragen (Verwaltung)"));
     $("#kst-input").disabled = st.state !== "verbunden";
     const a = $("#kst-admin-state"); if (a) a.textContent = `${st.state || "aus"}${st.error ? " – " + st.error : ""}`;
   }
@@ -881,7 +883,7 @@
   }
   $("#btn-kst-users").addEventListener("click", async () => {
     $("#kst-users").classList.toggle("hidden");
-    if (!$("#kst-users").classList.contains("hidden")) { try { S.kst.users = await GET(`/api/kst/users?my=${station()?.locator || ""}`); renderKstUsers(); if (!S.kst.users.length) await api("POST", "/api/kst/refresh_users", {}); } catch (_) { /* */ } }
+    if (!$("#kst-users").classList.contains("hidden")) { try { S.kst.users = await GET(`/api/kst/users?${sidQ()}&my=${station()?.locator || ""}`); renderKstUsers(); if (!S.kst.users.length) await api("POST", "/api/kst/refresh_users", { station_id: S.stationId }); } catch (_) { /* */ } }
   });
   function fillFromKst(call, locator) {
     const payload = { type: "fill", call, locator: locator || "" };
@@ -917,7 +919,6 @@
   }
   function kstFiltered() {
     const my = S.kst.msgs;
-    if (S.kst.tab === "me") return my.filter((m) => m.to_me && !m.own);
     if (S.kst.tab === "dm" && S.kst.dm) { const c = coreOf(S.kst.dm); return my.filter((m) => (m.own ? coreOf(m.to) === c : (m.to_me && coreOf(m.call) === c))); }
     return my;
   }
@@ -932,7 +933,7 @@
         el("span", { class: "c", title: (u?.locator || m.locator || "") + " " + (m.name || ""), onclick: () => fillFromKst(m.call, u?.locator || m.locator) }, m.call),
         m.to ? el("span", { class: "to" }, `(${m.to})`) : null,
         el("span", { class: "txt" }, m.text),
-        el("span", { class: "act" }, el("button", { class: "ghost", title: t("Antworten"), onclick: () => replyTo(m.call) }, "↩"), el("button", { class: "ghost", title: "DM", onclick: () => setDm(m.call) }, "DM"))));
+        el("span", { class: "act" }, el("button", { class: "ghost", title: "DM", onclick: () => setDm(m.call) }, "DM"))));
     }
     if (!list.length) log.append(el("div", { class: "sys" }, t("Keine Nachrichten.")));
     if (atBottom || true) log.scrollTop = log.scrollHeight;
@@ -952,19 +953,19 @@
         S.kst.seen[coreOf(S.kst.dm)] = new Date().toISOString(); localStorage.setItem("cl.dmseen", JSON.stringify(S.kst.seen));
       } else $("#kst-dm-head").textContent = t("Kontakt wählen");
       $("#kst-input").placeholder = S.kst.dm ? t("Nachricht an {call} …", { call: S.kst.dm }) : t("Erst Kontakt wählen");
-    } else $("#kst-input").placeholder = t("Nachricht an den KST-Chat … (/CQ CALL Text für gezielt)");
+    } else $("#kst-input").placeholder = t("Nachricht an alle im KST-Chat …");
     renderKstBadges();
   }
-  function replyTo(call) { const i = $("#kst-input"); i.value = `/CQ ${call} `; i.focus(); }
   function setDm(call) { S.kst.dm = call; if (S.kst.tab !== "dm") setChatTab("dm"); renderKst(); $("#kst-input").focus(); }
   $("#btn-dm-new").addEventListener("click", () => { const c = (prompt(t("Rufzeichen für neues Gespräch:")) || "").trim().toUpperCase(); if (c) setDm(c); });
   $("#kst-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     let text = $("#kst-input").value.trim(); if (!text) return;
     if (S.kst.tab === "dm") { if (!S.kst.dm) return toast(t("Erst Kontakt wählen"), "err"); if (!text.startsWith("/")) text = `/CQ ${S.kst.dm} ${text}`; }
-    try { await api("POST", "/api/kst/send", { text }); $("#kst-input").value = ""; } catch (err) { toast(err.message, "err"); }
+    try { await api("POST", "/api/kst/send", { text, station_id: S.stationId }); $("#kst-input").value = ""; } catch (err) { toast(err.message, "err"); }
   });
-  function kstTarget() { return (S.kst.tab === "dm" && S.kst.dm) || ($("#kst-input").value.match(/^\/CQ\s+(\S+)/i) || [])[1] || F.call.value.trim() || ""; }
+  // Ziel nur im DM-Reiter – im allgemeinen KST-Reiter gehen Texte an alle
+  function kstTarget() { return (S.kst.tab === "dm" && S.kst.dm) || ""; }
   function expandKst(text) {
     const st = station() || {}; const call = kstTarget(); const u = call ? kstUser(call) : null;
     return text.replace(/\{(\w+)\}/g, (_, k) => ({ call, name: u?.name?.split(" ")[0] || "", loc: u?.locator || "", mycall: st.call || "", myloc: st.locator || "", band: (st.band || "").replace("MHz", " MHz"), nick: S.nick })[k] ?? `{${k}}`);
@@ -972,16 +973,16 @@
   function renderKstMacros() {
     const box = $("#kst-macros"); box.innerHTML = "";
     for (const m of S.kst.macros) box.append(el("button", { type: "button", class: "ghost", title: m.text, onclick: async () => {
-      const text = expandKst(m.text);
-      if (/\{call\}|^\/CQ\s*$/.test(text) || (m.text.includes("{call}") && !kstTarget())) return toast(t("Erst Ziel-Rufzeichen wählen (DM, ↩ oder im Logger eintippen)"), "err");
-      try { await api("POST", "/api/kst/send", { text }); } catch (err) { toast(err.message, "err"); }
+      let text = expandKst(m.text).replace(/\s{2,}/g, " ").trim();
+      if (S.kst.tab === "dm") { if (!S.kst.dm) return toast(t("Erst Kontakt wählen"), "err"); if (!text.startsWith("/")) text = `/CQ ${S.kst.dm} ${text}`; }
+      try { await api("POST", "/api/kst/send", { text, station_id: S.stationId }); } catch (err) { toast(err.message, "err"); }
     } }, m.label));
     box.append(el("button", { type: "button", class: "ghost small", onclick: kstMacroEditor }, "✎"));
   }
   function kstMacroEditor() {
     const rows = S.kst.macros.length ? S.kst.macros : [{ label: "", text: "" }];
     const box = modal(el("div", {}, el("h3", {}, t("KST-Textbausteine")),
-      el("p", { class: "muted small" }, t("Platzhalter: {call} {name} {loc} (Ziel) · {mycall} {myloc} {band} (eigene Station). Beginnt der Text mit /CQ {call}, erscheint er beim Empfänger hervorgehoben. Gilt für alle Operatoren.")),
+      el("p", { class: "muted small" }, t("Im KST-Reiter gehen die Texte an alle (keine Adressierung). Im DM-Reiter gehen sie an den offenen Kontakt; dort gelten {call} {name} {loc}. Immer: {mycall} {myloc} {band}. Gilt für alle Operatoren.")),
       el("form", { id: "kst-macro-form", class: "stack" },
         el("div", { id: "kst-macro-rows", class: "stack" }, rows.map((m) => macroRow(m))),
         el("div", { class: "row" }, el("button", { class: "primary" }, t("Speichern")), el("button", { type: "button", class: "ghost", onclick: () => $("#kst-macro-rows").append(macroRow({ label: "", text: "" })) }, "+"), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Abbrechen"))))));
@@ -1025,15 +1026,6 @@
     });
     loadCands();
   }
-  // Verwaltung: KST
-  $("#kst-form-admin").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const body = { kst_user: $("#kst-user").value.trim(), kst_room: $("#kst-room-sel").value, kst_autostart: $("#kst-autostart").checked ? "1" : "0" };
-    if ($("#kst-pass").value) body.kst_pass = $("#kst-pass").value;
-    try { await api("POST", "/api/settings", body); $("#kst-pass").value = ""; toast(t("Einstellungen gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
-  });
-  $("#btn-kst-start").addEventListener("click", async () => { try { S.kst.status = { ...S.kst.status, ...(await api("POST", "/api/kst/start", {})) }; renderKstStatus(); toast(t("KST: verbinde …")); } catch (err) { toast(err.message, "err"); } });
-  $("#btn-kst-stop").addEventListener("click", async () => { try { await api("POST", "/api/kst/stop", {}); S.kst.status.state = "aus"; renderKstStatus(); } catch (err) { toast(err.message, "err"); } });
   // Verwaltung: DARC-Contest-Hub
   let darcList = [];
   (function initDarcYears() { const sel = $("#darc-year"); const y = new Date().getUTCFullYear(); for (let i = y; i >= 2017; i--) sel.append(el("option", { value: i }, i)); })();
@@ -1200,7 +1192,7 @@
     for (const s of c?.stations || []) {
       sb.append(el("tr", {},
         el("td", { class: "name", title: s.call }, el("b", {}, s.call), el("div", { class: "muted small" }, `ID ${s.id}`)), el("td", {}, s.locator), el("td", {}, s.band), el("td", {}, s.mode),
-        el("td", { class: "muted small" }, `${t("Nr.")} ${pad3(s.serial_next)} · ${s.has_password ? "🔒" : t("offen")}`),
+        el("td", { class: "muted small" }, `${t("Nr.")} ${pad3(s.serial_next)} · ${s.has_password ? "🔒" : t("offen")}${s.kst_user ? ` · KST ${s.kst_user}` : ""}`),
         el("td", { class: "actions" },
           el("button", { class: "ghost", onclick: () => { S.stationId = s.id; save(); renderStationBar(); loadQsos(); showView("fulllog"); setTimeout(() => runCheck(true), 300); } , title: t("EDI dieser Station") }, "EDI"), " ",
           el("a", { class: "button ghost", href: `/api/stations/${s.id}/export.adi`, download: 1 }, "ADIF"), " ",
@@ -1213,8 +1205,7 @@
     const inf = await GET("/api/info"); $("#cb-count").textContent = inf.callbook_count; $("#tile-url").value = inf.tile_url || "";
     try {
       const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider; $("#lookup-user").value = cfg.lookup_user || ""; $("#lookup-pass").placeholder = cfg.lookup_pass_set ? t("Passwort (gespeichert)") : t("Passwort");
-      $("#kst-user").value = cfg.kst_user || ""; $("#kst-pass").placeholder = cfg.kst_pass_set ? t("Passwort (gespeichert)") : t("KST-Passwort"); $("#kst-autostart").checked = !!cfg.kst_autostart;
-      const rs = $("#kst-room-sel"); rs.innerHTML = ""; for (const [n, name] of Object.entries(cfg.kst_rooms || {})) rs.append(el("option", { value: n, selected: Number(n) === cfg.kst_room ? 1 : null }, `${n} – ${name}`));
+      S.kstRooms = cfg.kst_rooms || {};
     } catch (_) { /* */ }
     renderBackups(); renderCallbook();
   }
@@ -1277,12 +1268,25 @@
           lab(t("Start-Seriennummer"), el("input", { id: "s-serial", type: "number", min: 1, value: s?.serial_next || 1 }))),
         el("details", {}, el("summary", { class: "muted" }, t("Angaben für die EDI-Abgabe (Standort, Verantwortlicher, Technik)")),
           el("div", { class: "grid2" }, INFO_FIELDS.map(([k, l]) => lab(l, el("input", { id: `i-${k}`, value: info[k] ?? prevInfo[k] ?? "" }))))),
+        el("details", { open: s?.kst_user ? 1 : null }, el("summary", { class: "muted" }, t("ON4KST-Chat dieser Station")),
+          el("p", { class: "muted small" }, t("Eigene KST-Verbindung je Station. „An mich“: Rufzeichen (Komma-getrennt), bei denen Nachrichten als an dich gerichtet gelten – Standard ist nur der KST-Login, z. B. DN2LH, DN2LH/P.")),
+          el("div", { class: "grid2" },
+            lab(t("KST-Rufzeichen"), el("input", { id: "s-kuser", value: s?.kst_user || "", placeholder: "DN2LH", autocomplete: "off" })),
+            lab(s?.kst_pass_set ? t("KST-Passwort (leer = unverändert)") : t("KST-Passwort"), el("input", { id: "s-kpass", type: "password", autocomplete: "new-password" })),
+            lab(t("Raum"), el("select", { id: "s-kroom" }, Object.entries(S.kstRooms || { 2: "144/432 MHz" }).map(([n, name]) => el("option", { value: n, selected: Number(n) === (s?.kst_room || 2) ? 1 : null }, `${n} – ${name}`)))),
+            lab(t("„An mich“-Rufzeichen"), el("input", { id: "s-kmy", value: s?.kst_my_calls || "", placeholder: s?.kst_user || "DN2LH, DN2LH/P" })),
+            lab(t("beim Serverstart verbinden"), el("input", { id: "s-kauto", type: "checkbox", checked: s?.kst_autostart ? 1 : null }))),
+          s ? el("div", { class: "row" },
+            el("button", { type: "button", class: "ghost", onclick: async () => { try { await api("POST", "/api/kst/start", { station_id: s.id }); toast(t("KST: verbinde …")); } catch (err) { toast(err.message, "err"); } } }, t("Verbinden")),
+            el("button", { type: "button", class: "ghost", onclick: async () => { try { await api("POST", "/api/kst/stop", { station_id: s.id }); toast(t("KST getrennt")); } catch (err) { toast(err.message, "err"); } } }, t("Trennen"))) : null),
         el("div", { class: "row" }, el("button", { class: "primary" }, t("Speichern")), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Abbrechen"))))));
     box.querySelector("#s-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const g = (id) => box.querySelector(id).value.trim();
       const infoOut = {}; INFO_FIELDS.forEach(([k]) => { infoOut[k] = g(`#i-${k}`); });
-      const body = { call: g("#s-call"), locator: g("#s-loc"), band: g("#s-band"), mode: g("#s-mode"), info: infoOut, serial_next: Number(g("#s-serial")) };
+      const body = { call: g("#s-call"), locator: g("#s-loc"), band: g("#s-band"), mode: g("#s-mode"), info: infoOut, serial_next: Number(g("#s-serial")),
+        kst_user: g("#s-kuser").toUpperCase(), kst_room: Number(g("#s-kroom")) || 2, kst_my_calls: g("#s-kmy").toUpperCase(), kst_autostart: box.querySelector("#s-kauto").checked ? 1 : 0 };
+      if (box.querySelector("#s-kpass").value) body.kst_pass = box.querySelector("#s-kpass").value;
       if (g("#s-pw") || !s) body.password = g("#s-pw");
       try {
         const r = s ? await api("PATCH", `/api/stations/${s.id}`, body) : await api("POST", `/api/contests/${S.contestId}/stations`, body);
@@ -1332,8 +1336,13 @@
     const out = $("#folder-result"); out.classList.remove("hidden"); out.textContent = t("Importiere …") + ` (${files.length} ${t("Dateien")})`;
     try {
       const r = await api("POST", "/api/import/folder", fd);
-      out.textContent = `${t("Contests angelegt")}: ${r.contests}\n${t("QSOs übernommen")}: ${r.qsos}\n${t("Call-Buch-Einträge")}: ${r.callbook}\n\n` +
-        r.files.map((f) => `${f.file}: ${f.kind}, ${f.qsos} QSOs, ${f.imported} ${t("neu")}${f.note ? " – " + f.note : ""}`).join("\n") + (r.skipped.length ? `\n\n${t("Hinweise")}:\n${r.skipped.join("\n")}` : "");
+      out.innerHTML = "";
+      out.append(el("div", { class: "imp-sum" },
+        `${r.files.length} ${t("Dateien importiert")} · ${r.contests} ${t("Contests angelegt")} · ${r.qsos} ${t("QSOs übernommen")}`, el("br"),
+        `${t("Rufzeichen")}: ${r.calls_new} ${t("neu")}, ${r.calls_known} ${t("bereits bekannt")}`),
+        el("details", {}, el("summary", {}, t("Details je Datei")),
+          el("div", {}, r.files.map((f) => el("div", {}, `${f.file}: ${f.kind}, ${f.qsos} QSOs, ${f.imported} ${t("neu")}, ${t("Rufzeichen")} ${f.calls_new} ${t("neu")} / ${f.calls_known} ${t("bekannt")}${f.note ? " – " + f.note : ""}`)))),
+        ...(r.skipped.length ? [el("details", {}, el("summary", {}, `${t("Hinweise")} (${r.skipped.length})`), el("div", {}, r.skipped.map((x) => el("div", {}, x))))] : []));
       toast(t("Import abgeschlossen"), "ok"); await loadContests(); renderAdmin();
     } catch (err) { out.textContent = t("Fehler: ") + err.message; toast(err.message, "err"); }
   });

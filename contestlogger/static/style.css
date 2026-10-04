@@ -279,7 +279,7 @@ table.fixed td.actions { white-space: nowrap; text-align: right; }
 table.fixed td.actions button, table.fixed td.actions .button { margin-left: 2px; }
 /* Verwaltung: Abschnitte innerhalb einer Karte klar trennen */
 .card > h3:not(:first-child) { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); }
-.card form.stack, .card .table-wrap, .card > pre.result { margin-bottom: 8px; }
+.card form.stack, .card .table-wrap, .card > .result { margin-bottom: 8px; }
 .card-head h3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* DM wie ein Messenger: Kontakte links, Gespräch rechts */
 .dm-pane { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px; margin-bottom: 8px; height: 420px; }
@@ -301,3 +301,8 @@ body.popup .dm-pane { height: calc(100vh - 230px); grid-template-columns: 170px 
 .rundruf-list label { flex-direction: row; align-items: center; gap: 8px; padding: 3px 6px; font-size: 13.5px; color: var(--text); }
 .rundruf-list label b { font-family: var(--mono); min-width: 90px; }
 .rundruf-list label .muted { margin-left: auto; }
+/* Import-Ergebnis: Zusammenfassung zuerst, Details ausklappbar */
+.result .imp-sum { font-weight: 600; margin-bottom: 6px; }
+.result details { margin-top: 4px; }
+.result details summary { cursor: pointer; color: var(--muted); }
+.result details > div { margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--line); }

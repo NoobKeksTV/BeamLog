@@ -109,7 +109,6 @@
             <div class="chat-tabs">
               <button data-ctab="local" class="active">Chat</button>
               <button data-ctab="kst">KST <span id="kst-badge" class="cnt hidden"></span></button>
-              <button data-ctab="me">An mich <span id="kst-me-badge" class="cnt hidden"></span></button>
               <button data-ctab="dm">DM <span id="kst-dm-badge" class="cnt hidden"></span></button>
             </div>
             <span class="grow"></span>
@@ -205,7 +204,7 @@
         <form id="folder-form" class="stack">
           <input type="file" id="folder-files" webkitdirectory directory multiple>
           <button class="primary">Ordner importieren</button>
-          <pre id="folder-result" class="result hidden"></pre>
+          <div id="folder-result" class="result hidden"></div>
         </form>
         <h3>Ergebnisliste importieren (DARC / IARU / UKW-Contest-Club)</h3>
         <p class="muted small">Die veröffentlichten Ergebnislisten enthalten Rufzeichen und Locator aller Teilnehmer – die größte frei verfügbare Quelle für die Stationsdatenbank. Datei (HTML, PDF, TXT, CSV), eingefügter Text oder Internetadresse der Ergebnisseite; vor der Übernahme gibt es eine Vorschau.</p>
@@ -270,16 +269,7 @@
           <div id="lookup-result" class="muted small"></div>
         </form>
         <h3>ON4KST-Chat</h3>
-        <p class="muted small">Verbindet den Server mit dem KST-Chat (Telnet, <code>www.on4kst.info:23000</code>). Alle Browser sehen und nutzen den Chat über den Reiter „KST“ im Chat-Fenster; gesendet wird unter dem hier eingetragenen Rufzeichen. Das Passwort geht im Klartext über das Netz – ein eigenes KST-Passwort verwenden. Nutzer mit Locator wandern automatisch in die Stationsdatenbank.</p>
-        <form id="kst-form-admin" class="stack">
-          <div class="row">
-            <input id="kst-user" placeholder="KST-Rufzeichen" autocomplete="off">
-            <input id="kst-pass" type="password" placeholder="KST-Passwort" autocomplete="new-password">
-            <select id="kst-room-sel"></select>
-            <label class="row small"><input type="checkbox" id="kst-autostart"> beim Start verbinden</label>
-          </div>
-          <div class="row"><button class="ghost">Speichern</button><button type="button" id="btn-kst-start" class="primary">Verbinden</button><button type="button" id="btn-kst-stop" class="ghost">Trennen</button><span id="kst-admin-state" class="muted small"></span></div>
-        </form>
+        <p class="muted small">Der KST-Chat (Telnet, <code>www.on4kst.info:23000</code>) wird <b>je Station</b> verbunden: Zugangsdaten, Raum und Autostart stehen bei der Station (Stationen → ✎). Jede Station hat so ihren eigenen Chat; die Nutzerliste wird alle 10 Minuten geholt und Nutzer mit Locator wandern automatisch in die Stationsdatenbank. Das Passwort geht im Klartext über das Netz – ein eigenes KST-Passwort verwenden.</p>
         <h3>Karte</h3>
         <form id="tile-form" class="row"><input id="tile-url" placeholder="https://tile.openstreetmap.org/{z}/{x}/{y}.png" style="flex:1;min-width:260px"><button class="ghost">Speichern</button></form>
         <p class="muted small">Kachel-URL für die Karte. Standard: OpenStreetMap (braucht Internet). Für reinen Offline-Betrieb einen lokalen Kachel-Server eintragen (z. B. <code>http://192.168.1.10:8080/tile/{z}/{x}/{y}.png</code>) – Linien und Marker funktionieren auch ohne Kacheln.</p>

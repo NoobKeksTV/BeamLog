@@ -79,28 +79,35 @@ def test_kst_endpoints(tmp_path, monkeypatch):
     with TestClient(app) as c:
         admin = c.post("/api/setup", json={"password": "admin1"}).json()["token"]
         H = {"X-Admin-Token": admin}
-        assert c.post("/api/kst/start", headers=H).status_code == 400  # nicht konfiguriert
-        c.post("/api/settings", json={"kst_user": "DN2LH", "kst_pass": "secret", "kst_room": "2"}, headers=H)
-        cfg = c.get("/api/settings", headers=H).json()
-        assert cfg["kst_user"] == "DN2LH" and cfg["kst_pass_set"] and "kst_pass" not in cfg
-        st = c.post("/api/kst/start", headers=H).json()
+        cid = c.post("/api/contests", json={"name": "T"}, headers=H).json()["id"]
+        sid = c.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH/P", "locator": "JO31AA", "band": "432MHz"}, headers=H).json()["id"]
+        sid2 = c.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH", "locator": "JO31AA", "band": "144MHz"}, headers=H).json()["id"]
+        assert c.post("/api/kst/start", json={"station_id": sid}, headers=H).status_code == 400  # nicht konfiguriert
+        st = c.patch(f"/api/stations/{sid}", json={"kst_user": "DN2LH", "kst_pass": "secret", "kst_room": 2, "kst_my_calls": "DN2LH, DN2LH/P"}, headers=H).json()
+        assert st["kst_user"] == "DN2LH" and st["kst_pass_set"] and "kst_pass" not in st
+        assert "kst_pass" not in c.get("/api/contests").json()[0]["stations"][0]
+        st = c.post("/api/kst/start", json={"station_id": sid}, headers=H).json()
         import time
         for _ in range(60):
             time.sleep(0.05)
-            st = c.get("/api/kst/status").json()
+            st = c.get("/api/kst/status", params={"station_id": sid}).json()
             if st["state"] == "verbunden" and st["users"]:
                 break
         assert st["state"] == "verbunden" and st["users"] == 3 and st["macros"]
+        assert c.get("/api/kst/status", params={"station_id": sid2}).json()["state"] == "aus"  # andere Station: eigene Verbindung
         assert c.get("/api/callbook", params={"q": "VU2CPL"}).json()["rows"][0]["locator"] == "MK83TE"  # aus Nutzerliste gelernt
-        users = c.get("/api/kst/users", params={"my": "JO31AA"}).json()
+        users = c.get("/api/kst/users", params={"station_id": sid, "my": "JO31AA"}).json()
         assert next(u for u in users if u["call"] == "DL8NAS")["km"] == 406 and users[0]["km"] <= users[-1]["km"]
-        assert c.post("/api/kst/send", json={"text": "/CQ DL8NAS hallo"}).json()["ok"]
+        assert c.post("/api/kst/send", json={"text": "/CQ DL8NAS hallo", "station_id": sid}).json()["ok"]
+        assert c.post("/api/kst/send", json={"text": "hallo", "station_id": sid2}).status_code == 409
         time.sleep(0.3)
-        msgs = c.get("/api/kst/messages").json()
+        msgs = c.get("/api/kst/messages", params={"station_id": sid}).json()
         assert msgs and msgs[-1]["own"] and msgs[-1]["to"] == "DL8NAS"
-        c.post("/api/settings", json={"kst_macros": [{"label": "X", "text": "/CQ {call} hi"}]}, headers=H)
-        assert c.get("/api/kst/status").json()["macros"][0]["label"] == "X"
-        assert c.post("/api/kst/stop", headers=H).json()["state"] == "aus"
+        assert c.get("/api/kst/messages", params={"station_id": sid2}).json() == []
+        c.post("/api/settings", json={"kst_macros": [{"label": "X", "text": "hi all"}]}, headers=H)
+        assert c.get("/api/kst/status", params={"station_id": sid}).json()["macros"][0]["label"] == "X"
+        assert c.post("/api/kst/stop", json={"station_id": sid}, headers=H).json()["state"] == "aus"
+        assert c.get("/api/kst/status", params={"station_id": sid}).json()["state"] == "aus"
     loop.call_soon_threadsafe(loop.stop)
 
 
@@ -119,11 +126,11 @@ def test_candidates_and_broadcast(tmp_path, monkeypatch):
         cid = c.post("/api/contests", json={"name": "T"}, headers=H).json()["id"]
         sid = c.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH", "locator": "JO31AA", "band": "432MHz"}, headers=H).json()["id"]
         c.post(f"/api/stations/{sid}/qsos", json={"call": "DL8NAS", "locator": "JN59LE"}, headers=H)  # schon gearbeitet
-        c.post("/api/settings", json={"kst_user": "DN2LH", "kst_pass": "secret", "kst_room": "2"}, headers=H)
-        c.post("/api/kst/start", headers=H)
+        c.patch(f"/api/stations/{sid}", json={"kst_user": "DN2LH", "kst_pass": "secret", "kst_room": 2}, headers=H)
+        c.post("/api/kst/start", json={"station_id": sid}, headers=H)
         for _ in range(60):
             time.sleep(0.05)
-            if c.get("/api/kst/status").json().get("users"):
+            if c.get("/api/kst/status", params={"station_id": sid}).json().get("users"):
                 break
         cand = c.get("/api/kst/candidates", params={"station_id": sid, "max_km": 500}).json()
         assert [u["call"] for u in cand] == []  # DF7KF ist abwesend, DL8NAS gearbeitet, VU2CPL zu weit

@@ -40,6 +40,11 @@ CREATE TABLE IF NOT EXISTS stations (
     password_hash TEXT NOT NULL DEFAULT '',
     serial_next INTEGER NOT NULL DEFAULT 1,
     info TEXT NOT NULL DEFAULT '{}',
+    kst_user TEXT NOT NULL DEFAULT '',
+    kst_pass TEXT NOT NULL DEFAULT '',
+    kst_room INTEGER NOT NULL DEFAULT 2,
+    kst_autostart INTEGER NOT NULL DEFAULT 0,
+    kst_my_calls TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS qsos (
@@ -86,7 +91,8 @@ CREATE TABLE IF NOT EXISTS kst_messages (
     to_call TEXT NOT NULL DEFAULT '',
     text TEXT NOT NULL,
     own INTEGER NOT NULL DEFAULT 0,
-    to_me INTEGER NOT NULL DEFAULT 0
+    to_me INTEGER NOT NULL DEFAULT 0,
+    station_id INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS chat (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,9 +139,22 @@ class Database:
     def _migrate(self) -> None:
         """Spalten nachrüsten, die in älteren Datenbanken fehlen."""
         cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(qsos)")}
+        scols = {r["name"] for r in self.conn.execute("PRAGMA table_info(stations)")}
+        kcols = {r["name"] for r in self.conn.execute("PRAGMA table_info(kst_messages)")}
         with self.conn:
             if "freq" not in cols:
                 self.conn.execute("ALTER TABLE qsos ADD COLUMN freq TEXT NOT NULL DEFAULT ''")
+            if "kst_user" not in scols:
+                # KST-Zugang ist jetzt je Station; bisherige globale Einstellung auf alle Stationen übernehmen
+                for col, typ in (("kst_user", "TEXT NOT NULL DEFAULT ''"), ("kst_pass", "TEXT NOT NULL DEFAULT ''"), ("kst_room", "INTEGER NOT NULL DEFAULT 2"),
+                                 ("kst_autostart", "INTEGER NOT NULL DEFAULT 0"), ("kst_my_calls", "TEXT NOT NULL DEFAULT ''")):
+                    self.conn.execute(f"ALTER TABLE stations ADD COLUMN {col} {typ}")
+                g = {k: self.get_setting(k, "") or "" for k in ("kst_user", "kst_pass", "kst_room", "kst_autostart")}
+                if g["kst_user"]:
+                    self.conn.execute("UPDATE stations SET kst_user=?, kst_pass=?, kst_room=?, kst_autostart=?",
+                                      (g["kst_user"], g["kst_pass"], int(g["kst_room"] or 2), int(g["kst_autostart"] == "1")))
+            if "station_id" not in kcols:
+                self.conn.execute("ALTER TABLE kst_messages ADD COLUMN station_id INTEGER NOT NULL DEFAULT 0")
 
     def backup_to(self, path: str | os.PathLike) -> None:
         """Konsistente Kopie der Datenbank (auch bei laufendem Betrieb), atomar über eine temporäre Datei."""
@@ -264,16 +283,25 @@ class Database:
             params = (contest_id,)
         out = []
         for s in self.rows(sql + " ORDER BY band, call", params):
-            s["has_password"] = bool(s.pop("password_hash"))
-            s["info"] = json.loads(s["info"] or "{}")
-            out.append(s)
+            out.append(self._station_public(s))
         return out
 
-    def get_station(self, sid: int) -> dict | None:
-        s = self.row("SELECT * FROM stations WHERE id=?", (sid,))
-        if s:
-            s["info"] = json.loads(s["info"] or "{}")
+    @staticmethod
+    def _station_public(s: dict) -> dict:
+        s["has_password"] = bool(s.pop("password_hash"))
+        s["kst_pass_set"] = bool(s.pop("kst_pass", ""))
+        s["info"] = json.loads(s["info"] or "{}")
         return s
+
+    def get_station(self, sid: int, secrets: bool = False) -> dict | None:
+        """Station; ohne secrets=True werden Passwort-Hash und KST-Passwort entfernt."""
+        s = self.row("SELECT * FROM stations WHERE id=?", (sid,))
+        if not s:
+            return None
+        if secrets:
+            s["info"] = json.loads(s["info"] or "{}")
+            return s
+        return self._station_public(s)
 
     def create_station(self, contest_id: int, call: str, locator: str, band: str, mode: str, password: str, info: dict | None = None) -> int:
         locator = geo.normalize_locator(locator)
@@ -288,7 +316,7 @@ class Database:
             return int(cur.lastrowid)
 
     def update_station(self, sid: int, **fields: Any) -> None:
-        allowed = {"call", "locator", "band", "mode", "serial_next", "info", "password"}
+        allowed = {"call", "locator", "band", "mode", "serial_next", "info", "password", "kst_user", "kst_pass", "kst_room", "kst_autostart", "kst_my_calls"}
         sets: dict[str, Any] = {}
         for k, v in fields.items():
             if k not in allowed or v is None:
@@ -586,11 +614,12 @@ class Database:
         return out
 
     # ----- Call-Buch und Vorschläge --------------------------------------
-    def learn_call(self, call: str, locator: str, source: str = "log", when: str = "", name: str = "") -> None:
+    def learn_call(self, call: str, locator: str, source: str = "log", when: str = "", name: str = "") -> str:
+        """Rufzeichen ins Call-Buch übernehmen. Rückgabe: "new" (neu), "known" (schon vorhanden) oder "" (ungültig)."""
         call = (call or "").strip().upper()
         core = prefixes.core_call(call)
         if not core:
-            return
+            return ""
         locator = geo.normalize_locator(locator)
         if locator and not geo.is_valid_locator(locator):
             locator = ""
@@ -601,7 +630,7 @@ class Database:
                     "INSERT INTO callbook(call,locator,name,source,qso_count,last_seen,alt_locators) VALUES(?,?,?,?,?,?,?)",
                     (core, locator, name, source, 1 if source == "log" else 0, when, ""),
                 )
-                return
+                return "new"
             alts = [a for a in (existing["alt_locators"] or "").split(",") if a]
             new_loc = existing["locator"]
             if locator and locator != existing["locator"]:
@@ -616,6 +645,7 @@ class Database:
                 "UPDATE callbook SET locator=?, name=COALESCE(NULLIF(?,''),name), qso_count=qso_count+?, last_seen=MAX(last_seen,?), alt_locators=? WHERE call=?",
                 (new_loc, name, 1 if source == "log" else 0, when, ",".join(alts[:5]), core),
             )
+        return "known"
 
     def suggest(self, partial: str, limit: int = 12, station_id: int | None = None) -> list[dict]:
         partial = (partial or "").strip().upper()

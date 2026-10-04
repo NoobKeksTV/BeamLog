@@ -1,6 +1,6 @@
 """ON4KST-Chat-Anbindung (Telnet, www.on4kst.info:23000).
 
-Der Server hält eine Verbindung für die ganze Station(en), verteilt Nachrichten per WebSocket
+Der Server hält je Station eine Verbindung, verteilt Nachrichten per WebSocket
 an alle Browser und nimmt Nachrichten/Kommandos entgegen. Protokoll (aus Mitschnitten
 dokumentiert, z. B. kst2mac/PROTOCOL.md, Tucnak-Wiki):
 
@@ -59,7 +59,8 @@ class KstClient:
     def __init__(self, user: str, password: str, room: int, on_event: Callable[[dict], Awaitable[None]], my_calls: list[str] | None = None):
         self.user, self.password, self.room = user.strip().upper(), password, int(room or 2)
         self.on_event = on_event
-        self.my_calls = {c.upper() for c in (my_calls or [])} | {self.user, prefixes.core_call(self.user)}
+        # Nachrichten "an mich": Zielcall (oder Call im Text) steht in dieser Liste – Standard ist nur der KST-Login
+        self.my_calls = {c.strip().upper() for c in (my_calls or []) if c.strip()} or {self.user}
         self.reader: asyncio.StreamReader | None = None
         self.writer: asyncio.StreamWriter | None = None
         self.state = "aus"
@@ -166,6 +167,7 @@ class KstClient:
         await self._emit({"type": "kst_status", "state": self.state, "error": ""})
         await self._cmd_queue.put("/SHOW USER")
         reader_task = asyncio.create_task(self._reader_loop())
+        roster_task = asyncio.create_task(self._roster_loop())
         try:
             while not self._stop:
                 cmd = await self._cmd_queue.get()
@@ -180,6 +182,7 @@ class KstClient:
                 self._last_cmd = time.time()
         finally:
             reader_task.cancel()
+            roster_task.cancel()
             try:
                 self.writer.close()
             except Exception:  # noqa: BLE001
@@ -187,6 +190,13 @@ class KstClient:
 
     _in_roster = False
     _roster_buf: dict[str, dict]
+    ROSTER_INTERVAL = int(os.environ.get("CONTESTLOGGER_KST_ROSTER_SEC", "600"))  # Nutzerliste alle 10 min -> Stationsdatenbank wächst automatisch
+
+    async def _roster_loop(self) -> None:
+        while not self._stop:
+            await asyncio.sleep(self.ROSTER_INTERVAL)
+            if self.state == "verbunden" and self._cmd_queue.empty():
+                await self._cmd_queue.put("/SHOW USER")
 
     async def _reader_loop(self) -> None:
         self._roster_buf = {}
@@ -214,7 +224,7 @@ class KstClient:
         msg = parse_message(line)
         if msg:
             msg["ts"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-            msg["own"] = msg["call"] in self.my_calls
+            msg["own"] = msg["call"] == self.user
             msg["to_me"] = bool(msg["to"] and msg["to"] in self.my_calls) or any(c in self.my_calls for c in CALL_IN_TEXT.findall(msg["text"].upper()))
             u = self.users.get(msg["call"])
             msg["locator"] = u["locator"] if u else ""

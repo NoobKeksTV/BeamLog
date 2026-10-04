@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -57,14 +58,14 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if n:
             print(f"Stationsdatenbank: {n} Rufzeichen aus der mitgelieferten Startdatei geladen.")
         task = asyncio.create_task(backup_loop()) if interval > 0 else None
-        if db.get_setting("kst_autostart", "0") == "1" and db.get_setting("kst_user") and db.get_setting("kst_pass"):
+        for st in db.rows("SELECT id FROM stations WHERE kst_autostart=1 AND kst_user<>'' AND kst_pass<>''"):
             try:
-                await kst_start()
+                await kst_start(st["id"])
             except HTTPException:
                 pass
         yield
-        if kst_client():
-            await kst_client().stop()
+        for c in list(kst_state.values()):
+            await c.stop()
         if task:
             task.cancel()
         try:
@@ -79,37 +80,48 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     app.state.hub = hub
     rig: dict[int, dict] = {}  # station_id -> {"freq": "432.200", "mode": "USB", "ts": ...}
     cw_queue: dict[int, list[str]] = {}  # station_id -> Texte, die die CAT-Bridge als CW senden soll
-    kst_state: dict[str, Any] = {"client": None}
+    kst_state: dict[int, kst.KstClient] = {}  # station_id -> Verbindung (eine je Station)
 
-    async def kst_event(ev: dict) -> None:
-        if ev.get("type") == "kst_users":
-            for u in ev["users"]:
-                if u.get("locator"):
-                    db.learn_call(u["call"], u["locator"], source="kst", name=u.get("name", ""))
-        if ev.get("type") == "kst":
-            m = ev["msg"]
-            with db.conn:
-                db.conn.execute("INSERT INTO kst_messages(ts_utc,time,call,name,to_call,text,own,to_me) VALUES(?,?,?,?,?,?,?,?)",
-                                (m["ts"], m["time"], m["call"], m["name"], m["to"], m["text"], int(m["own"]), int(m["to_me"])))
-        if ev.get("type") != "kst_raw":
-            await hub.broadcast(ev)
+    def kst_event_for(station_id: int):
+        async def kst_event(ev: dict) -> None:
+            if ev.get("type") == "kst_users":
+                for u in ev["users"]:
+                    if u.get("locator"):
+                        db.learn_call(u["call"], u["locator"], source="kst", name=u.get("name", ""))
+            if ev.get("type") == "kst":
+                m = ev["msg"]
+                with db.conn:
+                    db.conn.execute("INSERT INTO kst_messages(ts_utc,time,call,name,to_call,text,own,to_me,station_id) VALUES(?,?,?,?,?,?,?,?,?)",
+                                    (m["ts"], m["time"], m["call"], m["name"], m["to"], m["text"], int(m["own"]), int(m["to_me"]), station_id))
+            if ev.get("type") != "kst_raw":
+                await hub.broadcast({**ev, "station_id": station_id})
+        return kst_event
 
-    def kst_client() -> kst.KstClient | None:
-        return kst_state["client"]
+    def kst_client(station_id: int | None) -> kst.KstClient | None:
+        return kst_state.get(int(station_id or 0))
 
-    async def kst_start() -> dict:
-        user = db.get_setting("kst_user", "") or ""
-        pw = db.get_setting("kst_pass", "") or ""
+    def kst_my_calls(st: dict) -> list[str]:
+        return [c for c in re.split(r"[\s,;]+", (st.get("kst_my_calls") or "").upper()) if c] or [st.get("kst_user", "")]
+
+    async def kst_start(station_id: int) -> dict:
+        st = db.get_station(station_id, secrets=True)
+        if not st:
+            raise HTTPException(404, "Station nicht gefunden")
+        user, pw = st.get("kst_user") or "", st.get("kst_pass") or ""
         if not (user and pw):
-            raise HTTPException(400, "KST: Rufzeichen und Passwort in der Verwaltung eintragen")
-        c = kst_client()
+            raise HTTPException(400, "KST: Rufzeichen und Passwort bei der Station eintragen (Verwaltung → Station ✎)")
+        c = kst_state.get(station_id)
         if c:
             await c.stop()
-        calls = [s["call"] for s in db.rows("SELECT DISTINCT call FROM stations")]
-        c = kst.KstClient(user, pw, int(db.get_setting("kst_room", "2") or 2), kst_event, my_calls=calls)
-        kst_state["client"] = c
+        c = kst.KstClient(user, pw, int(st.get("kst_room") or 2), kst_event_for(station_id), my_calls=kst_my_calls(st))
+        kst_state[station_id] = c
         c.start()
         return c.status()
+
+    async def kst_stop(station_id: int) -> None:
+        c = kst_state.pop(station_id, None)
+        if c:
+            await c.stop()
 
     lookup_state = {"client": None}
     lookup_cache: dict[str, float] = {}  # Call -> Zeitpunkt der letzten erfolglosen Abfrage
@@ -161,7 +173,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.post("/api/settings", dependencies=[Depends(require_admin)])
     def set_settings(body: dict):
-        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_user", "kst_pass", "kst_room", "kst_autostart", "kst_macros"):
+        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros"):
             if k in body:
                 db.set_setting(k, json.dumps(body[k]) if k == "kst_macros" else str(body[k] or ""))
         lookup_state["client"] = None
@@ -173,8 +185,6 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return {"tile_url": db.get_setting("tile_url", ""), "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
                 "lookup_user": db.get_setting("lookup_user", ""), "lookup_pass_set": bool(db.get_setting("lookup_pass", "")),
                 "providers": lookup.PROVIDERS,
-                "kst_user": db.get_setting("kst_user", ""), "kst_pass_set": bool(db.get_setting("kst_pass", "")),
-                "kst_room": int(db.get_setting("kst_room", "2") or 2), "kst_autostart": db.get_setting("kst_autostart", "0") == "1",
                 "kst_rooms": kst.ROOMS}
 
     @app.post("/api/lookup/test", dependencies=[Depends(require_admin)])
@@ -339,6 +349,9 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                                     body.get("mode", "SSB"), body.get("password", ""), body.get("info") or {})
         except ValueError as e:
             raise HTTPException(400, str(e))
+        kst_fields = {k: v for k, v in body.items() if k.startswith("kst_")}
+        if kst_fields:
+            db.update_station(sid, **kst_fields)
         await hub.broadcast({"type": "update", "scope": "contests"})
         return db.get_station(sid)
 
@@ -352,12 +365,19 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             db.update_station(sid, **body)
         except ValueError as e:
             raise HTTPException(400, str(e))
+        if any(k.startswith("kst_") for k in body) and kst_client(sid):
+            await kst_stop(sid)
+            try:
+                await kst_start(sid)
+            except HTTPException:
+                pass
         await hub.broadcast({"type": "update", "scope": "contests"})
         await hub.broadcast({"type": "update", "scope": "qsos", "station_id": sid})
         return db.get_station(sid)
 
     @app.delete("/api/stations/{sid}", dependencies=[Depends(require_admin)])
     async def delete_station(sid: int):
+        await kst_stop(sid)
         db.delete_station(sid)
         await hub.broadcast({"type": "update", "scope": "contests"})
         return {"ok": True}
@@ -469,7 +489,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     async def import_folder(files: list[UploadFile] = File(...), x_nick: str | None = Header(default=None)):
         """Ganzer WinContest-Ordner (mehrere Dateien): jedes Log wird ein archivierter Contest, alle Calls ins Call-Buch."""
         from . import prefixes
-        report: dict[str, Any] = {"files": [], "contests": 0, "qsos": 0, "callbook": 0, "skipped": []}
+        report: dict[str, Any] = {"files": [], "contests": 0, "qsos": 0, "callbook": 0, "calls_new": 0, "calls_known": 0, "skipped": []}
         seen_logs: set[tuple[str, str]] = set()
         for up in sorted(files, key=lambda f: (0 if (f.filename or "").lower().endswith(".mdb") else 1, f.filename or "")):
             name = Path(up.filename or "datei").name
@@ -483,13 +503,16 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 continue
             if not res.qsos and not res.callbook:
                 continue
+            entry = {"file": name, "kind": res.kind, "qsos": len(res.qsos), "imported": 0, "calls_new": 0, "calls_known": 0}
             for call, loc, nm in res.callbook:
-                db.learn_call(call, loc, source="import", name=nm)
-                report["callbook"] += 1
+                r = db.learn_call(call, loc, source="import", name=nm)
+                entry["calls_new" if r == "new" else "calls_known"] += 1 if r else 0
             for q in res.qsos:
-                db.learn_call(q.call, q.locator, source="import", when=q.ts_utc)
-            report["callbook"] += len(res.qsos)
-            entry = {"file": name, "kind": res.kind, "qsos": len(res.qsos), "imported": 0}
+                r = db.learn_call(q.call, q.locator, source="import", when=q.ts_utc)
+                entry["calls_new" if r == "new" else "calls_known"] += 1 if r else 0
+            report["callbook"] += entry["calls_new"] + entry["calls_known"]
+            report["calls_new"] += entry["calls_new"]
+            report["calls_known"] += entry["calls_known"]
             report["files"].append(entry)
             if not res.qsos or not res.header.get("locator"):
                 continue
@@ -573,32 +596,36 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     # ------------------------------------------------------------ ON4KST-Chat
     @app.get("/api/kst/status")
-    def kst_status():
-        c = kst_client()
-        base = {"configured": bool(db.get_setting("kst_user") and db.get_setting("kst_pass")), "macros": json.loads(db.get_setting("kst_macros", "") or "null") or kst_default_macros()}
-        return {**base, **(c.status() if c else {"state": "aus", "error": "", "users": 0, "messages": 0, "room": int(db.get_setting("kst_room", "2") or 2)})}
+    def kst_status(station_id: int = 0):
+        c = kst_client(station_id)
+        st = db.get_station(station_id, secrets=True) or {}
+        base = {"configured": bool(st.get("kst_user") and st.get("kst_pass")), "station_id": station_id,
+                "macros": json.loads(db.get_setting("kst_macros", "") or "null") or kst_default_macros()}
+        return {**base, **(c.status() if c else {"state": "aus", "error": "", "users": 0, "messages": 0, "user": st.get("kst_user", ""), "room": int(st.get("kst_room") or 2)})}
 
     def kst_default_macros() -> list[dict]:
-        return [{"label": "CQ", "text": "/CQ {call} GA {name}, QRV {band}? pse call, my loc {myloc}"},
-                {"label": "QRV", "text": "/CQ {call} QRV {band} ssb, calling you now, loc {myloc}"},
-                {"label": "TNX", "text": "/CQ {call} TNX QSO {name}, 73!"},
-                {"label": "NIL", "text": "/CQ {call} sri {name}, nil heard, try again later?"},
-                {"label": "SKED", "text": "/CQ {call} sked in 5 min on {band}?"}]
+        # Im KST-Reiter gehen die Texte an alle (ohne Adressierung); im DM-Reiter werden sie automatisch an den Kontakt gerichtet.
+        return [{"label": "CQ", "text": "CQ {band} from {myloc} – who is QRV? pse call"},
+                {"label": "QRV", "text": "QRV {band} SSB, loc {myloc}, listening"},
+                {"label": "TNX", "text": "TNX QSO, 73!"},
+                {"label": "NIL", "text": "sri, nil heard – try again later?"},
+                {"label": "SKED", "text": "sked {band} in 5 min?"}]
+
+    def body_station(body: dict) -> int:
+        return int(body.get("station_id") or 0)
 
     @app.post("/api/kst/start", dependencies=[Depends(require_admin)])
-    async def kst_start_ep():
-        return await kst_start()
+    async def kst_start_ep(body: dict | None = None):
+        return await kst_start(body_station(body or {}))
 
     @app.post("/api/kst/stop", dependencies=[Depends(require_admin)])
-    async def kst_stop_ep():
-        c = kst_client()
-        if c:
-            await c.stop()
+    async def kst_stop_ep(body: dict | None = None):
+        await kst_stop(body_station(body or {}))
         return {"state": "aus"}
 
     @app.post("/api/kst/send")
     async def kst_send(body: dict, x_nick: str | None = Header(default=None)):
-        c = kst_client()
+        c = kst_client(body_station(body))
         if not c or c.state != "verbunden":
             raise HTTPException(409, "Nicht mit dem KST-Chat verbunden")
         text = (body.get("text") or "").strip()[:300]
@@ -614,7 +641,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     def kst_candidates(station_id: int, max_km: int = 300, include_away: int = 0):
         """KST-Nutzer im Umkreis, die mit dieser Station (Band) noch nicht gearbeitet wurden."""
         st = db.get_station(station_id)
-        c = kst_client()
+        c = kst_client(station_id)
         if not st or not c:
             return []
         worked = {q["core_call"] for q in db.list_qsos(station_id)}
@@ -637,7 +664,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     @app.post("/api/kst/broadcast")
     async def kst_broadcast(body: dict, x_nick: str | None = Header(default=None)):
         """Mehrere Nutzer nacheinander per /CQ anschreiben (Platzhalter je Empfänger, 2 s Abstand)."""
-        c = kst_client()
+        c = kst_client(body_station(body))
         if not c or c.state != "verbunden":
             raise HTTPException(409, "Nicht mit dem KST-Chat verbunden")
         calls = [str(x).strip().upper() for x in (body.get("calls") or []) if str(x).strip()][:60]
@@ -659,24 +686,24 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                     await c.send_text(msg)
                 except RuntimeError:
                     break
-                await hub.broadcast({"type": "kst_broadcast", "done": i + 1, "total": len(calls), "call": call})
+                await hub.broadcast({"type": "kst_broadcast", "done": i + 1, "total": len(calls), "call": call, "station_id": body_station(body)})
                 if i < len(calls) - 1:
                     await asyncio.sleep(2)
         asyncio.create_task(run())
         return {"queued": len(calls)}
 
     @app.post("/api/kst/refresh_users")
-    async def kst_refresh_users():
-        c = kst_client()
+    async def kst_refresh_users(body: dict | None = None):
+        c = kst_client(body_station(body or {}))
         if not c or c.state != "verbunden":
             raise HTTPException(409, "Nicht verbunden")
         await c.send_command("/SHOW USER")
         return {"ok": True}
 
     @app.get("/api/kst/messages")
-    def kst_messages(limit: int = 300):
-        rows = db.rows("SELECT * FROM kst_messages ORDER BY id DESC LIMIT ?", (min(int(limit), 2000),))
-        c = kst_client()
+    def kst_messages(station_id: int = 0, limit: int = 300):
+        rows = db.rows("SELECT * FROM kst_messages WHERE station_id=? ORDER BY id DESC LIMIT ?", (station_id, min(int(limit), 2000)))
+        c = kst_client(station_id)
         users = c.users if c else {}
         out = []
         for r in reversed(rows):
@@ -685,8 +712,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return out
 
     @app.get("/api/kst/users")
-    def kst_users(my: str = ""):
-        c = kst_client()
+    def kst_users(station_id: int = 0, my: str = ""):
+        c = kst_client(station_id)
         out = []
         for u in (c.users.values() if c else []):
             d = dict(u)
