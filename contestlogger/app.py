@@ -741,7 +741,11 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.get("/api/kst/messages")
     def kst_messages(station_id: int = 0, limit: int = 300):
-        rows = db.rows("SELECT * FROM kst_messages WHERE station_id=? ORDER BY id DESC LIMIT ?", (station_id, min(int(limit), 2000)))
+        # letzte N Nachrichten plus alle DM-relevanten (eigene gerichtete und 'an mich'), damit Gespräche vollständig bleiben
+        rows = db.rows("""SELECT * FROM kst_messages WHERE id IN (
+                             SELECT id FROM (SELECT id FROM kst_messages WHERE station_id=? ORDER BY id DESC LIMIT ?)
+                             UNION SELECT id FROM (SELECT id FROM kst_messages WHERE station_id=? AND ((own=1 AND to_call<>'') OR to_me=1) ORDER BY id DESC LIMIT 2000))
+                          ORDER BY id DESC""", (station_id, min(int(limit), 2000), station_id))
         c = kst_client(station_id)
         users = c.users if c else {}
         out = []
@@ -940,8 +944,17 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     # ------------------------------------------------------------ Chat / WS
     @app.get("/api/chat")
-    def chat_history():
-        return db.recent_chat()
+    def chat_history(contest_id: int = 0):
+        return db.recent_chat(contest_id)
+
+    @app.get("/api/kst/seen")
+    def kst_seen_get(station_id: int, x_nick: str | None = Header(default=None)):
+        return db.get_kst_seen(station_id, nick_of(x_nick))
+
+    @app.post("/api/kst/seen")
+    def kst_seen_set(body: dict, x_nick: str | None = Header(default=None)):
+        db.set_kst_seen(int(body.get("station_id") or 0), nick_of(x_nick), str(body.get("partner") or "").upper(), str(body.get("ts") or ""))
+        return {"ok": True}
 
     @app.websocket("/ws")
     async def ws(socket: WebSocket, nick: str = Query(default="")):
@@ -955,7 +968,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 except json.JSONDecodeError:
                     continue
                 if msg.get("type") == "chat" and (msg.get("text") or "").strip():
-                    entry = db.add_chat(nick, msg["text"].strip())
+                    entry = db.add_chat(nick, msg["text"].strip(), int(msg.get("contest_id") or 0))
                     await hub.broadcast({"type": "chat", "msg": entry})
                 elif msg.get("type") == "status":
                     hub.set_status(socket, msg.get("station_id"))

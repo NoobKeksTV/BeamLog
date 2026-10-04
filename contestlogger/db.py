@@ -109,7 +109,15 @@ CREATE TABLE IF NOT EXISTS chat (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ts_utc TEXT NOT NULL,
     nick TEXT NOT NULL,
-    text TEXT NOT NULL
+    text TEXT NOT NULL,
+    contest_id INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS kst_seen (
+    station_id INTEGER NOT NULL,
+    nick TEXT NOT NULL,
+    partner TEXT NOT NULL,
+    ts_utc TEXT NOT NULL,
+    PRIMARY KEY (station_id, nick, partner)
 );
 """
 
@@ -166,6 +174,8 @@ class Database:
                                       (g["kst_user"], g["kst_pass"], int(g["kst_room"] or 2), int(g["kst_autostart"] == "1")))
             if "station_id" not in kcols:
                 self.conn.execute("ALTER TABLE kst_messages ADD COLUMN station_id INTEGER NOT NULL DEFAULT 0")
+            if "contest_id" not in {r["name"] for r in self.conn.execute("PRAGMA table_info(chat)")}:
+                self.conn.execute("ALTER TABLE chat ADD COLUMN contest_id INTEGER NOT NULL DEFAULT 0")
             # Einträge wie DN2LH-2 (KST-Mehrfachanmeldung) mit dem Basis-Rufzeichen zusammenführen
             for r in self.conn.execute("SELECT call, locator FROM callbook WHERE call LIKE '%-%'").fetchall():
                 base = prefixes.core_call(r["call"])
@@ -727,11 +737,21 @@ class Database:
         return r["n"] if r else 0
 
     # ----- Chat -----------------------------------------------------------
-    def add_chat(self, nick: str, text: str) -> dict:
+    def add_chat(self, nick: str, text: str, contest_id: int = 0) -> dict:
         now = utcnow()
         with self.conn:
-            cur = self.conn.execute("INSERT INTO chat(ts_utc,nick,text) VALUES(?,?,?)", (now, nick[:24], text[:500]))
-        return {"id": cur.lastrowid, "ts_utc": now, "nick": nick[:24], "text": text[:500]}
+            cur = self.conn.execute("INSERT INTO chat(ts_utc,nick,text,contest_id) VALUES(?,?,?,?)", (now, nick[:24], text[:500], contest_id))
+        return {"id": cur.lastrowid, "ts_utc": now, "nick": nick[:24], "text": text[:500], "contest_id": contest_id}
 
-    def recent_chat(self, limit: int = 100) -> list[dict]:
-        return list(reversed(self.rows("SELECT * FROM chat ORDER BY id DESC LIMIT ?", (limit,))))
+    def recent_chat(self, contest_id: int = 0, limit: int = 300) -> list[dict]:
+        """Chat-Verlauf eines Contests (contest_id 0 = ohne Contest)."""
+        return list(reversed(self.rows("SELECT * FROM chat WHERE contest_id=? ORDER BY id DESC LIMIT ?", (contest_id, limit))))
+
+    # ------------------------------------------------------------ KST-Lesemarken (je Station und Nutzer, serverseitig)
+    def get_kst_seen(self, station_id: int, nick: str) -> dict[str, str]:
+        return {r["partner"]: r["ts_utc"] for r in self.rows("SELECT partner, ts_utc FROM kst_seen WHERE station_id=? AND nick=?", (station_id, nick))}
+
+    def set_kst_seen(self, station_id: int, nick: str, partner: str, ts_utc: str) -> None:
+        with self.conn:
+            self.conn.execute("INSERT INTO kst_seen(station_id,nick,partner,ts_utc) VALUES(?,?,?,?) ON CONFLICT(station_id,nick,partner) DO UPDATE SET ts_utc=MAX(ts_utc, excluded.ts_utc)",
+                              (station_id, nick, partner, ts_utc))

@@ -18,7 +18,7 @@
     info: {},
     rig: {},
     locAuto: false,
-    kst: { msgs: [], users: [], status: {}, tab: "local", dm: "", sid: null, unread: 0, unreadDm: 0, macros: [], seen: JSON.parse(localStorage.getItem("cl.dmseen") || "{}") },
+    kst: { msgs: [], users: [], status: {}, tab: "local", dm: "", sid: null, unread: 0, unreadDm: 0, macros: [], seen: {} },
   };
   const POPUP = new URLSearchParams(location.search).get("popup") === "chat";
   if (POPUP) document.body.classList.add("popup");
@@ -294,6 +294,7 @@
     ss.value = S.stationId ?? "";
     const st = station();
     if (S.kst.sid !== S.stationId && S.kst.sid !== undefined) loadKst();  // KST-Chat ist je Station
+    if (S.chatContest !== undefined && S.chatContest !== S.contestId) loadChat();  // lokaler Chat ist je Contest
     if (st && !st.has_password && !canLog()) autoUnlock(st);
     if (st) {
       const rig = S.rig[st.id];
@@ -834,7 +835,7 @@
     ws.onclose = () => { $("#conn").classList.remove("on"); setTimeout(connectWs, 2000); };
     ws.onmessage = async (ev) => {
       const m = JSON.parse(ev.data);
-      if (m.type === "chat") { appendChat(m.msg); if (m.msg.nick !== S.nick) Sound.play("chat"); }
+      if (m.type === "chat") { if ((m.msg.contest_id || 0) === (S.contestId || 0)) { appendChat(m.msg); if (m.msg.nick !== S.nick) Sound.play("chat"); } }
       else if (m.type?.startsWith("kst") && m.station_id !== S.stationId) { /* KST-Ereignis einer anderen Station */ }
       else if (m.type === "kst") {
         S.kst.msgs.push(m.msg); S.kst.msgs.splice(0, S.kst.msgs.length - 800);
@@ -847,7 +848,11 @@
         }
         // Eigene gerichtete Nachricht (auch aus einem anderen KST-Client mit demselben Login): DM-Gespräch dazu öffnen,
         // damit die Unterhaltung hier sichtbar weitergeht. Eingehende DM ohne offenes Gespräch: Kontakt vorwählen.
-        if (m.msg.own && m.msg.to && coreOf(m.msg.to) !== coreOf(S.kst.dm)) { S.kst.dm = m.msg.to; if (S.kst.tab !== "local") setChatTab("dm"); }
+        // … aber nicht, wenn hier gerade ein anderes Gespräch aktiv ist (Text in der Eingabe oder Nachrichten in den
+        // letzten 3 Minuten) – sonst würde jede DM eines anderen Operators derselben Station das Fenster umschalten.
+        const lastTs = S.kst.dm ? (S.kst.msgs.filter((x) => coreOf(x.own ? x.to : x.call) === coreOf(S.kst.dm)).pop()?.ts || "") : "";
+        const busy = !!$("#kst-input").value.trim() || (lastTs && Date.now() - Date.parse(lastTs) < 180000);
+        if (m.msg.own && m.msg.to && coreOf(m.msg.to) !== coreOf(S.kst.dm) && !busy) { S.kst.dm = m.msg.to; if (S.kst.tab !== "local") setChatTab("dm"); }
         else if (incoming && !S.kst.dm) S.kst.dm = m.msg.call;
         renderKst();
         if (m.msg.own) { Scroll.toBottom($("#kst-log")); Scroll.toBottom($("#kst-dm-msgs")); }  // eigene Nachricht: immer ans Ende
@@ -891,8 +896,8 @@
   };
   $$(".logwrap").forEach((w) => { const log = w.querySelector(".chat-log"); log.addEventListener("scroll", () => Scroll.update(log)); w.querySelector(".jump-down").addEventListener("click", () => Scroll.toBottom(log)); });
   async function loadChat() {
-    const log = $("#chat-log"); log.innerHTML = "";
-    try { (await GET("/api/chat")).forEach(appendChat); } catch (_) { /* */ }
+    const log = $("#chat-log"); log.innerHTML = ""; S.chatContest = S.contestId;
+    try { (await GET(`/api/chat?contest_id=${S.contestId || 0}`)).forEach(appendChat); } catch (_) { /* */ }
     Scroll.toBottom(log);
   }
   function appendChat(m) {
@@ -903,7 +908,7 @@
   $("#chat-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const t = $("#chat-input").value.trim();
-    if (t && S.ws?.readyState === 1) { S.ws.send(JSON.stringify({ type: "chat", text: t })); $("#chat-input").value = ""; }
+    if (t && S.ws?.readyState === 1) { S.ws.send(JSON.stringify({ type: "chat", text: t, contest_id: S.contestId || 0 })); $("#chat-input").value = ""; }
   });
 
   // ------------------------------------------------------------ Chat-Reiter, Popup, ON4KST
@@ -914,6 +919,8 @@
     $("#ctab-local").classList.toggle("active", tab === "local");
     $("#ctab-kst").classList.toggle("active", tab !== "local");
     if (tab !== "local") { S.kst.unread = 0; if (tab === "dm") S.kst.unreadDm = 0; renderKst(); $("#kst-input").focus(); }
+    // beim Reiterwechsel immer ans Ende (der Bereich war beim Aufbau noch unsichtbar, Scrollposition daher 0)
+    Scroll.toBottom($(tab === "local" ? "#chat-log" : tab === "dm" ? "#kst-dm-msgs" : "#kst-log"));
     renderKstBadges();
   }
   function renderKstBadges() {
@@ -926,8 +933,9 @@
   if (POPUP) setChatTab(localStorage.getItem("cl.chattab") || "kst");
   const sidQ = () => `station_id=${S.stationId || 0}`;
   async function loadKst() {
-    S.kst.sid = S.stationId; S.kst.msgs = []; S.kst.users = []; S.kst.status = {};
+    S.kst.sid = S.stationId; S.kst.msgs = []; S.kst.users = []; S.kst.status = {}; S.kst.seen = {};
     try {
+      S.kst.seen = await GET(`/api/kst/seen?${sidQ()}`);
       S.kst.status = await GET(`/api/kst/status?${sidQ()}`);
       S.kst.macros = S.kst.status.macros || [];
       S.kst.msgs = await GET(`/api/kst/messages?${sidQ()}&limit=300`);
@@ -1017,7 +1025,8 @@
     $("#kst-dm-pane").classList.toggle("hidden", !dmMode);
     $("#kst-log-wrap").classList.toggle("hidden", dmMode);
     if (dmMode) {
-      if (S.kst.dm) { const lastIn = [...list].reverse().find((m) => !m.own); if (lastIn) { S.kst.seen[coreOf(S.kst.dm)] = lastIn.ts; localStorage.setItem("cl.dmseen", JSON.stringify(S.kst.seen)); } }
+      if (S.kst.dm) { const lastIn = [...list].reverse().find((m) => !m.own); const k = coreOf(S.kst.dm);
+        if (lastIn && (S.kst.seen[k] || "") < lastIn.ts) { S.kst.seen[k] = lastIn.ts; api("POST", "/api/kst/seen", { station_id: S.stationId, partner: k, ts: lastIn.ts }).catch(() => {}); } }
       renderDmList();
       const msgs = $("#kst-dm-msgs"); const dmSnap = Scroll.snapshot(msgs); const dmChanged = S.kst.dmShown !== S.kst.dm; S.kst.dmShown = S.kst.dm; msgs.innerHTML = "";
       const u = S.kst.dm ? kstUser(S.kst.dm) : null;
