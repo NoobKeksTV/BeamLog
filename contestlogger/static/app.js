@@ -414,10 +414,10 @@
     const rate = S.qsos.filter((q) => Date.parse(q.ts_utc) > hourAgo).length;
     box.innerHTML = "";
     if (!S.stationId) return;
-    const k = (v, l, cls = "") => el("div", { class: `kpi ${cls}` }, el("b", {}, v), el("span", {}, l));
+    const k = (v, l, cls = "") => el("span", { class: `st ${cls}` }, el("b", {}, v), l);
     box.append(k(valid.length, t("QSOs")), k(pts.toLocaleString("de"), t("Punkte")), k(squares, t("Großfelder")),
       k(valid.length ? Math.round(pts / valid.length) : 0, t("Ø km")), k(rate, t("QSOs / letzte h")), k(S.qsos.length - valid.length, t("Dupes")),
-      k(odx ? `${odx.call} ${odx.km} km` : "–", "ODX", "wide"));
+      k(odx ? `${odx.call} ${odx.km} km` : "–", "ODX", "odx"));
   }
 
   // ---- Eingabeformular

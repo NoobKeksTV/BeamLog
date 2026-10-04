@@ -224,10 +224,13 @@ body.bigscreen .kpis.big .kpi b { font-size: 56px; }
 .arrow-icon { font-size: 26px; color: #ff5c6c; text-shadow: 0 0 4px #000; line-height: 1; }
 .map-label { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font-family: var(--mono); font-size: 12px; white-space: nowrap; }
 #lang-select { padding: 3px 6px; font-size: 12.5px; }
-.under-form { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; }
-.under-form .card { margin-bottom: 12px; }
-.under-form .kpis { align-content: start; }
-@media (max-width: 900px) { .under-form { grid-template-columns: 1fr; } }
+/* Kompakte Statistik-Zeile unter der Eingabe */
+.statline { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; padding: 6px 14px; margin-bottom: 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; }
+.statline .st b { font-family: var(--mono); font-size: 17px; color: var(--text); margin-right: 4px; }
+.statline .st { color: var(--muted); white-space: nowrap; }
+.statline .st.odx b { color: var(--accent); }
+.map-card .map { height: 220px; }
 /* Laufende Nummer deutlich hervorheben */
 .qso-form input#f-nr-sent, .qso-form input#f-nr-sent[readonly] {
   color: #04121f; background: var(--warn); border-color: var(--warn); font-weight: 800; font-size: 24px; text-align: center;
