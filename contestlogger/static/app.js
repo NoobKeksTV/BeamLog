@@ -110,7 +110,7 @@
   }
   function modal(content, { closable = true } = {}) {
     const m = $("#modal"), box = $("#modal-box");
-    box.innerHTML = "";
+    box.innerHTML = ""; box.classList.remove("wide");
     box.append(content);
     m.classList.remove("hidden");
     box.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", closeModal));
@@ -639,7 +639,7 @@
   });
 
   // ------------------------------------------------------------ Makros (F1–F8)
-  const MACRO_DEFAULTS = { F1: "CQ Contest {mycall} {mycall} Contest", F2: "{call}", F3: "{rst} {nr} {myloc}", F4: "QRZ? {mycall}", F5: "{mycall}", F6: "TU {mycall}", F7: "AGN?", F8: "NR?" };
+  const MACRO_DEFAULTS = { F2: "CQ Contest {mycall} {mycall} Contest", F3: "{call}", F4: "{rst} {nr} {myloc}", F5: "QRZ? {mycall}", F6: "{mycall}", F7: "TU {mycall}", F8: "AGN? NR?" };  // F1 = Hilfe
   const MACRO_KEYS = Object.keys(MACRO_DEFAULTS);
   const macros = () => ({ ...MACRO_DEFAULTS, ...((station()?.info || {}).macros || {}) });
   function expandMacro(text) {
@@ -679,9 +679,46 @@
   document.addEventListener("keydown", (e) => {
     if (!$("#view-log").classList.contains("active") || !$("#modal").classList.contains("hidden")) return;
     if (e.key === "F9") { e.preventDefault(); $("#macro-bar").classList.toggle("hidden"); localStorage.setItem("cl.macrobar", $("#macro-bar").classList.contains("hidden") ? "0" : "1"); renderMacroBar(); return; }
-    if (/^F[1-8]$/.test(e.key)) { e.preventDefault(); if (station()) fireMacro(e.key); }
+    if (/^F[2-8]$/.test(e.key)) { e.preventDefault(); if (station()) fireMacro(e.key); }
   });
   if (localStorage.getItem("cl.macrobar") === "1") $("#macro-bar").classList.remove("hidden");
+
+  // ------------------------------------------------------------ Hilfe (F1 / „?“ im Kopf)
+  function helpDialog() {
+    const K = (keys, what) => el("tr", {}, el("td", { class: "keys" }, ...keys.map((k) => el("kbd", {}, k))), el("td", {}, what));
+    const H = (title, ...rows) => [el("h4", {}, title), el("table", { class: "help-table" }, el("tbody", {}, ...rows))];
+    const P = (text) => el("p", { class: "muted small" }, text);
+    const box = modal(el("div", { class: "help" }, el("h3", {}, t("Hilfe und Tastenkürzel")),
+      ...H(t("Loggen (Eingabeformular)"),
+        K(["Enter"], t("Weiter zum nächsten Feld. Stehen Rufzeichen und Locator, wird im Feld Nr erh., Locator oder Kommentar das QSO geloggt.")),
+        K(["Leertaste"], t("Springt Rufzeichen → Nr erh. → Locator → Kommentar → Rufzeichen (im Rufzeichenfeld wird dabei die Stationsdatenbank abgefragt). Im Kommentar bleibt die Leertaste ein Leerzeichen.")),
+        K(["↑", "↓"], t("In der Vorschlagsliste unter dem Rufzeichen blättern.")),
+        K(["Enter", "Tab"], t("Markierten Vorschlag übernehmen (Rufzeichen und Locator).")),
+        K(["Esc"], t("Formular leeren (bzw. offenes Fenster schließen); laufende CW-Ausgabe stoppen.")),
+        K(["F1"], t("Diese Hilfe.")),
+        K(["F2", "…", "F8"], t("Sprachbausteine F2–F8 (F1 ist die Hilfe): Text wird groß eingeblendet und, wenn eine CAT-Bridge mit CW läuft, als CW gesendet. Platzhalter: {mycall} {myloc} {call} {rst} {nr} {loc} {band} {nick}. Bearbeiten über ✎ in der Makroleiste.")),
+        K(["F9"], t("Makroleiste ein-/ausblenden (Übersicht aller Sprachbausteine mit ausgefülltem Text).")),
+        K(["Klick auf Standort"], t("Hat ein Rufzeichen mehrere bekannte Locator, erscheinen sie unter dem Formular zur Auswahl."))),
+      ...H(t("Chat, KST und DM"),
+        K(["Enter"], t("Nachricht senden (Chat, KST-Tab, DM-Gespräch).")),
+        K(["Klick auf Rufzeichen"], t("Im KST-Tab, im DM-Gespräch oder in der Nutzerliste: Rufzeichen und Locator in den Logger übernehmen.")),
+        K(["DM"], t("Knopf an einer KST-Nachricht: Gespräch mit dem Absender öffnen. Die Eingabe geht dann nur an diesen Kontakt.")),
+        K(["↓ Neueste"], t("Erscheint, wenn du hochgescrollt hast: springt ans Ende. Solange du oben bist, zieht nichts nach unten.")),
+        K(["↗"], t("Chat als eigenes Fenster ausklinken (z. B. für den zweiten Bildschirm). Töne kommen nur aus dem Hauptfenster.")),
+        K(["Rundruf"], t("Noch nicht gearbeitete KST-Nutzer im Umkreis gezielt anschreiben: Liste laden, „Nächste →“ dreht die Auswahl weiter, bereits Angeschriebene werden übersprungen. Eigene Texte lassen sich speichern."))),
+      ...H(t("Allgemein"),
+        K(["Loggen", "Log", "Statistik", "Verwaltung"], t("Reiter oben: Eingabe, komplettes Log mit Suche und Log-Prüfung, Auswertung, Verwaltung (Admin).")),
+        K(["Contest / Station"], t("Auswahl in der Leiste unter dem Kopf. Jede Station hat eigenes Rufzeichen, Band, Seriennummer und eigenen KST-Chat.")),
+        K(["🔔"], t("Töne an/aus: Pling beim QSO, Brummen bei Dupe, Ping bei Chat/DM/„an mich“, Tick wenn eine andere Station loggt.")),
+        K(["📱"], t("Adresse des Servers als QR-Code für Handy oder Tablet.")),
+        K(["◐"], t("Hell/Dunkel umschalten.")),
+        K([t("Sprache")], t("Umschalten der Oberfläche; eigene Übersetzungen über die Verwaltung."))),
+      P(t("Export und Abgabe: in der Verwaltung unter „Export / Abgabe“ – EDI je Station/Band (mit Log-Prüfung), ADIF, CSV oder alle Bänder als EDI-ZIP. Jede Änderung steht im Aktionsprotokoll.")),
+      el("div", { class: "row" }, el("span", { class: "muted small grow" }, `${S.info.app || "ContestLogger"} ${S.info.version || ""} · ${S.info.copyright || ""}`), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")))));
+    box.classList.add("wide");
+  }
+  $("#help-btn").addEventListener("click", helpDialog);
+  document.addEventListener("keydown", (e) => { if (e.key === "F1") { e.preventDefault(); if ($("#modal").classList.contains("hidden")) helpDialog(); } });
 
   // ------------------------------------------------------------ Karte (Leaflet, lokal gebündelt; Kacheln von OSM oder eigenem Server)
   function locToLatLon(loc) {
