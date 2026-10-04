@@ -55,6 +55,7 @@ async def _client_against_fake_server(monkeypatch):
     assert c.state == "verbunden" and "DL8NAS" in c.users and c.users["DF7KF"]["away"]
     await fake.push("1203Z DL8NAS Klaus> (DN2LH/P)  hi Lars, qrv 70cm?")
     await fake.push("1203Z OK1ABC Pepa> cq all")
+    await fake.push("1203Z ON4KST Server> Welcome, please read the rules")  # Systemmeldung -> wird verworfen
     await c.send_text("/CQ DL8NAS yes, calling now")
     await asyncio.sleep(0.3)
     msgs = [e["msg"] for e in events if e["type"] == "kst"]

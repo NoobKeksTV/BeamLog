@@ -705,7 +705,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.get("/api/kst/messages")
     def kst_messages(station_id: int = 0, limit: int = 300):
-        rows = db.rows("SELECT * FROM kst_messages WHERE station_id=? ORDER BY id DESC LIMIT ?", (station_id, min(int(limit), 2000)))
+        rows = db.rows("SELECT * FROM kst_messages WHERE station_id=? AND call NOT IN ('ON4KST','KST','SYSOP','ADMIN') ORDER BY id DESC LIMIT ?", (station_id, min(int(limit), 2000)))
         c = kst_client(station_id)
         users = c.users if c else {}
         out = []

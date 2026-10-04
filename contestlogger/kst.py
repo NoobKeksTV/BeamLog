@@ -32,6 +32,7 @@ ROOMS = {1: "50/70 MHz", 2: "144/432 MHz", 3: "Microwave", 4: "EME/JT65", 5: "Lo
 MSG_RE = re.compile(r"^(\d{4})Z\s+([A-Z0-9/\-]+)\s+(.*?)>\s*(?:\(([A-Z0-9/\-]+)\)\s*)?(.*)$")
 PROMPT_RE = re.compile(r"^(\d{4})Z\s+([A-Z0-9/\-]+)\s+.*chat>\s*$")
 USER_RE = re.compile(r"^\(?([A-Z0-9/\-]{3,12})\)?\s{2,}([A-R]{2}\d{2}[A-X]{2})?\s*(.*)$")
+SYSTEM_SENDERS = {"ON4KST", "KST", "SYSOP", "ADMIN"}
 CALL_IN_TEXT = re.compile(r"\b([A-Z0-9]{1,3}[0-9][A-Z0-9]{0,4}[A-Z](?:/[A-Z0-9]{1,3})?)\b")
 
 
@@ -265,6 +266,8 @@ class KstClient:
                 await self._emit({"type": "kst_users", "users": list(self.users.values())})
             return
         msg = parse_message(line)
+        if msg and msg["call"] in SYSTEM_SENDERS:
+            return  # Systemmeldungen des Chat-Servers (ON4KST) nicht als Nachricht führen
         if msg:
             msg["ts"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             msg["own"] = msg["call"] == self.user

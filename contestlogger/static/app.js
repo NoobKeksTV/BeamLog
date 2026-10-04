@@ -933,7 +933,7 @@
     if (!list.length) box.append(el("div", { class: "muted small", style: "padding:8px" }, t("Noch keine Kontakte – „+“ oder DM an einer Nachricht.")));
   }
   function kstFiltered() {
-    const my = S.kst.msgs;
+    const my = S.kst.msgs.filter((m) => !["ON4KST", "KST", "SYSOP", "ADMIN"].includes(m.call));
     if (S.kst.tab === "dm" && S.kst.dm) { const c = coreOf(S.kst.dm); return my.filter((m) => (m.own ? coreOf(m.to) === c : (m.to_me && coreOf(m.call) === c))); }
     return my;
   }
