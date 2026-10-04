@@ -383,5 +383,11 @@
  "gewählten Text aus der Liste entfernen": "remove selected text from the list",
  "Rundruf-Texte gespeichert": "Broadcast texts saved",
  "Eigene KST-Verbindung je Station. Nachrichten an den KST-Login oder das Stations-Call gelten immer als „an mich“ (Zusätze wie /P oder -2 werden ignoriert); weitere Rufzeichen Komma-getrennt eintragen.": "Separate KST connection per station. Messages to the KST login or the station call always count as “to me” (suffixes like /P or -2 are ignored); enter further callsigns comma separated.",
- "weitere, z. B. DL0ABC": "more, e.g. DL0ABC"
+ "weitere, z. B. DL0ABC": "more, e.g. DL0ABC",
+ "Aktionsprotokoll": "Activity log",
+ "Jede Änderung (QSOs, Stationen, Contests, Importe, Einstellungen, KST, Backups) wird mit Zeit, Nutzer und Admin-Kennzeichen festgehalten – auch auf der Server-Konsole.": "Every change (QSOs, stations, contests, imports, settings, KST, backups) is recorded with time, user and admin flag – also on the server console.",
+ "Suchen (Aktion, Nutzer, Details) …": "Search (action, user, details) …",
+ "Aktualisieren": "Refresh",
+ "Als Textdatei": "As text file",
+ "fehlgeschlagen": "failed"
 }

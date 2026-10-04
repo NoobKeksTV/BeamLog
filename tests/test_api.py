@@ -174,3 +174,28 @@ def test_results_import(client):
     assert r["imported"] == 1
     assert client.get("/api/callbook", params={"q": "OK9ZZZ"}).json()["rows"][0]["locator"] == "JN79FX"
     assert client.post("/api/import/results", data={"commit": "0"}, headers=H).status_code == 400
+
+
+def test_audit_log(tmp_path):
+    from contestlogger.app import create_app
+    from fastapi.testclient import TestClient
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        admin = c.post("/api/setup", json={"password": "admin1"}).json()["token"]
+        H = {"X-Admin-Token": admin, "X-Nick": "Lars"}
+        cid = c.post("/api/contests", json={"name": "T"}, headers=H).json()["id"]
+        sid = c.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH", "locator": "JO31AA", "band": "432MHz", "kst_pass": "geheim"}, headers=H).json()["id"]
+        c.post(f"/api/stations/{sid}/qsos", json={"call": "DL8NAS", "locator": "JN59LE"}, headers=H)
+        assert c.post("/api/admin/login", json={"password": "falsch"}).status_code == 403
+        assert c.get("/api/audit").status_code == 403  # nur Admin
+        rows = c.get("/api/audit", headers=H).json()
+        actions = [r["action"] for r in rows]
+        assert "Server gestartet" in actions and "Admin-Passwort festgelegt (Ersteinrichtung)" in actions
+        st = next(r for r in rows if r["action"].startswith("Station in Contest"))
+        assert st["nick"] == "Lars" and st["admin"] == 1 and "***" in st["details"] and "geheim" not in st["details"]
+        qso = next(r for r in rows if r["action"].startswith("QSO geloggt"))
+        assert "DL8NAS" in qso["details"]
+        fail = next(r for r in rows if r["action"] == "Admin-Anmeldung")
+        assert fail["status"] == 403 and fail["admin"] == 0
+        assert c.get("/api/audit", headers=H, params={"q": "DL8NAS"}).json()[0]["action"].startswith("QSO geloggt")
+        assert "QSO geloggt" in c.get("/api/audit.txt", headers=H).text

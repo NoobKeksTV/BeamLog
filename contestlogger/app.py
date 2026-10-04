@@ -16,7 +16,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __version__, exporters, geo, importers, kst, logcheck, lookup, prefixes
+from . import __app_name__, __copyright__, __version__, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes
 from .db import Database
 
 STATIC = Path(__file__).parent / "static"
@@ -57,6 +57,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         n = seed_callbook()
         if n:
             print(f"Stationsdatenbank: {n} Rufzeichen aus der mitgelieferten Startdatei geladen.")
+        db.add_audit("Server gestartet", details=f"Version {__version__}", nick="Server")
+        db.prune_audit()
         task = asyncio.create_task(backup_loop()) if interval > 0 else None
         for st in db.rows("SELECT id FROM stations WHERE kst_autostart=1 AND kst_user<>'' AND kst_pass<>''"):
             try:
@@ -64,6 +66,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             except HTTPException:
                 pass
         yield
+        db.add_audit("Server wird beendet", nick="Server")
         for c in list(kst_state.values()):
             await c.stop()
         if task:
@@ -152,6 +155,18 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     def nick_of(x_nick: str | None) -> str:
         return (x_nick or "").strip()[:24]
+
+    app.add_middleware(audit.AuditMiddleware, record=db.add_audit, is_admin=is_admin)
+
+    @app.get("/api/audit", dependencies=[Depends(require_admin)])
+    def audit_list(limit: int = 200, q: str = ""):
+        return db.list_audit(min(int(limit), 2000), q.strip())
+
+    @app.get("/api/audit.txt", dependencies=[Depends(require_admin)])
+    def audit_txt(limit: int = 5000):
+        lines = [f"{r['ts_utc']}  {r['nick'] or '?'}{' [Admin]' if r['admin'] else ''}  {r['action']}  {r['details']}  {'(' + str(r['status']) + ')' if r['status'] >= 400 else ''}".rstrip()
+                 for r in reversed(db.list_audit(min(int(limit), 20000)))]
+        return PlainTextResponse("\n".join(lines), headers={"Content-Disposition": "attachment; filename=contestlogger-protokoll.txt"})
 
     # ------------------------------------------------------------ Allgemein
     @app.get("/api/info")
@@ -867,7 +882,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return logcheck.check_station(contest, station, db.list_qsos(sid))
 
     @app.get("/api/contests/{cid}/export.zip")
-    def export_contest_zip(cid: int, force: int = 0, x_admin_token: str | None = Header(default=None)):
+    def export_contest_zip(cid: int, force: int = 0, nick: str = "", x_admin_token: str | None = Header(default=None)):
         """Alle Stationen/Bänder eines Contests als EDI-Dateien in einem ZIP – nur geprüfte Logs."""
         import io
         import zipfile
@@ -889,10 +904,11 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             if skipped:
                 z.writestr("NICHT_EXPORTIERT.txt", "Diese Logs haben die Prüfung nicht bestanden:\n" + "\n".join(skipped))
         fname = f"{contest['name']}".replace("/", "-").replace(" ", "_") + ".zip"
+        db.add_audit(f"EDI-ZIP exportiert (Contest {cid})", details=f"{fname}; nicht exportiert: {len(skipped)}" + (" [erzwungen]" if force else ""), admin=is_admin(x_admin_token), nick=nick_of(nick))
         return Response(buf.getvalue(), media_type="application/zip", headers={"Content-Disposition": f"attachment; filename={fname}"})
 
     @app.get("/api/stations/{sid}/export.{fmt}")
-    def export(sid: int, fmt: str, force: int = 0, x_admin_token: str | None = Header(default=None)):
+    def export(sid: int, fmt: str, force: int = 0, nick: str = "", x_admin_token: str | None = Header(default=None)):
         station = db.get_station(sid)
         if not station:
             raise HTTPException(404)
@@ -903,7 +919,9 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             # Die Log-Prüfung ist Pflicht: mit Fehlern wird nur exportiert, wenn der Admin es erzwingt.
             res = logcheck.check_station(contest, station, qsos)
             if res["errors"] and not (force and is_admin(x_admin_token)):
+                db.add_audit(f"EDI-Export abgelehnt (Station {sid})", details=f"{len(res['errors'])} Fehler in der Log-Prüfung", status=409)
                 raise HTTPException(409, f"Log-Prüfung nicht bestanden: {len(res['errors'])} Fehler – bitte erst beheben")
+            db.add_audit(f"EDI exportiert (Station {sid})", details=f"{base}.edi, {len(qsos)} QSOs" + (" [mit Fehlern erzwungen]" if res["errors"] else ""), admin=is_admin(x_admin_token), nick=nick_of(nick))
             return Response(exporters.export_edi(contest, station, qsos).encode("latin-1", "replace"),
                             media_type="text/plain", headers={"Content-Disposition": f"attachment; filename={base}.edi"})
         if fmt in ("adi", "adif"):

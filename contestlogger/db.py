@@ -94,6 +94,17 @@ CREATE TABLE IF NOT EXISTS kst_messages (
     to_me INTEGER NOT NULL DEFAULT 0,
     station_id INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts_utc TEXT NOT NULL,
+    nick TEXT NOT NULL DEFAULT '',
+    admin INTEGER NOT NULL DEFAULT 0,
+    action TEXT NOT NULL,
+    method TEXT NOT NULL DEFAULT '',
+    path TEXT NOT NULL DEFAULT '',
+    status INTEGER NOT NULL DEFAULT 0,
+    details TEXT NOT NULL DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS chat (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ts_utc TEXT NOT NULL,
@@ -184,7 +195,29 @@ class Database:
         name = f"contestlogger-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{reason}.db"
         self.backup_to(self.backup_dir / name)
         self.prune_backups()
+        self.add_audit("Backup erstellt", details=f"{name} ({reason})", nick="Server")
         return self.backup_dir / name
+
+    # ------------------------------------------------------------ Aktionsprotokoll
+    def add_audit(self, action: str, details: str = "", nick: str = "", admin: bool = False, method: str = "", path: str = "", status: int = 0) -> None:
+        """Eintrag ins Aktionsprotokoll (wer hat wann was gemacht) – zusätzlich auf der Konsole."""
+        ts = utcnow()
+        with self.conn:
+            self.conn.execute("INSERT INTO audit(ts_utc,nick,admin,action,method,path,status,details) VALUES(?,?,?,?,?,?,?,?)",
+                              (ts, nick or "", int(admin), action, method, path, status, details[:1000]))
+        who = f"{nick or '?'}{' [Admin]' if admin else ''}"
+        print(f"[{ts}] {who}: {action}{' – ' + details if details else ''}{' (' + str(status) + ')' if status >= 400 else ''}", flush=True)
+
+    def list_audit(self, limit: int = 200, q: str = "") -> list[dict]:
+        if q:
+            like = f"%{q}%"
+            return self.rows("SELECT * FROM audit WHERE action LIKE ? OR details LIKE ? OR nick LIKE ? OR path LIKE ? ORDER BY id DESC LIMIT ?",
+                             (like, like, like, like, limit))
+        return self.rows("SELECT * FROM audit ORDER BY id DESC LIMIT ?", (limit,))
+
+    def prune_audit(self, keep: int = 20000) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM audit WHERE id < (SELECT COALESCE(MAX(id),0) FROM audit) - ?", (keep,))
 
     def list_backups(self) -> list[dict]:
         if not self.backup_dir.exists():

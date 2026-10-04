@@ -317,3 +317,6 @@ body.popup .dm-pane { height: calc(100vh - 230px); grid-template-columns: 170px 
 .rr-top > button { margin-bottom: 1px; }
 .rr-bottom { margin-top: 10px; align-items: center; }
 .rr-bottom button { white-space: nowrap; }
+.nowrap { white-space: nowrap; }
+.audit-details { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+tr.audit-fail td { color: var(--warn); }

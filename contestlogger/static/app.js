@@ -303,10 +303,7 @@
       $("#station-state").textContent = S.contests.length ? "" : t("Lege unter „Verwaltung“ einen Contest und eine Station an.");
       $("#qso-form").querySelectorAll("input,button").forEach((i) => { i.disabled = true; });
     }
-    for (const f of ["adi", "csv"]) $(`#exp-${f}`).href = st ? `/api/stations/${st.id}/export.${f}` : "#";
     renderMacroBar();
-    $("#exp-zip").href = S.contestId ? `/api/contests/${S.contestId}/export.zip` : "#";
-    $("#export-station").textContent = st ? `– ${st.call} ${st.band}` : "";
   }
   $("#sel-contest").addEventListener("change", async (e) => {
     S.contestId = Number(e.target.value) || null;
@@ -391,13 +388,13 @@
       x.serial ? el("span", { class: "n" }, `#${pad3(x.serial)} ${x.call}`) : null, x.msg);
     res.errors.forEach((x) => list.append(item(x, "err")));
     res.warnings.forEach((x) => list.append(item(x, "warn")));
-    const dl = (force) => { window.location.href = `/api/stations/${st.id}/export.edi${force ? "?force=1" : ""}`; };
+    const dl = (force) => { window.location.href = `/api/stations/${st.id}/export.edi?nick=${encodeURIComponent(S.nick)}${force ? "&force=1" : ""}`; };
     const buttons = el("div", { class: "row" });
     if (res.ok) buttons.append(el("button", { class: "primary", onclick: () => { closeModal(); dl(false); } }, t("EDI herunterladen")));
     else if (S.adminToken) buttons.append(el("button", { class: "ghost danger", onclick: () => { if (confirm(t("Mit Fehlern exportieren? Der Auswerter wird diese QSOs wahrscheinlich streichen."))) { closeModal(); dlForce(); } } }, t("Trotzdem exportieren (Admin)")));
     buttons.append(el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")));
     const dlForce = async () => {
-      const r = await fetch(`/api/stations/${st.id}/export.edi?force=1`, { headers: { "X-Admin-Token": S.adminToken } });
+      const r = await fetch(`/api/stations/${st.id}/export.edi?force=1&nick=${encodeURIComponent(S.nick)}`, { headers: { "X-Admin-Token": S.adminToken } });
       const blob = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${st.call.replace("/", "-")}_${st.band}.edi`; a.click();
     };
     modal(el("div", {},
@@ -408,8 +405,6 @@
     if (res.ok && thenExport) { closeModal(); dl(false); }
   }
   $("#btn-check").addEventListener("click", () => runCheck(false));
-  $("#btn-export-jump").addEventListener("click", () => { showView("fulllog"); setTimeout(() => $(".export-card").scrollIntoView({ behavior: "smooth", block: "start" }), 50); });
-  $("#exp-edi").addEventListener("click", () => runCheck(true));
 
   function renderKpis(summary) {
     const box = $("#kpis");
@@ -1217,7 +1212,7 @@
         el("td", { class: "muted small" }, `${c.stations.length} ${t("Stationen")}${c.archived ? " · " + t("Archiv") : ""}`),
         el("td", { class: "actions" },
           el("button", { class: "ghost", onclick: () => { S.contestId = c.id; S.stationId = c.stations[0]?.id || null; save(); renderStationBar(); loadQsos(); renderScoreboard(); renderAdmin(); } }, t("wählen")), " ",
-          el("a", { class: "button ghost", href: `/api/contests/${c.id}/export.zip`, download: 1, title: t("Alle Stationen/Bänder dieses Contests als EDI-Dateien") }, "EDI-ZIP"), " ",
+          el("a", { class: "button ghost", href: `/api/contests/${c.id}/export.zip?nick=${encodeURIComponent(S.nick)}`, download: 1, title: t("Alle Stationen/Bänder dieses Contests als EDI-Dateien") }, "EDI-ZIP"), " ",
           el("button", { class: "ghost", onclick: () => contestDialog(c) }, "✎"), " ",
           el("button", { class: "ghost", onclick: async () => { await api("PATCH", `/api/contests/${c.id}`, { archived: c.archived ? 0 : 1 }); } }, c.archived ? t("aktivieren") : t("archivieren")), " ",
           el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("Contest „{name}“ mit allen Stationen und QSOs löschen?", c))) await api("DELETE", `/api/contests/${c.id}`); } }, "✕"))));
@@ -1230,7 +1225,7 @@
         el("td", { class: "name", title: s.call }, el("b", {}, s.call), el("div", { class: "muted small" }, `ID ${s.id}`)), el("td", {}, s.locator), el("td", {}, s.band), el("td", {}, s.mode),
         el("td", { class: "muted small" }, `${t("Nr.")} ${pad3(s.serial_next)} · ${s.has_password ? "🔒" : t("offen")}${s.kst_user ? ` · KST ${s.kst_user}` : ""}`),
         el("td", { class: "actions" },
-          el("button", { class: "ghost", onclick: () => { S.stationId = s.id; save(); renderStationBar(); loadQsos(); showView("fulllog"); setTimeout(() => runCheck(true), 300); } , title: t("EDI dieser Station") }, "EDI"), " ",
+          el("button", { class: "ghost", onclick: () => { S.stationId = s.id; save(); renderStationBar(); loadQsos().then(() => runCheck(true)); }, title: t("EDI dieser Station") }, "EDI"), " ",
           el("a", { class: "button ghost", href: `/api/stations/${s.id}/export.adi`, download: 1 }, "ADIF"), " ",
           el("button", { class: "ghost", onclick: () => stationDialog(s) }, "✎"), " ",
           el("button", { class: "ghost", onclick: async () => { const v = prompt("Nächste Seriennummer:", s.serial_next); if (v && /^\d+$/.test(v)) await api("POST", `/api/stations/${s.id}/serial`, { start: Number(v) }); } }, t("Nr.")), " ",
@@ -1241,10 +1236,10 @@
     const ex = $("#admin-export"); ex.innerHTML = "";
     for (const s of c?.stations || []) ex.append(el("div", { class: "row" },
       el("b", { style: "min-width:160px" }, `${s.call} · ${s.band}`),
-      el("button", { class: "primary small", onclick: () => { S.stationId = s.id; save(); renderStationBar(); loadQsos(); showView("fulllog"); setTimeout(() => runCheck(true), 300); } }, t("EDI (mit Prüfung)")),
+      el("button", { class: "primary small", onclick: () => { S.stationId = s.id; save(); renderStationBar(); loadQsos().then(() => runCheck(true)); } }, t("EDI (mit Prüfung)")),
       el("a", { class: "button ghost small", href: `/api/stations/${s.id}/export.adi`, download: 1 }, "ADIF"),
       el("a", { class: "button ghost small", href: `/api/stations/${s.id}/export.csv`, download: 1 }, "CSV")));
-    if (c) ex.append(el("div", { class: "row" }, el("a", { class: "button primary", href: `/api/contests/${c.id}/export.zip`, download: 1 }, t("Alle Bänder als EDI-ZIP")), el("span", { class: "muted small" }, t("nur Logs, die die Prüfung bestehen; Details in NICHT_EXPORTIERT.txt im ZIP"))));
+    if (c) ex.append(el("div", { class: "row" }, el("a", { class: "button primary", href: `/api/contests/${c.id}/export.zip?nick=${encodeURIComponent(S.nick)}`, download: 1 }, t("Alle Bänder als EDI-ZIP")), el("span", { class: "muted small" }, t("nur Logs, die die Prüfung bestehen; Details in NICHT_EXPORTIERT.txt im ZIP"))));
     if (!c?.stations?.length) ex.append(el("div", { class: "muted small" }, t("Keine Stationen im gewählten Contest.")));
     const is = $("#imp-station"); is.innerHTML = "";
     S.contests.forEach((cc) => cc.stations.forEach((s) => is.append(el("option", { value: s.id }, `${cc.name} · ${s.call} ${s.band}`))));
@@ -1253,7 +1248,7 @@
       const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider; $("#lookup-user").value = cfg.lookup_user || ""; $("#lookup-pass").placeholder = cfg.lookup_pass_set ? t("Passwort (gespeichert)") : t("Passwort");
       S.kstRooms = cfg.kst_rooms || {};
     } catch (_) { /* */ }
-    renderBackups(); renderCallbook();
+    renderBackups(); renderCallbook(); renderAudit();
   }
   $("#admin-login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1261,6 +1256,23 @@
   });
   $("#btn-backup").addEventListener("click", async () => {
     try { const r = await api("POST", "/api/backups"); toast(t("Gesichert: {name}", r), "ok"); renderBackups(); } catch (err) { toast(err.message, "err"); }
+  });
+  async function renderAudit() {
+    const tb = $("#audit-table tbody"); tb.innerHTML = "";
+    try {
+      const rows = await GET(`/api/audit?limit=300&q=${encodeURIComponent($("#audit-search").value.trim())}`);
+      for (const r of rows) tb.append(el("tr", { class: r.status >= 400 ? "audit-fail" : "" },
+        el("td", { class: "muted small nowrap" }, `${fmtDate(r.ts_utc)} ${fmtTime(r.ts_utc)}`),
+        el("td", { class: "nowrap" }, el("b", {}, r.nick || "?"), r.admin ? el("span", { class: "tag me", style: "margin-left:4px" }, "Admin") : null),
+        el("td", {}, r.action, r.status >= 400 ? el("span", { class: "muted small" }, ` (${t("fehlgeschlagen")} ${r.status})`) : null),
+        el("td", { class: "muted small audit-details", title: r.details }, r.details)));
+      if (!rows.length) tb.append(el("tr", {}, el("td", { class: "muted" }, t("Keine Einträge."))));
+    } catch (_) { /* */ }
+  }
+  let auditTimer; $("#audit-search").addEventListener("input", () => { clearTimeout(auditTimer); auditTimer = setTimeout(renderAudit, 200); });
+  $("#btn-audit-refresh").addEventListener("click", renderAudit);
+  $("#btn-audit-dl").addEventListener("click", async () => {
+    try { const r = await fetch("/api/audit.txt", { headers: { "X-Admin-Token": S.adminToken } }); const blob = await r.blob(); const a = el("a", { href: URL.createObjectURL(blob), download: "contestlogger-protokoll.txt" }); document.body.append(a); a.click(); a.remove(); } catch (err) { toast(err.message, "err"); }
   });
   async function renderBackups() {
     const tb = $("#backup-list tbody"); tb.innerHTML = "";
