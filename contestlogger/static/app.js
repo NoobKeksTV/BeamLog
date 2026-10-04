@@ -1191,13 +1191,28 @@
       kpi(s.qsos - s.dupes, t("gültige QSOs")), kpi((s.points || 0).toLocaleString("de"), t("Punkte")), kpi(s.squares, t("Großfelder")),
       kpi(s.countries, t("Länder")), kpi(s.avg_km, t("Ø km / QSO")), kpi(s.dupes, t("Dupes")),
       kpi(s.odx ? `${s.odx.call} · ${s.odx.km} km` : "–", `ODX (${s.odx?.locator || ""})`, "wide")));
-    const mapCard = card(t("Karte aller QSOs"), el("div", { id: "map-stats", class: "map tall" })); mapCard.style.gridColumn = "1 / -1"; root.append(mapCard);
-    setTimeout(() => { const m = makeMap("map-stats"); if (!m) return; m.map.invalidateSize(); drawQsoDots(m, S.qsos); m.layer.clearLayers(); const a = locToLatLon(own?.locator); if (a) L.circleMarker(a, { radius: 7, color: "#3fb3ff", fillOpacity: 1 }).addTo(m.layer); const pts = S.qsos.map((q) => locToLatLon(q.locator)).filter(Boolean); if (pts.length) m.map.fitBounds(L.latLngBounds(pts.concat(a ? [a] : [])), { padding: [20, 20] }); }, 50);
-    root.append(card(t("QSOs und Punkte pro Stunde"), barChart(st.per_hour.map((h) => ({ label: h.hour.slice(11) + "h", a: h.qsos, b: h.points })), t("QSOs"), t("Punkte"))));
-    root.append(card(t("Entfernungsverteilung (km)"), barChart(st.distance.map((d) => ({ label: d.range, a: d.qsos, b: d.points })), t("QSOs"), t("Punkte"))));
+    const mapCard = card(t("Karte aller QSOs und Großfelder"), el("div", { id: "map-stats", class: "map tall" })); mapCard.style.gridColumn = "1 / -1"; root.append(mapCard);
+    if (Maps["map-stats"]) { try { Maps["map-stats"].map.remove(); } catch (_) { /* */ } delete Maps["map-stats"]; }  // altes Element ist weg – Karte neu anlegen
+    setTimeout(() => {
+      const m = makeMap("map-stats"); if (!m) return;
+      m.map.invalidateSize(); m.layer.clearLayers();
+      // gearbeitete Großfelder (JO31 …) als Rechtecke mit QSO-Zahl
+      for (const sq of st.squares) {
+        const c = locToLatLon(sq.square); if (!c) continue;
+        L.rectangle([[c[0] - 0.5, c[1] - 1], [c[0] + 0.5, c[1] + 1]], { color: "#ffb347", weight: 1, fillColor: "#ffb347", fillOpacity: 0.12 + Math.min(0.4, sq.qsos / 40) })
+          .bindTooltip(`${sq.square}: ${sq.qsos} QSOs, ${sq.points} ${t("Punkte")}`).addTo(m.layer);
+        L.marker(c, { icon: L.divIcon({ className: "map-sq-label", html: `${sq.square} · ${sq.qsos}`, iconAnchor: [28, 7] }), interactive: false }).addTo(m.layer);
+      }
+      drawQsoDots(m, S.qsos);
+      const a = locToLatLon(own?.locator); if (a) L.circleMarker(a, { radius: 7, color: "#3fb3ff", fillColor: "#3fb3ff", fillOpacity: 1 }).bindTooltip(`${t("Eigene Station")} ${own.locator}`).addTo(m.layer);
+      const pts = S.qsos.filter((q) => !q.dupe).map((q) => locToLatLon(q.locator)).filter(Boolean);
+      if (pts.length) m.map.fitBounds(L.latLngBounds(pts.concat(a ? [a] : [])), { padding: [20, 20] }); else if (a) m.map.setView(a, 6);
+    }, 50);
+    const c1 = card(t("QSOs und Punkte pro Stunde"), barChart(st.per_hour.map((h) => ({ label: h.hour.slice(11) + "h", a: h.qsos, b: h.points })), t("QSOs"), t("Punkte"))); c1.classList.add("wide2"); root.append(c1);
+    const c2 = card(t("Entfernungsverteilung (km)"), barChart(st.distance.map((d) => ({ label: d.range, a: d.qsos, b: d.points })), t("QSOs"), t("Punkte"))); c2.classList.add("wide2"); root.append(c2);
     root.append(card(t("Richtungsverteilung von {loc}", { loc: own?.locator || "" }), rose(st.bearings)));
     root.append(card(t("Top 10 Entfernungen"), table([t("Call"), t("Locator"), "km", t("Pkt"), "UTC"], st.top.map((q) => [q.call, q.locator, q.km, q.points, fmtTime(q.ts_utc)]))));
-    root.append(card(`${t("Großfelder")} (${st.squares.length})`, table([t("Feld"), t("QSOs"), t("Punkte")], st.squares.map((q) => [q.square, q.qsos, q.points]))));
+    const csq = card(`${t("Großfelder")} (${st.squares.length})`, table([t("Feld"), t("QSOs"), t("Punkte")], st.squares.map((q) => [q.square, q.qsos, q.points]))); csq.querySelector(".table-wrap")?.classList.add("tall"); root.append(csq);
     root.append(card(t("Länder"), table([t("Land"), t("QSOs"), t("Punkte"), t("ODX km")], st.countries.map((c) => [c.country, c.qsos, c.points, c.odx]))));
     root.append(card(t("Operatoren"), table([t("Nick"), t("QSOs"), t("Punkte")], st.operators.map((o) => [o.nick || "–", o.qsos, o.points]))));
   }
@@ -1214,7 +1229,7 @@
     const W = 600, H = 220, P = 30, bw = (W - 2 * P) / data.length;
     const maxA = Math.max(1, ...data.map((d) => d.a)), maxB = Math.max(1, ...data.map((d) => d.b));
     const ns = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${H + 20}`);
+    const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${H + 20}`); svg.classList.add("chart");
     const add = (tag, attrs, text) => { const n = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); if (text != null) n.textContent = text; svg.append(n); return n; };
     add("line", { x1: P, y1: H, x2: W - P, y2: H, class: "axis" });
     data.forEach((d, i) => {
@@ -1223,14 +1238,17 @@
       add("rect", { x: x + 2, y: H - ha, width: bw / 2 - 3, height: ha, class: "bar", rx: 2 }).append(Object.assign(document.createElementNS(ns, "title"), { textContent: `${d.label}: ${d.a} ${la}` }));
       add("rect", { x: x + bw / 2 + 1, y: H - hb, width: bw / 2 - 3, height: hb, class: "bar pts", rx: 2 }).append(Object.assign(document.createElementNS(ns, "title"), { textContent: `${d.label}: ${d.b} ${lb}` }));
       if (d.a) add("text", { x: x + bw / 4, y: H - ha - 3, class: "lbl", "text-anchor": "middle" }, d.a);
-      if (data.length <= 30 || i % 2 === 0) add("text", { x: x + bw / 2, y: H + 13, class: "lbl", "text-anchor": "middle" }, d.label);
+      // lange Beschriftungen (z. B. 300-400) versetzt in zwei Reihen, damit nichts überlappt
+      const long = data.some((q) => String(q.label).length > 4);
+      if (data.length <= 30 || i % 2 === 0) add("text", { x: x + bw / 2, y: H + (long && i % 2 ? 28 : 13), class: "lbl", "text-anchor": "middle" }, d.label);
     });
+    if (data.some((q) => String(q.label).length > 4)) svg.setAttribute("viewBox", `0 0 ${W} ${H + 36}`);
     add("text", { x: P, y: 12, class: "lbl" }, `■ ${la} (${t("blau")})   ■ ${lb} (${t("grün")})`);
     return svg;
   }
   function rose(sectors) {
     const ns = "http://www.w3.org/2000/svg", R = 100, C = 120;
-    const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", "0 0 240 240"); svg.classList.add("rose");
+    const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", "0 0 240 240"); svg.classList.add("rose", "chart");
     const add = (tag, attrs, text) => { const n = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); if (text != null) n.textContent = text; svg.append(n); return n; };
     [0.33, 0.66, 1].forEach((f) => add("circle", { cx: C, cy: C, r: R * f }));
     const max = Math.max(1, ...sectors.map((s) => s.points));
@@ -1254,15 +1272,15 @@
       kpi(st.total_qsos, t("QSOs gesamt")), kpi(st.total_points.toLocaleString("de"), t("Punkte gesamt")), kpi(st.rate_last_hour, t("QSOs letzte Stunde")), kpi(st.unique_calls, t("verschiedene Calls")),
       kpi(st.unique_squares, t("Großfelder (alle Bänder)")), kpi(st.unique_countries, t("Länder")), kpi(st.bands.length, t("Bänder aktiv")),
       kpi(c.end_utc ? $("#countdown").textContent || "–" : "–", t("Restzeit"))));
-    root.append(card(t("Stationen / Bänder"), table([t("Station"), t("Band"), t("QSOs"), t("Punkte"), t("Felder"), "ODX", t("ODX-Call"), "/h"],
-      st.stations.map((s) => { const o = st.odx.find((x) => x.band === s.band); return [s.call, s.band, s.qsos - s.dupes, s.points || 0, s.squares, s.odx_km || 0, o ? `${o.call} ${o.locator}` : "–", s.rate_last_hour]; }))));
+    const cs = card(t("Stationen / Bänder"), table([t("Station"), t("Band"), t("QSOs"), t("Punkte"), t("Felder"), "ODX km", t("ODX-Call"), "/h"],
+      st.stations.map((s) => { const o = st.odx.find((x) => x.band === s.band); return [s.call, s.band, s.qsos - s.dupes, s.points || 0, s.squares, s.odx_km || 0, o ? `${o.call} ${o.locator}` : "–", s.rate_last_hour]; }))); cs.classList.add("wide2"); root.append(cs);
     // Stundenverlauf je Band (gestapelt)
     const hours = [...new Set(st.per_hour.map((h) => h.hour))].sort();
     const bands = [...new Set(st.per_hour.map((h) => h.band))];
-    root.append(card(t("QSOs pro Stunde je Band"), stackedChart(hours, bands, st.per_hour)));
+    const ch = card(t("QSOs pro Stunde je Band"), stackedChart(hours, bands, st.per_hour)); ch.classList.add("wide2"); root.append(ch);
     const feed = el("div", { class: "feed table-wrap" }, table(["UTC", t("Station"), t("Band"), t("Call"), t("Locator"), "km", t("Pkt"), "Op"],
       st.recent.map((q) => [fmtTime(q.ts_utc), q.own_call, q.band, q.call + (q.dupe ? t(" (D)") : ""), q.locator, q.km, q.points, q.logged_by])));
-    root.append(card(t("Letzte QSOs (alle Stationen)"), feed));
+    const cf = card(t("Letzte QSOs (alle Stationen)"), feed); cf.classList.add("wide2"); root.append(cf);
     root.append(card(t("Länder (alle Bänder)"), table([t("Land"), t("QSOs"), t("Punkte"), t("ODX km")], st.countries.map((x) => [x.country, x.qsos, x.points, x.odx]))));
     root.append(card(t("Operatoren (alle Bänder)"), table([t("Nick"), t("QSOs"), t("Punkte")], st.operators.map((o) => [o.nick || "–", o.qsos, o.points]))));
   }
@@ -1272,7 +1290,7 @@
     const colors = ["#3fb3ff", "#3ddc84", "#ffb347", "#ff5c6c", "#b48cff", "#6ee7e7"];
     const totals = hours.map((h) => rows.filter((r) => r.hour === h).reduce((a, r) => a + r.qsos, 0));
     const max = Math.max(1, ...totals);
-    const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${H + 20}`);
+    const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${H + 20}`); svg.classList.add("chart");
     const add = (tag, attrs, text) => { const n = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); if (text != null) n.textContent = text; svg.append(n); return n; };
     add("line", { x1: P, y1: H, x2: W - P, y2: H, class: "axis" });
     hours.forEach((h, i) => {

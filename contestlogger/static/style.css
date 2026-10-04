@@ -84,7 +84,7 @@ code { background: var(--bg2); padding: 1px 5px; border-radius: 4px; font-family
 .log-grid > *, .qso-form .fields > *, .admin-grid > *, .stats-grid > * { min-width: 0; }
 .qso-form .fields input { width: 100%; }
 .admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; }
 @media (max-width: 1100px) {
   .log-grid { grid-template-columns: 1fr; }
   .admin-grid { grid-template-columns: 1fr; }
@@ -170,14 +170,18 @@ table.compact td, table.compact th { padding: 5px 6px; font-size: 13.5px; }
 #chat-form input { flex: 1; }
 
 /* ---------- Statistik ---------- */
-.stat-card svg { width: 100%; height: auto; display: block; }
+.stat-card svg.chart { width: 100%; height: auto; display: block; }   /* nur Diagramme – nicht die Leaflet-Ebenen */
+.stat-card.wide2 { grid-column: span 2; }
+@media (max-width: 900px) { .stat-card.wide2 { grid-column: auto; } }
+.map-sq-label { background: rgba(0,0,0,.55); color: #fff; font: 600 11px/1 var(--mono); padding: 2px 4px; border-radius: 4px; white-space: nowrap; }
 .bar { fill: var(--accent); }
 .bar.pts { fill: var(--ok); }
 .axis { stroke: var(--line); }
-.lbl { fill: var(--muted); font-size: 10px; font-family: var(--sans); }
+.lbl { fill: var(--muted); font-size: 13px; font-family: var(--sans); }
 .rose path { fill: rgba(63,179,255,.5); stroke: var(--accent); }
 .rose circle { fill: none; stroke: var(--line); }
-.rose text { fill: var(--muted); font-size: 10px; }
+.rose text { fill: var(--muted); font-size: 12px; }
+svg.rose { max-width: 360px; margin: 0 auto; }
 
 /* ---------- Modal / Toast ---------- */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 5000; padding: 16px; }

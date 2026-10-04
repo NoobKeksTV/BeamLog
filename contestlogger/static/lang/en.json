@@ -431,5 +431,6 @@
  "Ende der Liste – wieder von vorn": "End of list – starting over",
  "KST-Nutzer mit Locator im Umkreis von {loc}, die in diesem Log noch fehlen und von dieser Station noch keine Nachricht bekommen haben. Jeder Empfänger bekommt eine eigene /CQ-Nachricht, gesendet mit 2 s Abstand.": "KST users with locator around {loc} that are still missing in this log and have not received a message from this station yet. Each recipient gets its own /CQ message, sent 2 s apart.",
  "Rohdaten": "Raw data",
- "Rohdaten der Verbindung (zur Fehlersuche)": "Raw data of the connection (for troubleshooting)"
+ "Rohdaten der Verbindung (zur Fehlersuche)": "Raw data of the connection (for troubleshooting)",
+ "Karte aller QSOs und Großfelder": "Map of all QSOs and squares"
 }
