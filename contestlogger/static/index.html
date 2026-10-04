@@ -111,7 +111,7 @@
         <div class="card chat" id="chat-card">
           <div class="chat-head">
             <div class="chat-tabs">
-              <button data-ctab="local" class="active">Chat</button>
+              <button data-ctab="local" class="active">Chat <span id="chat-badge" class="cnt hidden"></span></button>
               <button data-ctab="kst">KST <span id="kst-badge" class="cnt hidden"></span></button>
               <button data-ctab="dm">DM <span id="kst-dm-badge" class="cnt hidden"></span></button>
             </div>
@@ -184,12 +184,17 @@
     </div>
     <div id="admin-root" class="hidden admin-grid">
       <div class="card">
+        <div class="card-head"><h3>Stationen (global)</h3><button id="btn-new-template" class="primary small">+ Station</button></div>
+        <p class="muted small">Die Stationen eures Teams mit allen Stammdaten (Rufzeichen, Locator, Band, Passwort, KST-Zugang, EDI-Angaben). Beim Anlegen eines Contests wählst du, welche davon teilnehmen – jede bekommt dort ihr eigenes Log mit eigener Nummer und eigenem KST-Chat.</p>
+        <div class="table-wrap"><table id="admin-templates" class="compact fixed"><tbody></tbody></table></div>
+      </div>
+      <div class="card">
         <div class="card-head"><h3>Contests</h3><button id="btn-new-contest" class="primary small">+ Contest</button></div>
         <div class="table-wrap"><table id="admin-contests" class="compact fixed"><tbody></tbody></table></div>
       </div>
       <div class="card">
-        <div class="card-head"><h3>Stationen <span id="admin-contest-name" class="muted"></span></h3><button id="btn-new-station" class="primary small">+ Station</button></div>
-        <p class="muted small">Jede Station hat eigenes Rufzeichen, Locator, Band und Passwort. Operatoren schalten die Station mit dem Passwort frei und loggen darunter. Die Stations-ID (für die CAT-Bridge <code>tools/cat_bridge.py</code>) steht in der Tabelle.</p>
+        <div class="card-head"><h3>Stationen im Contest <span id="admin-contest-name" class="muted"></span></h3><div class="row"><select id="tpl-add-sel" class="small"></select><button id="btn-add-template" class="primary small" title="Globale Station in diesen Contest aufnehmen">+ aufnehmen</button><button id="btn-new-station" class="ghost small" title="Station nur für diesen Contest anlegen">+ einmalig</button></div></div>
+        <p class="muted small">Die Stationen dieses Contests mit eigenem Log und eigener laufender Nummer. Operatoren schalten die Station mit dem Passwort frei. Die Stations-ID (für CAT-Bridge und Operator-Fenster) steht in der Tabelle.</p>
         <div class="table-wrap"><table id="admin-stations" class="compact fixed"><tbody></tbody></table></div>
         <h3>Export / Abgabe <span id="admin-export-name" class="muted"></span></h3>
         <p class="muted small">EDI (REG1TEST) je Station/Band für die Abgabe – vor dem Export läuft die Log-Prüfung. Das ZIP enthält die EDI-Dateien aller geprüften Stationen des Contests.</p>
@@ -248,7 +253,18 @@
         <form id="cb-form" class="row">
           <input id="cb-call" placeholder="Rufzeichen" required><input id="cb-loc" placeholder="Locator" required><input id="cb-name" placeholder="Name"><button class="ghost">Speichern</button>
         </form>
-        <p><a href="/api/callbook/export.csv" class="button ghost" download>Call-Buch als CSV exportieren</a></p>
+        <div class="row">
+          <a href="/api/callbook/export.csv" class="button primary" download>Stationsdatenbank exportieren (CSV)</a>
+          <a href="/api/callbook/export_seed.csv" class="button ghost" download title="Call;Locator;Zuletzt – zum Einchecken als contestlogger/seed/stationsdatenbank.csv im Repo">Export im Repo-Format</a>
+          <button type="button" id="btn-cb-sync" class="ghost" title="Stationsdatenbank aus dem GitHub-Repo laden und neue Einträge übernehmen">Nach neuen suchen (Repo)</button>
+          <span id="cb-sync-result" class="muted small"></span>
+        </div>
+        <form id="repo-form" class="row">
+          <input id="repo-url" placeholder="Repo-Datei (GitHub-API-URL oder Raw-URL)" style="flex:1;min-width:260px">
+          <input id="repo-token" type="password" placeholder="GitHub-Token (nur bei privatem Repo)" autocomplete="new-password" style="width:220px">
+          <button class="ghost small">Speichern</button>
+        </form>
+        <p class="muted small">Ablauf: Hier „Export im Repo-Format“ herunterladen und als <code>contestlogger/seed/stationsdatenbank.csv</code> ins Repo einchecken; andere Installationen holen sie mit „Nach neuen suchen“. Für ein privates Repo braucht der Server ein GitHub-Token mit Lesezugriff (Settings → Developer settings → Fine-grained token, Contents: Read).</p>
         <h3>Backups auf dem Server</h3>
         <p class="muted small" id="backup-info">Der Server sichert die Datenbank automatisch (nur wenn sich etwas geändert hat) in den Ordner <code>backup/</code> neben der Datenbank; beim Beenden zusätzlich. Die Datenbank selbst läuft im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt sie nicht.</p>
         <p><button id="btn-backup" class="ghost">Jetzt sichern</button></p>

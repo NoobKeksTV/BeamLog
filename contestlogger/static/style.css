@@ -339,3 +339,5 @@ tr.audit-fail td { color: var(--warn); }
 .help-table td.keys { white-space: nowrap; width: 150px; }
 kbd { display: inline-block; padding: 1px 6px; margin-right: 3px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--bg2); font-family: var(--mono); font-size: 12px; }
 #modal-box.wide { width: min(820px, 100%); }
+.tpl-list { display:flex; flex-wrap:wrap; gap:4px 14px; }
+.tpl-list label.check { flex-direction:row; align-items:center; gap:6px; color:var(--text); font-size:13.5px; }

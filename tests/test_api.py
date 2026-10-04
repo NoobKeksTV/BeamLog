@@ -199,3 +199,55 @@ def test_audit_log(tmp_path):
         assert fail["status"] == 403 and fail["admin"] == 0
         assert c.get("/api/audit", headers=H, params={"q": "DL8NAS"}).json()[0]["action"].startswith("QSO geloggt")
         assert "QSO geloggt" in c.get("/api/audit.txt", headers=H).text
+
+
+def test_templates_and_callbook_repo(tmp_path):
+    from contestlogger.app import create_app
+    from fastapi.testclient import TestClient
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        admin = c.post("/api/setup", json={"password": "admin1"}).json()["token"]
+        H = {"X-Admin-Token": admin}
+        # globale Stationen anlegen, Contest mit Auswahl erzeugen
+        t1 = c.post("/api/templates", json={"call": "DN2LH/P", "locator": "JO31AA", "band": "432MHz", "password": "70cm", "kst_user": "DN2LH", "kst_pass": "x", "info": {"club": "G13"}}, headers=H).json()
+        t2 = c.post("/api/templates", json={"call": "DN2LH", "locator": "JO31AA", "band": "144MHz"}, headers=H).json()
+        assert t1["has_password"] and t1["kst_user"] == "DN2LH" and "kst_pass" not in t1 and "password_hash" not in t1
+        assert c.post("/api/templates", json={"call": "X", "locator": "ZZ99", "band": "144MHz"}, headers=H).status_code == 400
+        assert len(c.get("/api/templates", headers=H).json()) == 2
+        contest = c.post("/api/contests", json={"name": "Mai", "template_ids": [t1["id"], t2["id"]]}, headers=H).json()
+        cl = c.get("/api/contests").json()[0]
+        assert {(s["call"], s["band"]) for s in cl["stations"]} == {("DN2LH/P", "432MHz"), ("DN2LH", "144MHz")}
+        s432 = next(s for s in cl["stations"] if s["band"] == "432MHz")
+        assert s432["has_password"] and s432["kst_user"] == "DN2LH" and s432["info"]["club"] == "G13"
+        assert c.post(f"/api/stations/{s432['id']}/unlock", json={"password": "70cm"}).status_code == 200  # Passwort übernommen
+        # Station nachträglich aufnehmen, Vorlage ändern/löschen ohne Auswirkung auf Contest-Station
+        c.patch(f"/api/templates/{t2['id']}", json={"locator": "JO31AB"}, headers=H)
+        s2 = c.post(f"/api/contests/{contest['id']}/stations/from_template", json={"template_id": t2["id"]}, headers=H).json()
+        assert s2["locator"] == "JO31AB"
+        c.delete(f"/api/templates/{t2['id']}", headers=H)
+        assert len(c.get("/api/contests").json()[0]["stations"]) == 3
+        # Stationsdatenbank: Repo-Format exportieren und aus einer (lokalen) Repo-Datei abgleichen
+        seed = c.get("/api/callbook/export_seed.csv").text
+        assert seed.startswith("Call;Locator;Zuletzt\n") and "DA2C;JO30XF" in seed
+        repo = tmp_path / "repo.csv"
+        repo.write_text("Call;Locator;Zuletzt\nDA2C;JO30XF;2025-05-04\nOK9NEW;JN79XX;2026-01-01\n", encoding="utf-8")
+        r = c.post("/api/callbook/sync_repo", json={"url": repo.as_uri()}, headers=H).json()
+        assert r["total"] == 2 and r["new"] == 1 and r["known"] == 1
+        assert c.get("/api/callbook", params={"q": "OK9NEW"}).json()["rows"][0]["locator"] == "JN79XX"
+        assert c.post("/api/callbook/sync_repo", json={"url": "http://127.0.0.1:1/nix"}, headers=H).status_code == 502
+
+
+def test_migration_creates_templates_from_stations(tmp_path):
+    """Bestehende Datenbank: vorhandene Contest-Stationen werden beim Start als globale Stationen übernommen."""
+    from contestlogger.db import Database
+    db = Database(tmp_path / "t.db")
+    cid = db.create_contest("Alt", None, None)
+    db.create_station(cid, "DN2LH/P", "JO31AA", "432MHz", "SSB", "pw")
+    db.create_station(cid, "DN2LH/P", "JO31AA", "144MHz", "SSB", "")
+    with db.conn:
+        db.conn.execute("DELETE FROM settings WHERE key='templates_migrated'")  # wie eine Datenbank aus einer Version ohne globale Stationen
+    db.close()
+    db2 = Database(tmp_path / "t.db")
+    tpl = db2.list_templates()
+    assert {(x["call"], x["band"]) for x in tpl} == {("DN2LH/P", "432MHz"), ("DN2LH/P", "144MHz")}
+    db2.close()

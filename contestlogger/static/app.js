@@ -398,6 +398,7 @@
       x.serial ? el("span", { class: "n" }, `#${pad3(x.serial)} ${x.call}`) : null, x.msg);
     res.errors.forEach((x) => list.append(item(x, "err")));
     res.warnings.forEach((x) => list.append(item(x, "warn")));
+    if (res.lookup) list.append(el("div", { class: "muted small" }, res.lookup.provider === "none" ? t("Online-Abgleich (HamQTH/QRZ) aus – in der Verwaltung einrichten, dann werden Rufzeichen und Locator automatisch gegengeprüft.") : t("Online-Abgleich: {n} Rufzeichen jetzt bei {p} nachgeschlagen, bereits geprüfte werden nicht erneut abgefragt.", { n: res.lookup.checked_now, p: res.lookup.provider === "hamqth" ? "HamQTH" : "QRZ" })));
     const dl = (force) => { window.location.href = `/api/stations/${st.id}/export.edi?nick=${encodeURIComponent(S.nick)}${force ? "&force=1" : ""}`; };
     const buttons = el("div", { class: "row" });
     if (res.ok) buttons.append(el("button", { class: "primary", onclick: () => { closeModal(); dl(false); } }, t("EDI herunterladen")));
@@ -859,7 +860,7 @@
     ws.onclose = () => { $("#conn").classList.remove("on"); setTimeout(connectWs, 2000); };
     ws.onmessage = async (ev) => {
       const m = JSON.parse(ev.data);
-      if (m.type === "chat") { if ((m.msg.contest_id || 0) === (S.contestId || 0)) { appendChat(m.msg); if (m.msg.nick !== S.nick) Sound.play("chat"); } }
+      if (m.type === "chat") { if ((m.msg.contest_id || 0) === (S.contestId || 0)) { appendChat(m.msg); if (m.msg.nick !== S.nick) { Sound.play("chat"); if (S.kst.tab !== "local" || POPUP === false && document.hidden) { S.chatUnread = (S.chatUnread || 0) + 1; renderKstBadges(); } } } }
       else if (m.type?.startsWith("kst") && m.station_id !== S.stationId) { /* KST-Ereignis einer anderen Station */ }
       else if (m.type === "kst") {
         S.kst.msgs.push(m.msg); S.kst.msgs.splice(0, S.kst.msgs.length - 800);
@@ -945,6 +946,7 @@
     $("#ctab-local").classList.toggle("active", tab === "local");
     $("#ctab-kst").classList.toggle("active", tab !== "local");
     if (tab !== "local") { S.kst.unread = 0; if (tab === "dm") S.kst.unreadDm = 0; renderKst(); $("#kst-input").focus(); }
+    else S.chatUnread = 0;
     // beim Reiterwechsel immer ans Ende (der Bereich war beim Aufbau noch unsichtbar, Scrollposition daher 0)
     Scroll.toBottom($(tab === "local" ? "#chat-log" : tab === "dm" ? "#kst-dm-msgs" : "#kst-log"));
     renderKstBadges();
@@ -952,6 +954,7 @@
   function renderKstBadges() {
     const b = $("#kst-badge");
     b.textContent = S.kst.unread; b.classList.toggle("hidden", !S.kst.unread);
+    const bc = $("#chat-badge"); bc.textContent = S.chatUnread || 0; bc.classList.toggle("hidden", !S.chatUnread);
     const nDm = dmConversations().reduce((a, c) => a + c.unread, 0);
     const bd = $("#kst-dm-badge"); bd.textContent = nDm; bd.classList.toggle("hidden", !nDm);
   }
@@ -1359,8 +1362,19 @@
           el("button", { class: "ghost", onclick: async () => { await api("PATCH", `/api/contests/${c.id}`, { archived: c.archived ? 0 : 1 }); } }, c.archived ? t("aktivieren") : t("archivieren")), " ",
           el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("Contest „{name}“ mit allen Stationen und QSOs löschen?", c))) await api("DELETE", `/api/contests/${c.id}`); } }, "✕"))));
     }
+    // globale Stationen
+    try { S.templates = await GET("/api/templates"); } catch (_) { S.templates = []; }
+    const tt = $("#admin-templates tbody"); tt.innerHTML = "";
+    for (const s of S.templates) tt.append(el("tr", {},
+      el("td", { class: "name", title: s.call }, el("b", {}, s.call)), el("td", {}, s.band), el("td", {}, s.locator), el("td", {}, s.mode),
+      el("td", { class: "muted small" }, `${s.has_password ? "🔒" : t("offen")}${s.kst_user ? ` · KST ${s.kst_user}` : ""}`),
+      el("td", { class: "actions" }, el("button", { class: "ghost", onclick: () => stationDialog(s, true) }, "✎"), " ",
+        el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("Globale Station {call} {band} löschen? (Logs in Contests bleiben erhalten)", s))) { await api("DELETE", `/api/templates/${s.id}`); renderAdmin(); } } }, "✕"))));
+    if (!S.templates.length) tt.append(el("tr", {}, el("td", { class: "muted" }, t("Noch keine globale Station – mit „+ Station“ anlegen."))));
     const c = contest();
     $("#admin-contest-name").textContent = c ? `– ${c.name}` : "";
+    const ts = $("#tpl-add-sel"); ts.innerHTML = "";
+    for (const s of S.templates) ts.append(el("option", { value: s.id }, `${s.call} · ${s.band}`));
     const sb = $("#admin-stations tbody"); sb.innerHTML = "";
     for (const s of c?.stations || []) {
       sb.append(el("tr", {},
@@ -1389,6 +1403,7 @@
     try {
       const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider; $("#lookup-user").value = cfg.lookup_user || ""; $("#lookup-pass").placeholder = cfg.lookup_pass_set ? t("Passwort (gespeichert)") : t("Passwort");
       S.kstRooms = cfg.kst_rooms || {};
+      $("#repo-url").value = cfg.repo_url || ""; $("#repo-token").placeholder = cfg.repo_token_set ? t("Token (gespeichert)") : t("GitHub-Token (nur bei privatem Repo)");
     } catch (_) { /* */ }
     renderBackups(); renderCallbook(); renderAudit();
   }
@@ -1431,6 +1446,21 @@
     try { await api("POST", "/api/admin/password", { password: $("#admin-pw-new").value }); S.adminToken = (await api("POST", "/api/admin/login", { password: $("#admin-pw-new").value })).token; save(); $("#admin-pw-new").value = ""; toast(t("Admin-Passwort geändert"), "ok"); } catch (err) { toast(err.message, "err"); }
   });
   $("#btn-new-contest").addEventListener("click", () => contestDialog(null));
+  $("#btn-new-template").addEventListener("click", () => stationDialog(null, true));
+  $("#btn-add-template").addEventListener("click", async () => {
+    const tid = Number($("#tpl-add-sel").value); if (!tid || !S.contestId) return toast(t("Erst globale Station und Contest wählen"), "err");
+    try { await api("POST", `/api/contests/${S.contestId}/stations/from_template`, { template_id: tid }); toast(t("Station aufgenommen"), "ok"); } catch (err) { toast(err.message, "err"); }
+  });
+  $("#repo-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = { repo_url: $("#repo-url").value.trim() }; if ($("#repo-token").value) body.repo_token = $("#repo-token").value;
+    try { await api("POST", "/api/settings", body); $("#repo-token").value = ""; toast(t("Einstellungen gespeichert"), "ok"); renderAdmin(); } catch (err) { toast(err.message, "err"); }
+  });
+  $("#btn-cb-sync").addEventListener("click", async () => {
+    const out = $("#cb-sync-result"); out.textContent = t("Lade aus dem Repo …");
+    try { const r = await api("POST", "/api/callbook/sync_repo", {}); out.textContent = `${r.total} ${t("Einträge im Repo")}: ${r.new} ${t("neu")}, ${r.changed} ${t("Locator aktualisiert")} · ${t("Stationsdatenbank")}: ${r.callbook_count}`; toast(`${r.new} ${t("neue Rufzeichen übernommen")}`, "ok"); renderCallbook(); $("#cb-count").textContent = r.callbook_count; }
+    catch (err) { out.textContent = err.message; toast(err.message, "err"); }
+  });
   $("#btn-new-station").addEventListener("click", () => { if (!contest()) return toast(t("Erst einen Contest anlegen/wählen"), "err"); stationDialog(null); });
 
   const toLocal = (ts) => (ts ? ts.slice(0, 16) : "");
@@ -1443,10 +1473,14 @@
           lab(t("Beginn (UTC)"), el("input", { id: "c-start", type: "datetime-local", value: toLocal(c?.start_utc) })),
           lab(t("Ende (UTC)"), el("input", { id: "c-end", type: "datetime-local", value: toLocal(c?.end_utc) }))),
         lab(t("Notizen"), el("input", { id: "c-notes", value: c?.notes || "" })),
+        c ? null : el("div", { class: "stack" }, el("span", { class: "muted small" }, t("Teilnehmende Stationen (aus den globalen Stationen):")),
+          el("div", { class: "tpl-list" }, (S.templates || []).map((s) => el("label", { class: "check" }, el("input", { type: "checkbox", class: "c-tpl", value: s.id, checked: 1 }), `${s.call} · ${s.band} · ${s.locator}`)),
+            (S.templates || []).length ? null : el("span", { class: "muted small" }, t("Keine globalen Stationen angelegt – Stationen können auch später aufgenommen werden.")))),
         el("div", { class: "row" }, el("button", { class: "primary" }, t("Speichern")), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Abbrechen"))))));
     box.querySelector("#c-form").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const body = { name: box.querySelector("#c-name").value, start_utc: fromLocal(box.querySelector("#c-start").value), end_utc: fromLocal(box.querySelector("#c-end").value), notes: box.querySelector("#c-notes").value };
+      const body = { name: box.querySelector("#c-name").value, start_utc: fromLocal(box.querySelector("#c-start").value), end_utc: fromLocal(box.querySelector("#c-end").value), notes: box.querySelector("#c-notes").value,
+        template_ids: $$("#c-form .c-tpl:checked").map((x) => Number(x.value)) };
       try {
         const r = c ? await api("PATCH", `/api/contests/${c.id}`, body) : await api("POST", "/api/contests", body);
         if (!c) { S.contestId = r.id; save(); }
@@ -1454,10 +1488,10 @@
       } catch (err) { toast(err.message, "err"); }
     });
   }
-  function stationDialog(s) {
+  function stationDialog(s, isGlobal = false) {
     const info = s?.info || {};
-    const prevInfo = !s ? (contest()?.stations[0]?.info || {}) : {};
-    const box = modal(el("div", {}, el("h3", {}, s ? t("Station {call} bearbeiten", s) : t("Neue Station")),
+    const prevInfo = !s ? ((isGlobal ? S.templates?.[0]?.info : contest()?.stations[0]?.info) || {}) : {};
+    const box = modal(el("div", {}, el("h3", {}, s ? (isGlobal ? t("Globale Station {call} bearbeiten", s) : t("Station {call} bearbeiten", s)) : (isGlobal ? t("Neue globale Station") : t("Neue Station (nur dieser Contest)"))),
       el("form", { id: "s-form", class: "stack" },
         el("div", { class: "grid2" },
           lab(t("Rufzeichen"), el("input", { id: "s-call", value: s?.call || "", required: 1, placeholder: "DN2LH/P" })),
@@ -1465,7 +1499,7 @@
           lab(t("Band"), el("select", { id: "s-band" }, BANDS.map((b) => el("option", { value: b, selected: (s?.band || "144MHz") === b ? 1 : null }, b)))),
           lab(t("Modus"), el("select", { id: "s-mode" }, ["SSB", "CW", "FM", "MIXED"].map((m) => el("option", { value: m, selected: (s?.mode || "SSB") === m ? 1 : null }, m)))),
           lab(s ? t("Neues Passwort (leer = unverändert)") : t("Stations-Passwort"), el("input", { id: "s-pw", type: "text", placeholder: t("für Operatoren") })),
-          lab(t("Start-Seriennummer"), el("input", { id: "s-serial", type: "number", min: 1, value: s?.serial_next || 1 }))),
+          isGlobal ? el("span") : lab(t("Start-Seriennummer"), el("input", { id: "s-serial", type: "number", min: 1, value: s?.serial_next || 1 }))),
         el("details", {}, el("summary", { class: "muted" }, t("Angaben für die EDI-Abgabe (Standort, Verantwortlicher, Technik)")),
           el("div", { class: "grid2" }, INFO_FIELDS.map(([k, l]) => lab(l, el("input", { id: `i-${k}`, value: info[k] ?? prevInfo[k] ?? "" }))))),
         el("details", { open: s?.kst_user ? 1 : null }, el("summary", { class: "muted" }, t("ON4KST-Chat dieser Station")),
@@ -1476,7 +1510,7 @@
             lab(t("Raum"), el("select", { id: "s-kroom" }, Object.entries(S.kstRooms || { 2: "144/432 MHz" }).map(([n, name]) => el("option", { value: n, selected: Number(n) === (s?.kst_room || 2) ? 1 : null }, `${n} – ${name}`)))),
             lab(t("„An mich“-Rufzeichen"), el("input", { id: "s-kmy", value: s?.kst_my_calls || "", placeholder: t("weitere, z. B. DL0ABC") })),
             lab(t("beim Serverstart verbinden"), el("input", { id: "s-kauto", type: "checkbox", checked: s?.kst_autostart ? 1 : null }))),
-          s ? el("div", { class: "row" },
+          s && !isGlobal ? el("div", { class: "row" },
             el("button", { type: "button", class: "ghost", onclick: async () => { try { await api("POST", "/api/kst/start", { station_id: s.id }); toast(t("KST: verbinde …")); } catch (err) { toast(err.message, "err"); } } }, t("Verbinden")),
             el("button", { type: "button", class: "ghost", onclick: async () => { try { await api("POST", "/api/kst/stop", { station_id: s.id }); toast(t("KST getrennt")); } catch (err) { toast(err.message, "err"); } } }, t("Trennen")),
             el("button", { type: "button", class: "ghost small", title: t("Rohdaten der Verbindung (zur Fehlersuche)"), onclick: async () => { try { const r = await GET(`/api/kst/raw?station_id=${s.id}`); const w = window.open("", "kstraw"); w.document.write("<pre style=\"font:12px monospace;white-space:pre-wrap\">" + r.lines.map((l) => l.replace(/</g, "&lt;")).join("\n") + "</pre>"); } catch (err) { toast(err.message, "err"); } } }, t("Rohdaten"))) : null),
@@ -1485,11 +1519,13 @@
       e.preventDefault();
       const g = (id) => box.querySelector(id).value.trim();
       const infoOut = {}; INFO_FIELDS.forEach(([k]) => { infoOut[k] = g(`#i-${k}`); });
-      const body = { call: g("#s-call"), locator: g("#s-loc"), band: g("#s-band"), mode: g("#s-mode"), info: infoOut, serial_next: Number(g("#s-serial")),
+      const body = { call: g("#s-call"), locator: g("#s-loc"), band: g("#s-band"), mode: g("#s-mode"), info: infoOut,
         kst_user: g("#s-kuser").toUpperCase(), kst_room: Number(g("#s-kroom")) || 2, kst_my_calls: g("#s-kmy").toUpperCase(), kst_autostart: box.querySelector("#s-kauto").checked ? 1 : 0 };
+      if (!isGlobal) body.serial_next = Number(g("#s-serial"));
       if (box.querySelector("#s-kpass").value) body.kst_pass = box.querySelector("#s-kpass").value;
       if (g("#s-pw") || !s) body.password = g("#s-pw");
       try {
+        if (isGlobal) { s ? await api("PATCH", `/api/templates/${s.id}`, body) : await api("POST", "/api/templates", body); closeModal(); toast(t("Globale Station gespeichert"), "ok"); renderAdmin(); return; }
         const r = s ? await api("PATCH", `/api/stations/${s.id}`, body) : await api("POST", `/api/contests/${S.contestId}/stations`, body);
         if (!s) { S.stationId = r.id; save(); }
         closeModal(); toast(t("Station gespeichert"), "ok");

@@ -47,6 +47,21 @@ CREATE TABLE IF NOT EXISTS stations (
     kst_my_calls TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS station_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    call TEXT NOT NULL,
+    locator TEXT NOT NULL,
+    band TEXT NOT NULL,
+    mode TEXT NOT NULL DEFAULT 'SSB',
+    password_hash TEXT NOT NULL DEFAULT '',
+    info TEXT NOT NULL DEFAULT '{}',
+    kst_user TEXT NOT NULL DEFAULT '',
+    kst_pass TEXT NOT NULL DEFAULT '',
+    kst_room INTEGER NOT NULL DEFAULT 2,
+    kst_autostart INTEGER NOT NULL DEFAULT 0,
+    kst_my_calls TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS qsos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
@@ -80,7 +95,10 @@ CREATE TABLE IF NOT EXISTS callbook (
     source TEXT NOT NULL DEFAULT '',
     qso_count INTEGER NOT NULL DEFAULT 0,
     last_seen TEXT NOT NULL DEFAULT '',
-    alt_locators TEXT NOT NULL DEFAULT ''
+    alt_locators TEXT NOT NULL DEFAULT '',
+    ext_locator TEXT NOT NULL DEFAULT '',
+    ext_source TEXT NOT NULL DEFAULT '',
+    ext_checked TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS kst_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,6 +194,22 @@ class Database:
                 self.conn.execute("ALTER TABLE kst_messages ADD COLUMN station_id INTEGER NOT NULL DEFAULT 0")
             if "contest_id" not in {r["name"] for r in self.conn.execute("PRAGMA table_info(chat)")}:
                 self.conn.execute("ALTER TABLE chat ADD COLUMN contest_id INTEGER NOT NULL DEFAULT 0")
+            ccols = {r["name"] for r in self.conn.execute("PRAGMA table_info(callbook)")}
+            for col in ("ext_locator", "ext_source", "ext_checked"):
+                if col not in ccols:
+                    self.conn.execute(f"ALTER TABLE callbook ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+            # globale Stationen: beim ersten Start aus den vorhandenen Contest-Stationen ableiten (je Call+Band die neueste)
+            if not self.conn.execute("SELECT value FROM settings WHERE key='templates_migrated'").fetchone():
+                self.conn.execute("INSERT INTO settings(key,value) VALUES('templates_migrated','1')")
+                seen: set[tuple[str, str]] = set()
+                for s in self.conn.execute("SELECT * FROM stations ORDER BY id DESC").fetchall():
+                    key = (s["call"], s["band"])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    self.conn.execute(
+                        "INSERT INTO station_templates(call,locator,band,mode,password_hash,info,kst_user,kst_pass,kst_room,kst_autostart,kst_my_calls,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (s["call"], s["locator"], s["band"], s["mode"], s["password_hash"], s["info"], s["kst_user"], s["kst_pass"], s["kst_room"], s["kst_autostart"], s["kst_my_calls"], utcnow()))
             # Einträge wie DN2LH-2 (KST-Mehrfachanmeldung) mit dem Basis-Rufzeichen zusammenführen
             for r in self.conn.execute("SELECT call, locator FROM callbook WHERE call LIKE '%-%'").fetchall():
                 base = prefixes.core_call(r["call"])
@@ -365,6 +399,76 @@ class Database:
                  hash_password(password) if password else "", json.dumps(info or {}), utcnow()),
             )
             return int(cur.lastrowid)
+
+    # ------------------------------------------------------------ globale Stationen (Vorlagen für Contests)
+    def list_templates(self) -> list[dict]:
+        return [self._station_public(s) for s in self.rows("SELECT * FROM station_templates ORDER BY call, band")]
+
+    def get_template(self, tid: int, secrets: bool = False) -> dict | None:
+        s = self.row("SELECT * FROM station_templates WHERE id=?", (tid,))
+        if not s:
+            return None
+        if secrets:
+            s["info"] = json.loads(s["info"] or "{}")
+            return s
+        return self._station_public(s)
+
+    def create_template(self, call: str, locator: str, band: str, mode: str = "SSB", password: str = "", info: dict | None = None, **kst: Any) -> int:
+        locator = geo.normalize_locator(locator)
+        if not geo.is_valid_locator(locator):
+            raise ValueError("Ungültiger Locator")
+        with self.conn:
+            cur = self.conn.execute(
+                "INSERT INTO station_templates(call,locator,band,mode,password_hash,info,kst_user,kst_pass,kst_room,kst_autostart,kst_my_calls,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (call.strip().upper(), locator, band, mode or "SSB", hash_password(password) if password else "", json.dumps(info or {}),
+                 str(kst.get("kst_user") or "").upper(), str(kst.get("kst_pass") or ""), int(kst.get("kst_room") or 2), int(bool(kst.get("kst_autostart"))), str(kst.get("kst_my_calls") or "").upper(), utcnow()))
+            return int(cur.lastrowid)
+
+    def update_template(self, tid: int, **fields: Any) -> None:
+        allowed = {"call", "locator", "band", "mode", "info", "password", "kst_user", "kst_pass", "kst_room", "kst_autostart", "kst_my_calls"}
+        sets: dict[str, Any] = {}
+        for k, v in fields.items():
+            if k not in allowed or v is None:
+                continue
+            if k == "password":
+                sets["password_hash"] = hash_password(v) if v else ""
+            elif k == "info":
+                sets["info"] = json.dumps(v)
+            elif k == "locator":
+                v = geo.normalize_locator(v)
+                if not geo.is_valid_locator(v):
+                    raise ValueError("Ungültiger Locator")
+                sets["locator"] = v
+            elif k == "call":
+                sets["call"] = str(v).strip().upper()
+            else:
+                sets[k] = v
+        if sets:
+            with self.conn:
+                self.conn.execute(f"UPDATE station_templates SET {', '.join(k + '=?' for k in sets)} WHERE id=?", (*sets.values(), tid))
+
+    def delete_template(self, tid: int) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM station_templates WHERE id=?", (tid,))
+
+    def create_station_from_template(self, contest_id: int, tid: int) -> int:
+        """Contest-Station aus globaler Station anlegen (eigenes Log, eigene Nummer, eigener KST-Chat)."""
+        s = self.row("SELECT * FROM station_templates WHERE id=?", (tid,))
+        if not s:
+            raise ValueError("Globale Station nicht gefunden")
+        with self.conn:
+            cur = self.conn.execute(
+                "INSERT INTO stations(contest_id,call,locator,band,mode,password_hash,info,kst_user,kst_pass,kst_room,kst_autostart,kst_my_calls,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (contest_id, s["call"], s["locator"], s["band"], s["mode"], s["password_hash"], s["info"], s["kst_user"], s["kst_pass"], s["kst_room"], s["kst_autostart"], s["kst_my_calls"], utcnow()))
+            return int(cur.lastrowid)
+
+    def set_ext_lookup(self, call: str, locator: str, source: str) -> None:
+        core = prefixes.core_call(call)
+        with self.conn:
+            self.conn.execute("UPDATE callbook SET ext_locator=?, ext_source=?, ext_checked=? WHERE call=?", (locator or "", source, utcnow(), core))
+            if self.conn.total_changes == 0 or not self.row("SELECT 1 FROM callbook WHERE call=?", (core,)):
+                self.conn.execute("INSERT OR IGNORE INTO callbook(call,locator,name,source,qso_count,last_seen,alt_locators,ext_locator,ext_source,ext_checked) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                                  (core, locator or "", "", source, 0, "", "", locator or "", source, utcnow()))
 
     def update_station(self, sid: int, **fields: Any) -> None:
         allowed = {"call", "locator", "band", "mode", "serial_next", "info", "password", "kst_user", "kst_pass", "kst_room", "kst_autostart", "kst_my_calls"}

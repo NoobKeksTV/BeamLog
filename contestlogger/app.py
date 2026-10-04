@@ -140,6 +140,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if c:
             await c.stop()
 
+    REPO_CALLBOOK_URL = "https://api.github.com/repos/NoobKeksTV/ContestLogger/contents/contestlogger/seed/stationsdatenbank.csv?ref=main"
     lookup_state = {"client": None}
     lookup_cache: dict[str, float] = {}  # Call -> Zeitpunkt der letzten erfolglosen Abfrage
 
@@ -202,7 +203,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.post("/api/settings", dependencies=[Depends(require_admin)])
     def set_settings(body: dict):
-        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros"):
+        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros", "repo_url", "repo_token"):
             if k in body:
                 db.set_setting(k, json.dumps(body[k]) if k == "kst_macros" else str(body[k] or ""))
         lookup_state["client"] = None
@@ -214,7 +215,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return {"tile_url": db.get_setting("tile_url", ""), "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
                 "lookup_user": db.get_setting("lookup_user", ""), "lookup_pass_set": bool(db.get_setting("lookup_pass", "")),
                 "providers": lookup.PROVIDERS,
-                "kst_rooms": kst.ROOMS}
+                "kst_rooms": kst.ROOMS, "repo_url": db.get_setting("repo_url", "") or REPO_CALLBOOK_URL, "repo_token_set": bool(db.get_setting("repo_token", ""))}
 
     @app.post("/api/lookup/test", dependencies=[Depends(require_admin)])
     async def lookup_test():
@@ -285,8 +286,59 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if not (body.get("name") or "").strip():
             raise HTTPException(400, "Name fehlt")
         cid = db.create_contest(body["name"], body.get("start_utc"), body.get("end_utc"), body.get("scoring", "km"), body.get("notes", ""))
+        for tid in body.get("template_ids") or []:  # teilnehmende globale Stationen
+            try:
+                sid = db.create_station_from_template(cid, int(tid))
+            except ValueError:
+                continue
+            st = db.get_station(sid, secrets=True) or {}
+            if st.get("kst_autostart") and st.get("kst_user") and st.get("kst_pass"):
+                try:
+                    await kst_start(sid)
+                except HTTPException:
+                    pass
         await hub.broadcast({"type": "update", "scope": "contests"})
         return db.get_contest(cid)
+
+    # ------------------------------------------------------------ globale Stationen (Vorlagen)
+    @app.get("/api/templates", dependencies=[Depends(require_admin)])
+    def templates_list():
+        return db.list_templates()
+
+    @app.post("/api/templates", dependencies=[Depends(require_admin)])
+    def template_create(body: dict):
+        try:
+            tid = db.create_template(body.get("call", ""), body.get("locator", ""), body.get("band", "144MHz"), body.get("mode", "SSB"), body.get("password", ""), body.get("info") or {},
+                                     **{k: v for k, v in body.items() if k.startswith("kst_")})
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return db.get_template(tid)
+
+    @app.patch("/api/templates/{tid}", dependencies=[Depends(require_admin)])
+    def template_update(tid: int, body: dict):
+        if not db.get_template(tid):
+            raise HTTPException(404, "Globale Station nicht gefunden")
+        try:
+            db.update_template(tid, **body)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return db.get_template(tid)
+
+    @app.delete("/api/templates/{tid}", dependencies=[Depends(require_admin)])
+    def template_delete(tid: int):
+        db.delete_template(tid)
+        return {"ok": True}
+
+    @app.post("/api/contests/{cid}/stations/from_template", dependencies=[Depends(require_admin)])
+    async def station_from_template(cid: int, body: dict):
+        if not db.get_contest(cid):
+            raise HTTPException(404, "Contest nicht gefunden")
+        try:
+            sid = db.create_station_from_template(cid, int(body.get("template_id") or 0))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        await hub.broadcast({"type": "update", "scope": "contests"})
+        return db.get_station(sid)
 
     @app.patch("/api/contests/{cid}", dependencies=[Depends(require_admin)])
     async def update_contest(cid: int, body: dict):
@@ -898,12 +950,84 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     # ------------------------------------------------------------ Export
     @app.get("/api/stations/{sid}/check")
-    def check(sid: int):
+    async def check(sid: int, lookup_max: int = 150):
         station = db.get_station(sid)
         if not station:
             raise HTTPException(404)
         contest = db.get_contest(station["contest_id"]) or {"name": ""}
-        return logcheck.check_station(contest, station, db.list_qsos(sid))
+        qsos = db.list_qsos(sid)
+        res = logcheck.check_station(contest, station, qsos)
+        # Abgleich mit HamQTH/QRZ (falls eingerichtet): jedes Rufzeichen nur einmal nachschlagen, Ergebnis im Call-Buch merken
+        client = lookup_client()
+        checked = 0
+        if client.enabled:
+            seen: set[str] = set()
+            for q in qsos:
+                core = prefixes.core_call(q["call"])
+                if not core or core in seen or q.get("dupe"):
+                    continue
+                seen.add(core)
+                row = db.lookup_call(core) or {}
+                if not row.get("ext_checked"):
+                    if checked >= lookup_max:
+                        res["warnings"].append({"qso_id": None, "serial": None, "call": None, "msg": f"Online-Abgleich: nur {lookup_max} Rufzeichen je Durchlauf – Prüfung nochmal starten für den Rest"})
+                        break
+                    try:
+                        r = await asyncio.to_thread(client.lookup, core)
+                    except Exception as e:  # noqa: BLE001
+                        res["warnings"].append({"qso_id": None, "serial": None, "call": None, "msg": f"Online-Abgleich nicht möglich: {e}"})
+                        break
+                    db.set_ext_lookup(core, r.get("locator", ""), r.get("source", client.provider) if r else client.provider)
+                    row = db.lookup_call(core) or {}
+                    checked += 1
+                ext = (row.get("ext_locator") or "").upper()
+                if ext and q["locator"] and ext[:4] != q["locator"].upper()[:4]:
+                    res["warnings"].append({"qso_id": q["id"], "serial": q["serial_sent"], "call": q["call"], "msg": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')} kennt {core} mit {ext} (Log: {q['locator']}) – Locator prüfen"})
+                elif ext and q["locator"] and ext != q["locator"].upper() and len(q["locator"]) >= 6 and len(ext) >= 6:
+                    res["warnings"].append({"qso_id": q["id"], "serial": q["serial_sent"], "call": q["call"], "msg": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')}: {core} mit {ext} eingetragen (Log: {q['locator']}) – Portabelbetrieb?"})
+            res["lookup"] = {"provider": client.provider, "checked_now": checked}
+        else:
+            res["lookup"] = {"provider": "none", "checked_now": 0}
+        return res
+
+    # ------------------------------------------------------------ Stationsdatenbank aus dem Repo abgleichen
+    @app.post("/api/callbook/sync_repo", dependencies=[Depends(require_admin)])
+    async def callbook_sync_repo(body: dict | None = None):
+        """Stationsdatenbank aus dem Repo (seed/stationsdatenbank.csv) holen und neue/geänderte Einträge übernehmen.
+        Standard: GitHub-API (liefert mit Token auch aus privaten Repos); eine andere URL ist in den Einstellungen möglich."""
+        import urllib.request
+        url = (body or {}).get("url") or db.get_setting("repo_url", "") or REPO_CALLBOOK_URL
+        token = db.get_setting("repo_token", "") or ""
+        headers = {"User-Agent": f"ContestLogger/{__version__}", "Accept": "application/vnd.github.raw"}
+        if token and "github" in url:
+            headers["Authorization"] = f"Bearer {token}"
+        try:
+            text = await asyncio.to_thread(lambda: urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30).read().decode("utf-8", "replace"))
+        except Exception as e:  # noqa: BLE001
+            hint = " – privates Repo? Dann in der Verwaltung ein GitHub-Token (Lesezugriff auf das Repo) eintragen." if "404" in str(e) or "401" in str(e) else ""
+            raise HTTPException(502, f"Repo nicht erreichbar: {e}{hint}")
+        res = importers.parse_callbook_csv(text)
+        new = known = changed = 0
+        import re as _re
+        for call, loc, name in res.callbook:
+            when = f"{name}T00:00:00Z" if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) else ""
+            before = db.lookup_call(call)
+            r = db.learn_call(call, loc, source="repo", name="" if when else name, when=when)
+            if r == "new":
+                new += 1
+            elif r == "known":
+                known += 1
+                if before and loc and before.get("locator") != loc:
+                    changed += 1
+        db.add_audit("Stationsdatenbank aus dem Repo abgeglichen", details=f"{len(res.callbook)} Einträge, {new} neu, {changed} Locator geändert", nick="Admin", admin=True)
+        return {"total": len(res.callbook), "new": new, "known": known, "changed": changed, "callbook_count": db.callbook_count(), "url": url}
+
+    @app.get("/api/callbook/export_seed.csv")
+    def callbook_export_seed():
+        """Stationsdatenbank im Repo-Format (Call;Locator;Zuletzt) – zum Einchecken als contestlogger/seed/stationsdatenbank.csv."""
+        rows = db.rows("SELECT call, locator, last_seen FROM callbook WHERE locator<>'' ORDER BY call")
+        lines = ["Call;Locator;Zuletzt"] + [f"{r['call']};{r['locator']};{(r['last_seen'] or '')[:10]}" for r in rows]
+        return PlainTextResponse("\n".join(lines) + "\n", media_type="text/csv", headers={"Content-Disposition": "attachment; filename=stationsdatenbank.csv"})
 
     @app.get("/api/contests/{cid}/export.zip")
     def export_contest_zip(cid: int, force: int = 0, nick: str = "", x_admin_token: str | None = Header(default=None)):
