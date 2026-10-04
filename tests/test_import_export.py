@@ -68,3 +68,13 @@ def test_export_roundtrip(tmp_path):
         assert len(importers.parse_adif(adif).qsos) == 2
         csv_ = exporters.export_csv(contest, station, qsos)
         assert "DL8NAS" in csv_
+
+
+def test_mdb_pure_python():
+    from pathlib import Path
+    data = (Path(__file__).parent / "fixtures" / "wincontest.mdb").read_bytes()
+    r = importers.parse_file("Oktober 2024.mdb", data)
+    assert r.kind == "mdb" and len(r.qsos) == 11 and not r.warnings
+    assert r.header == {"call": "DN2LH", "locator": "JO31AA", "band": "432MHz"}
+    q = r.qsos[0]
+    assert (q.call, q.locator, q.serial_sent, q.serial_rcvd, q.ts_utc) == ("DL0GM", "JO31UB", 1, "078", "2024-10-05T17:13:00Z")

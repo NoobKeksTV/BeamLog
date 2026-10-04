@@ -73,7 +73,7 @@
           </div>
           <div class="hint-row">
             <div id="hint-geo" class="hint">— km · —°</div>
-            <div id="hint-info" class="hint muted">Rufzeichen eingeben – Vorschläge aus Call-Buch und alten Logs erscheinen automatisch.</div>
+            <div id="hint-info" class="hint muted"></div>
             <div id="hint-dupe" class="hint warn hidden"></div>
             <div id="hint-plaus" class="hint warn hidden"></div>
             <button type="button" id="btn-clear" class="ghost small">Leeren (Esc)</button>
@@ -104,10 +104,6 @@
       </div>
 
       <aside class="col-side">
-        <div class="card">
-          <h3>Stationen im Contest</h3>
-          <table id="scoreboard" class="compact"><tbody></tbody></table>
-        </div>
         <div class="card chat" id="chat-card">
           <div class="chat-head">
             <div class="chat-tabs">
@@ -187,12 +183,12 @@
     <div id="admin-root" class="hidden admin-grid">
       <div class="card">
         <div class="card-head"><h3>Contests</h3><button id="btn-new-contest" class="primary small">+ Contest</button></div>
-        <table id="admin-contests" class="compact"><tbody></tbody></table>
+        <div class="table-wrap"><table id="admin-contests" class="compact fixed"><tbody></tbody></table></div>
       </div>
       <div class="card">
         <div class="card-head"><h3>Stationen <span id="admin-contest-name" class="muted"></span></h3><button id="btn-new-station" class="primary small">+ Station</button></div>
         <p class="muted small">Jede Station hat eigenes Rufzeichen, Locator, Band und Passwort. Operatoren schalten die Station mit dem Passwort frei und loggen darunter. Die Stations-ID (für die CAT-Bridge <code>tools/cat_bridge.py</code>) steht in der Tabelle.</p>
-        <table id="admin-stations" class="compact"><tbody></tbody></table>
+        <div class="table-wrap"><table id="admin-stations" class="compact fixed"><tbody></tbody></table></div>
       </div>
       <div class="card">
         <h3>WinContest-Ordner (DD3KU) übernehmen</h3>

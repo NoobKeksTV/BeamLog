@@ -22,7 +22,7 @@ oder Handys im Browser. Kein Internet nötig, keine Accounts.
 - **Chat** für alle Angemeldeten (nur ein Nickname, kein Account), Anwesenheitsliste.
 - **Statistik**: QSOs/Punkte pro Stunde, Entfernungsverteilung, Richtungsrose, Großfelder,
   Länder, Top-10-ODX, Operatoren.
-- **Import**: WinContest `Datenbank/*.txt`, `*.mdb` (mit mdbtools), `DD3KU/*.EXP`, EDI/REG1TEST,
+- **Import**: WinContest `Datenbank/*.txt`, `*.mdb` (rein in Python, auch verschlüsselte Jet4-Dateien), `DD3KU/*.EXP`, EDI/REG1TEST,
   ADIF, Call-Listen (`Call;Locator;Name`).
 - **Export**: EDI (REG1TEST für die Abgabe), ADIF, CSV, Call-Buch-CSV.
 - **Multi-Band-Gesamtwertung** pro Contest (alle Stationen/Bänder zusammen), Countdown bis Contest-Ende.
@@ -65,8 +65,7 @@ python run.py                # http://localhost:8000 – die LAN-Adresse wird be
 Optional: `python run.py --port 8080 --db /pfad/zu/log.db`.
 Alle Daten liegen in **einer** SQLite-Datei (`data/contestlogger.db`) – zum Sichern einfach kopieren.
 
-Für den Import von Access-`.mdb`-Dateien wird `mdbtools` benötigt (`apt install mdbtools`);
-ohne mdbtools die parallele `.txt` aus dem `Datenbank`-Ordner nehmen.
+Access-`.mdb`-Dateien werden ohne Zusatzprogramme gelesen (eingebauter Jet4-Leser).
 
 ## Ablauf
 

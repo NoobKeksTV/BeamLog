@@ -32,7 +32,7 @@ HIDDEN = ["uvicorn.logging", "uvicorn.loops", "uvicorn.loops.auto", "uvicorn.loo
           "uvicorn.protocols.websockets", "uvicorn.protocols.websockets.auto", "uvicorn.protocols.websockets.websockets_impl",
           "uvicorn.protocols.websockets.wsproto_impl", "uvicorn.lifespan", "uvicorn.lifespan.on", "uvicorn.lifespan.off",
           "websockets", "websockets.legacy", "websockets.legacy.server", "wsproto", "h11", "anyio._backends._asyncio",
-          "multipart", "python_multipart", "qrcode", "qrcode.image.svg"]
+          "multipart", "python_multipart", "qrcode", "qrcode.image.svg", "construct", "tabulate", "pypdf"]
 
 
 def run(cmd: list[str]) -> None:

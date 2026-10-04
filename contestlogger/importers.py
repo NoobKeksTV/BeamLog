@@ -255,9 +255,48 @@ def parse_adif(text: str) -> ImportResult:
 
 # ---------------------------------------------------------------- Access MDB
 def parse_mdb(data: bytes) -> ImportResult:
-    """Liest die WinContest-Access-Datenbank über `mdb-export` (Paket mdbtools)."""
-    if not shutil.which("mdb-tables"):
-        raise ValueError("mdbtools nicht installiert – bitte die gleichnamige .txt aus dem Datenbank-Ordner importieren")
+    """Liest die WinContest-Access-Datenbank – rein in Python (auch verschlüsselte Jet4-Dateien),
+    mdbtools nur noch als Reserve, falls der Python-Leser scheitert."""
+    try:
+        from . import mdb
+        tables = mdb.read_tables(data)
+    except Exception as e:  # noqa: BLE001
+        if shutil.which("mdb-tables"):
+            return _parse_mdb_mdbtools(data)
+        raise ValueError(f"Access-Datei nicht lesbar: {e}") from e
+    res = ImportResult("mdb")
+    param = tables.get("PARAM") or {}
+    if param.get("Call"):
+        res.header["call"] = str(param["Call"][0] or "")
+        res.header["locator"] = str((param.get("Locator") or [""])[0] or "")
+    for t, cols in tables.items():
+        if not re.match(r"^\d+(MHz|GHz|MHZ|GHZ)?$", t) and t != "LASER":
+            continue
+        n = len(cols.get("Rufzeichen") or [])
+        for i in range(n):
+            r = {k: (v[i] if i < len(v) else None) for k, v in cols.items()}
+            if not r.get("Rufzeichen"):
+                continue
+            try:
+                rs, ss = _split_rst(str(r.get("RST_geg") or ""))
+                rr, sr = _split_rst(str(r.get("RST_erh") or ""))
+                res.qsos.append(ImportedQso(
+                    ts_utc=_ts(str(r["Datum"]), str(r["Zeit"])), call=str(r["Rufzeichen"]).strip().upper(),
+                    locator=str(r.get("Locator") or "").strip().upper(), rst_sent=rs, rst_rcvd=rr,
+                    serial_sent=int(ss) if ss.isdigit() else None, serial_rcvd=sr,
+                    mode=str(r.get("Modus") or "SSB").strip() or "SSB", band=_band_label(t),
+                    comment=str(r.get("Kommentar") or "").strip(),
+                ))
+            except Exception as e:  # noqa: BLE001
+                res.warnings.append(f"{t} #{i + 1}: {e}")
+        if res.qsos and "band" not in res.header:
+            res.header["band"] = _band_label(t)
+    res.qsos.sort(key=lambda q: q.ts_utc)
+    return res
+
+
+def _parse_mdb_mdbtools(data: bytes) -> ImportResult:
+    """Reserve über das Systemprogramm mdb-export (Paket mdbtools)."""
     res = ImportResult("mdb")
     with tempfile.NamedTemporaryFile(suffix=".mdb", delete=False) as fh:
         fh.write(data)

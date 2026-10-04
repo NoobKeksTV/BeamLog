@@ -128,7 +128,7 @@ label > input, label > select { color: var(--text); font-size: 15px; }
 .hint-row .ghost { margin-left: auto; }
 
 .suggest {
-  position: absolute; top: 100%; left: 0; min-width: min(560px, 90vw); z-index: 20; background: var(--card2);
+  position: absolute; top: 100%; left: 0; min-width: min(560px, 90vw); z-index: 3000; background: var(--card2);
   border: 1px solid var(--line); border-radius: 8px; margin-top: 4px; max-height: 320px; overflow: auto;
   box-shadow: 0 10px 30px rgba(0,0,0,.4);
 }
@@ -180,11 +180,11 @@ table.compact td, table.compact th { padding: 5px 6px; font-size: 13.5px; }
 .rose text { fill: var(--muted); font-size: 10px; }
 
 /* ---------- Modal / Toast ---------- */
-.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 5000; padding: 16px; }
 .modal-box { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; width: min(560px, 100%); max-height: 90vh; overflow: auto; }
 .modal-box h3 { margin-top: 0; }
 .modal-box .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--card2); border: 1px solid var(--line); padding: 10px 16px; border-radius: 10px; z-index: 200; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--card2); border: 1px solid var(--line); padding: 10px 16px; border-radius: 10px; z-index: 6000; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
 .toast.err { border-color: var(--bad); color: var(--bad); }
 .toast.ok { border-color: var(--ok); }
 .result { background: var(--bg2); padding: 10px; border-radius: 8px; font-size: 12.5px; white-space: pre-wrap; }
@@ -207,7 +207,7 @@ tr.total td { border-top: 2px solid var(--line); }
 .macro-list div { background: var(--card2); border-radius: 6px; padding: 5px 8px; font-size: 13px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .macro-list div:hover { outline: 1px solid var(--accent); }
 .macro-list b { font-family: var(--mono); color: var(--accent); margin-right: 6px; }
-.macro-flash { position: fixed; top: 110px; left: 50%; transform: translateX(-50%); z-index: 90; background: var(--accent2); color: #fff; font-family: var(--mono); font-size: 34px; font-weight: 700; padding: 14px 28px; border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.5); max-width: 90vw; text-align: center; }
+.macro-flash { position: fixed; top: 110px; left: 50%; transform: translateX(-50%); z-index: 4000; background: var(--accent2); color: #fff; font-family: var(--mono); font-size: 34px; font-weight: 700; padding: 14px 28px; border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.5); max-width: 90vw; text-align: center; }
 .macro-flash small { display: block; font-size: 13px; font-weight: 400; opacity: .8; font-family: var(--sans); }
 @media (max-width: 900px) { .macro-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .kpis.big .kpi b { font-size: 40px; }
@@ -218,7 +218,7 @@ body.bigscreen main { padding: 20px; }
 body.bigscreen .kpis.big .kpi b { font-size: 56px; }
 .feed { font-family: var(--mono); font-size: 14px; }
 .feed .dupe { color: var(--muted); text-decoration: line-through; }
-.map { height: 260px; border-radius: 8px; background: var(--bg2); }
+.map { height: 260px; border-radius: 8px; background: var(--bg2); position: relative; z-index: 0; isolation: isolate; }
 .map.tall { height: 60vh; }
 .leaflet-container { font: inherit; }
 .arrow-icon { font-size: 26px; color: #ff5c6c; text-shadow: 0 0 4px #000; line-height: 1; }
@@ -272,3 +272,12 @@ body.popup main { padding: 8px; }
 body.popup .log-grid { grid-template-columns: 1fr; }
 body.popup .chat-log { height: calc(100vh - 230px); }
 body.popup #btn-chat-pop { display: none; }
+/* Verwaltungstabellen: lange Namen abschneiden statt überlappen */
+table.fixed { width: 100%; }
+table.fixed td.name { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.fixed td.actions { white-space: nowrap; text-align: right; }
+table.fixed td.actions button, table.fixed td.actions .button { margin-left: 2px; }
+/* Verwaltung: Abschnitte innerhalb einer Karte klar trennen */
+.card > h3:not(:first-child) { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); }
+.card form.stack, .card .table-wrap, .card > pre.result { margin-bottom: 8px; }
+.card-head h3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

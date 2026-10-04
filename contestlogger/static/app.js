@@ -296,7 +296,7 @@
         : `<button class="ghost small" id="btn-unlock">🔒 ${t("freischalten")}</button>`;
       $("#btn-unlock")?.addEventListener("click", () => askUnlock(st));
       $("#qso-form").querySelectorAll("input,button").forEach((i) => { if (i.id !== "f-nr-sent") i.disabled = !unlocked; });
-      $("#hint-info").textContent = unlocked ? t("Rufzeichen eingeben – Vorschläge aus Call-Buch und alten Logs erscheinen automatisch.") : t("Station ist nur im Lesemodus. Zum Loggen mit Stations-Passwort freischalten.");
+      $("#hint-info").textContent = unlocked ? "" : t("Station ist nur im Lesemodus. Zum Loggen mit Stations-Passwort freischalten.");
     } else {
       $("#station-meta").textContent = "";
       $("#station-state").textContent = S.contests.length ? "" : t("Lege unter „Verwaltung“ einen Contest und eine Station an.");
@@ -754,7 +754,8 @@
 
   // ------------------------------------------------------------ Scoreboard
   async function renderScoreboard() {
-    const tb = $("#scoreboard tbody"); tb.innerHTML = "";
+    const tb = $("#scoreboard tbody"); if (!tb) { if (S.contestId) { try { (await GET(`/api/contests/${S.contestId}/scoreboard`)).forEach((r) => { if (r.rig) S.rig[r.id] = r.rig; }); } catch (_) { /* */ } } return; }
+    tb.innerHTML = "";
     if (!S.contestId) return;
     let rows = [];
     try { rows = await GET(`/api/contests/${S.contestId}/scoreboard`); } catch (_) { return; }
@@ -1102,7 +1103,7 @@
     const tb = $("#admin-contests tbody"); tb.innerHTML = "";
     for (const c of S.contests) {
       tb.append(el("tr", {},
-        el("td", {}, c.id === S.contestId ? el("b", {}, c.name) : c.name),
+        el("td", { class: "name", title: c.name }, c.id === S.contestId ? el("b", {}, c.name) : c.name),
         el("td", { class: "muted small" }, c.start_utc ? `${fmtDate(c.start_utc)} ${fmtTime(c.start_utc)} – ${fmtDate(c.end_utc)} ${fmtTime(c.end_utc)}` : ""),
         el("td", { class: "muted small" }, `${c.stations.length} ${t("Stationen")}${c.archived ? " · " + t("Archiv") : ""}`),
         el("td", { class: "actions" },
@@ -1117,7 +1118,7 @@
     const sb = $("#admin-stations tbody"); sb.innerHTML = "";
     for (const s of c?.stations || []) {
       sb.append(el("tr", {},
-        el("td", {}, el("b", {}, s.call), el("div", { class: "muted small" }, `ID ${s.id}`)), el("td", {}, s.locator), el("td", {}, s.band), el("td", {}, s.mode),
+        el("td", { class: "name", title: s.call }, el("b", {}, s.call), el("div", { class: "muted small" }, `ID ${s.id}`)), el("td", {}, s.locator), el("td", {}, s.band), el("td", {}, s.mode),
         el("td", { class: "muted small" }, `${t("Nr.")} ${pad3(s.serial_next)} · ${s.has_password ? "🔒" : t("offen")}`),
         el("td", { class: "actions" },
           el("button", { class: "ghost", onclick: () => { S.stationId = s.id; save(); renderStationBar(); loadQsos(); showView("fulllog"); setTimeout(() => runCheck(true), 300); } , title: t("EDI dieser Station") }, "EDI"), " ",

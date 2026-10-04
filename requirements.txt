@@ -3,3 +3,5 @@ uvicorn[standard]>=0.27
 python-multipart>=0.0.9
 qrcode>=7.4
 pypdf>=4.0
+construct>=2.10
+tabulate>=0.9

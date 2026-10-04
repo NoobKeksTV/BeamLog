@@ -149,7 +149,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             "public_url": public_url or os.environ.get("CONTESTLOGGER_URL", ""),
             "tile_url": db.get_setting("tile_url", "") or "",
             "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
-            "mdbtools": bool(__import__("shutil").which("mdb-tables")),
+            "mdbtools": True,  # MDB-Import rein in Python eingebaut
         }
 
     @app.get("/api/qr.svg")
