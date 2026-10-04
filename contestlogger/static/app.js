@@ -845,6 +845,10 @@
           Sound.play("chat");
           if (Date.now() - (S.kst.lastToast || 0) > 1500) { S.kst.lastToast = Date.now(); toast(`KST ${m.msg.call}: ${m.msg.text}`.slice(0, 120)); }
         }
+        // Eigene gerichtete Nachricht (auch aus einem anderen KST-Client mit demselben Login): DM-Gespräch dazu öffnen,
+        // damit die Unterhaltung hier sichtbar weitergeht. Eingehende DM ohne offenes Gespräch: Kontakt vorwählen.
+        if (m.msg.own && m.msg.to && coreOf(m.msg.to) !== coreOf(S.kst.dm)) { S.kst.dm = m.msg.to; if (S.kst.tab !== "local") setChatTab("dm"); }
+        else if (incoming && !S.kst.dm) S.kst.dm = m.msg.call;
         renderKst();
         if (m.msg.own) { Scroll.toBottom($("#kst-log")); Scroll.toBottom($("#kst-dm-msgs")); }  // eigene Nachricht: immer ans Ende
       }

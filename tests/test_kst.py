@@ -57,13 +57,15 @@ async def _client_against_fake_server(monkeypatch):
     await fake.push("1203Z OK1ABC Pepa> cq all")
     await fake.push("1203Z DF7KF Peter> dn2lh/p pse qsy 432.200")  # Call im Text, andere Schreibweise -> an mich
     await fake.push("1203Z DF7KF Peter> (DL0ABC-2)  hi")  # Zusatz-Call aus der Liste mit KST-Anhängsel -> an mich
+    await fake.push("1204Z DN2LH-2 Lars> (OK1ABC)  aus anderem Client")  # eigener Login aus zweitem Client -> eigene DM
     await c.send_text("/CQ DL8NAS yes, calling now")
     await asyncio.sleep(0.3)
     msgs = [e["msg"] for e in events if e["type"] == "kst"]
     assert msgs[0]["to_me"] and msgs[0]["locator"] == "JN59LE"
     assert not msgs[1]["to_me"]
     assert msgs[2]["to_me"] and msgs[3]["to_me"] and msgs[3]["to"] == "DL0ABC"
-    assert msgs[4]["own"] and msgs[4]["to"] == "DL8NAS" and not msgs[4]["to_me"]
+    assert msgs[4]["own"] and msgs[4]["to"] == "OK1ABC" and msgs[4]["call"] == "DN2LH" and not msgs[4]["to_me"]
+    assert msgs[5]["own"] and msgs[5]["to"] == "DL8NAS" and not msgs[5]["to_me"]
     assert "/CQ DL8NAS yes, calling now" in fake.received
     # Internetausfall: Verbindung bricht weg -> Client verbindet sich von selbst neu und holt die Nutzerliste erneut
     c.RECONNECT_WAIT = 0.2

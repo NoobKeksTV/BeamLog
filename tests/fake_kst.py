@@ -60,6 +60,7 @@ class FakeKst:
                 writer.write(f"1203Z DL8NAS Klaus> ({user})  hallo an dich\r\n".encode())
                 writer.write(b"1204Z DL8NAS Klaus> (DF7KF)  an peter, nicht an dich\r\n")
                 writer.write(b"1205Z DL8NAS Klaus> cq cq oeffentlich\r\n")
+                writer.write(f"1206Z {user}-2 Lars> (OK1ABC)  aus anderem Client\r\n".encode())
             elif line.upper().startswith("/CQ "):
                 _, to, *rest = line.split(" ")
                 writer.write(f"1202Z {user} Lars> ({to})  {' '.join(rest)}\r\n".encode())
