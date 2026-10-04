@@ -255,7 +255,8 @@ body.bigscreen .kpis.big .kpi b { font-size: 56px; }
 .kst-log .m { display: block; padding: 2px 4px; border-radius: 4px; line-height: 1.35; }
 .kst-log .m > span { margin-right: 5px; }
 .kst-log .m.me { background: rgba(255,179,71,.18); }
-.kst-log .m.own { opacity: .85; }
+.kst-log .m.own { background: rgba(63,179,255,.14); border-left: 3px solid var(--accent); }
+.kst-log .m.own .c { color: var(--text); }
 .kst-log .m .c { font-weight: 700; color: var(--accent); cursor: pointer; font-family: var(--mono); }
 .kst-log .m .c:hover { text-decoration: underline; }
 .kst-log .m .to { color: var(--warn); font-family: var(--mono); font-size: 12px; }
