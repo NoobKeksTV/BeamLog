@@ -25,7 +25,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt pyinstaller pytest httpx
       - run: python -m pytest -q
-      - run: python build_tools/build.py
+      - run: python build_tools/build.py   # erzeugt auch contestlogger/CHANGELOG.md aus der Git-Historie
       - id: ver
         shell: bash
         run: echo "version=$(python -c 'import contestlogger;print(contestlogger.__version__)')" >> "$GITHUB_OUTPUT"

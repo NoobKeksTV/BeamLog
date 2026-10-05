@@ -1,156 +1,84 @@
+<div align="center">
+
 # ContestLogger
 
-Lokaler, webbasierter Contest-Logger für UKW-Contests (DARC/IARU Region 1) –
-gedacht als Nachfolger von DD3KU WinContest. Ein kleiner Python-Server im LAN
-ist der zentrale Speicher; geloggt wird von beliebig vielen Rechnern, Tablets
-oder Handys im Browser. Kein Internet nötig, keine Accounts.
+**Lokaler, webbasierter Contest-Logger für UKW-Contests (DARC / IARU Region 1)**
+Nachfolger von DD3KU WinContest · ein Server im LAN, loggen von jedem Browser · ON4KST-Chat, Operator-Fenster, Aircraft-Scatter
 
-© Lars Hölker
+[![Release](https://img.shields.io/github/v/release/NoobKeksTV/ContestLogger?label=Release&color=3fb3ff)](https://github.com/NoobKeksTV/ContestLogger/releases/latest)
+[![Build](https://img.shields.io/github/actions/workflow/status/NoobKeksTV/ContestLogger/build.yml?label=Build)](https://github.com/NoobKeksTV/ContestLogger/actions/workflows/build.yml)
+[![Downloads](https://img.shields.io/github/downloads/NoobKeksTV/ContestLogger/total?label=Downloads&color=3ddc84)](https://github.com/NoobKeksTV/ContestLogger/releases)
+[![Letzter Commit](https://img.shields.io/github/last-commit/NoobKeksTV/ContestLogger?label=Letzter%20Commit)](https://github.com/NoobKeksTV/ContestLogger/commits/main)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![Plattformen](https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-portable-8b98a8)](https://github.com/NoobKeksTV/ContestLogger/releases/latest)
+[![Stars](https://img.shields.io/github/stars/NoobKeksTV/ContestLogger?style=social)](https://github.com/NoobKeksTV/ContestLogger/stargazers)
+
+[**Download**](https://github.com/NoobKeksTV/ContestLogger/releases/latest) · [**Wiki**](docs/wiki/Home.md) · [Installation](docs/wiki/Installation.md) · [Server-Deploy](docs/wiki/Deploy.md) · [Tastenkürzel](docs/wiki/Tastenkuerzel.md) · [Fehlersuche](docs/wiki/Fehlersuche.md)
+
+</div>
+
+---
+
+![Loggen](docs/wiki/img/loggen.png)
+
+## Was ist das?
+
+Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speicher für euren Contest. Alle am Standort loggen im Browser, jeder nur mit einem Nickname. Mehrere Stationen (2 m, 70 cm, 23 cm …) laufen parallel, jede mit eigenem Log, eigener laufender Nummer und eigenem ON4KST-Chat. Punkte, Dupes und Statistik rechnet der Server so wie WinContest, verifiziert gegen echte Logs.
 
 ## Funktionen
 
-- **Mehrere Stationen pro Contest** (z. B. 2 m und 70 cm), jede mit eigenem Rufzeichen,
-  Locator, Band, Passwort und Seriennummer. Freischalten per Passwort, Umschalten jederzeit.
-- **Live-Scoreboard**: alle Stationen sehen gegenseitig QSOs, Punkte, Großfelder, ODX, Rate.
-- **Loggen**: Rufzeichen, Locator, RST gegeben/erhalten, Nr. gegeben (automatisch hochzählend,
-  pro Station rücksetzbar), Nr. erhalten, Kommentar. Zeit immer **UTC**.
-- **Vorschläge beim Tippen** aus dem Call-Buch und allen eigenen (alten und aktuellen) Logs –
-  mit Locator, Entfernung, Richtung, „schon gearbeitet“-Hinweis. Das Call-Buch wächst mit jedem QSO.
-- **Entfernung in km und Richtung in Grad** vom eigenen Locator, Dupe-Erkennung je Band, Punkte
-  wie WinContest (1 Punkt pro angefangenem km – gegen echte WinContest-Logs verifiziert).
-- **Bearbeiten und Löschen** von QSOs, Punkte/Dupes werden neu berechnet.
-- **Chat** für alle Angemeldeten (nur ein Nickname, kein Account), Anwesenheitsliste.
-- **Statistik**: QSOs/Punkte pro Stunde, Entfernungsverteilung, Richtungsrose, Großfelder,
-  Länder, Top-10-ODX, Operatoren.
-- **Import**: WinContest `Datenbank/*.txt`, `*.mdb` (rein in Python, auch verschlüsselte Jet4-Dateien), `DD3KU/*.EXP`, EDI/REG1TEST,
-  ADIF, Call-Listen (`Call;Locator;Name`).
-- **Export**: EDI (REG1TEST für die Abgabe), ADIF, CSV, Call-Buch-CSV.
-- **Multi-Band-Gesamtwertung** pro Contest (alle Stationen/Bänder zusammen), Countdown bis Contest-Ende.
-- **CAT-Anbindung**: `tools/cat_bridge.py` meldet die Frequenz des Funkgeräts (Hamlib rigctld oder flrig)
-  an den Server; sie wird bei der Station angezeigt und je QSO gespeichert (ADIF `FREQ`).
-- **Backup** automatisch auf dem Server (alle 15 min bei Änderungen, beim Beenden, manuell per Knopf);
-  SQLite im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt die Datenbank nicht.
-- **Karte** (OpenStreetMap, Leaflet lokal gebündelt): Großkreis-Pfeil vom eigenen zum Partner-Locator mit
-  km/Grad, alle QSOs als Punkte; Kachel-Server einstellbar (lokaler Tile-Server für reinen Offline-Betrieb).
-- **Tastatur-Makros F1–F8** mit Platzhaltern (`{mycall} {call} {nr} {rst} …`), F9 zeigt die Übersicht,
-  Esc stoppt; mit CAT-Bridge `--cw` werden sie als CW über Hamlib gegeben.
-- **Töne** (QSO, Dupe, Chat, QSO einer anderen Station), abschaltbar.
-- **Contest-Ansicht**: globale Zahlen über alle Stationen/Bänder, Stundenverlauf je Band, Live-Feed,
-  Großanzeige-Modus für einen Monitor.
-- **Log-Prüfung (Pflicht)** vor dem EDI-Export: Locator/RST/Nummern/Zeiten/Contestzeitraum/EDI-Kopfdaten,
-  Klick auf den Fehler öffnet das QSO; Export aller Bänder eines Contests als ZIP.
-- **QR-Code** mit der Server-Adresse für Handy/Tablet.
-- **Mehrsprachig** (Deutsch, Englisch); eigene Sprachen per JSON-Datei in `data/lang/` (Vorlage in der Verwaltung).
-- **Stationsdatenbank** mit Startdaten, wächst mit jedem QSO/Import; Locator/km/Grad werden beim Eingeben
-  des Rufzeichens automatisch gesetzt. Optional **externe Abfrage** bei HamQTH oder QRZ.com (wie Wavelog),
-  Ergebnisse werden gespeichert. **Ergebnislisten-Import** (DARC/IARU/UKW-CC als HTML, PDF, Text oder URL) mit
-  Vorschau füllt die Stationsdatenbank. **Plausibilitätsprüfung** Rufzeichen-Land ↔ Locator (live und bei der Log-Prüfung).
-- **DARC-Contest-Hub direkt**: Verwaltung → „DARC-Contest-Hub“ lädt die offiziellen `result.csv` aller
-  UKW-Conteste (2017–heute, 500–900 Calls je Contest inkl. ODX-Gegenstationen) in die Stationsdatenbank.
-- **ON4KST-Chat** im Chat-Fenster (Reiter KST / An mich / DM): Server hält die Telnet-Verbindung, alle Browser
-  chatten unter dem Stations-Call; Nutzerliste mit km/Grad, Antworten per ↩ (`/CQ CALL`), DM-Ansicht je Nutzer,
-  Textbausteine mit Platzhaltern per Knopf, Klick auf ein Rufzeichen übernimmt Call + Locator in den Logger.
-- **Chat als eigenes Fenster** (↗) – auch von dort landen Klicks auf Rufzeichen im Logger des Hauptfensters.
-- Länderkennung weltweit (DXCC-Präfixe), responsives Layout (Fenster beliebig skalierbar, auch Handy), hell/dunkel.
+| | |
+|---|---|
+| **Loggen** | Rufzeichen, RST, Nummern, Locator, Kommentar; Vorschläge aus der Stationsdatenbank und allen eigenen Logs; Locator, km und Grad automatisch; Dupe-Warnung; Plausibilitätsprüfung Rufzeichen ↔ Locator; Bearbeiten und Löschen; Zeit in UTC |
+| **Stationen und Contests** | Globale Stationen mit Stammdaten (Passwort, KST-Zugang, EDI-Angaben), Contest anlegen mit Stationsauswahl, Operatoren schalten per Passwort frei |
+| **Chat, ON4KST, DM** | Lokaler Chat je Contest, KST-Chat je Station (Nutzerliste, Textbausteine, „an mich“-Markierung), Direktnachrichten wie ein Messenger, Rundruf an noch nicht gearbeitete Stationen im Umkreis |
+| **Operator-Fenster** | Zweiter Monitor: live Rufzeichen, Nummern, RST, Locator, Entfernung/Richtung, Dupe-Warnung, Hinweis vom Logger, Statistik, Karte, letzte QSOs |
+| **Karte** | Richtungspfeil zum Partner, alle QSOs, Großfelder; **Flugzeug-Scatter** (ADS-B, wie AirScout) mit Zone gemeinsamer Sichtbarkeit und Flugzeugen im Korridor |
+| **Statistik** | Contest gesamt und je Station: Stundenverlauf, Entfernungs- und Richtungsverteilung, Großfelder, Länder, ODX, Großanzeige |
+| **Import** | WinContest-Ordner (`.mdb` ohne Zusatzsoftware, `.txt`, `.EXP`), EDI, ADIF, Ergebnislisten (DARC/IARU), DARC-Contest-Hub direkt |
+| **Export / Abgabe** | EDI (REG1TEST) mit Pflicht-Log-Prüfung und Online-Abgleich (HamQTH/QRZ), ADIF, CSV, alle Bänder als ZIP |
+| **Stationsdatenbank** | Wächst mit jedem QSO, der KST-Nutzerliste, Importen und Online-Abfragen; Export und Abgleich mit dem Repo |
+| **CAT / CW** | Frequenz vom Funkgerät (Hamlib, flrig), Sprachbausteine F2–F8 als CW |
+| **Betrieb** | Backups auf dem Server (crash-sicher), Aktionsprotokoll, Update-Prüfung mit Selbst-Aktualisierung, „Was ist neu“, mehrsprachig, hell/dunkel, Hilfe mit F1 |
 
-## Installation und Start
+## Schnellstart
 
-Voraussetzung: Python 3.10+ auf dem Rechner, der als Server dient (Laptop, Raspberry Pi …).
+1. [ZIP für dein System laden](https://github.com/NoobKeksTV/ContestLogger/releases/latest) und entpacken.
+2. `ContestLogger.exe` (Windows) bzw. `./ContestLogger` (Linux/macOS) starten. Der Browser öffnet `http://localhost:8000`; andere Rechner nutzen die beim Start angezeigte LAN-Adresse oder den QR-Code (📱).
+3. Admin-Passwort festlegen, unter **Verwaltung** die Stationen anlegen und den ersten Contest erstellen.
+4. Im Reiter **Loggen** Station wählen und loslegen. F1 zeigt alle Tastenkürzel.
 
-```bash
-pip install -r requirements.txt
-python run.py                # http://localhost:8000 – die LAN-Adresse wird beim Start angezeigt
-```
+Für einen dauerhaft laufenden Server (Debian, nginx, systemd): im Linux-ZIP liegt `deploy/`, Anleitung im [Wiki](docs/wiki/Deploy.md).
 
-Optional: `python run.py --port 8080 --db /pfad/zu/log.db`.
-Alle Daten liegen in **einer** SQLite-Datei (`data/contestlogger.db`) – zum Sichern einfach kopieren.
+Aus dem Quellcode: `pip install -r requirements.txt && python run.py` (Python 3.11+).
 
-Access-`.mdb`-Dateien werden ohne Zusatzprogramme gelesen (eingebauter Jet4-Leser).
+## Bilder
 
-## Ablauf
+<table>
+<tr>
+<td><img src="docs/wiki/img/operator.png" alt="Operator-Fenster"><br><sub>Operator-Fenster für den zweiten Monitor</sub></td>
+<td><img src="docs/wiki/img/statistik.png" alt="Statistik"><br><sub>Statistik mit Karte, Großfeldern und Diagrammen</sub></td>
+</tr>
+<tr>
+<td><img src="docs/wiki/img/chat-kst.png" alt="KST-Chat"><br><sub>ON4KST-Chat je Station</sub></td>
+<td><img src="docs/wiki/img/karte-flugzeuge.png" alt="Flugzeug-Scatter"><br><sub>Flugzeug-Scatter auf der Karte</sub></td>
+</tr>
+<tr>
+<td><img src="docs/wiki/img/verwaltung.png" alt="Verwaltung"><br><sub>Verwaltung: Stationen, Contests, Importe, Export</sub></td>
+<td><img src="docs/wiki/img/logpruefung.png" alt="Log-Prüfung"><br><sub>Log-Prüfung vor der EDI-Abgabe</sub></td>
+</tr>
+</table>
 
-1. Beim ersten Aufruf das **Admin-Passwort** festlegen.
-2. Jeder Browser gibt einen **Nickname** ein (wird im Chat und je QSO als Operator gespeichert).
-3. Unter **Verwaltung** (Admin) Contest anlegen und Stationen mit Passwort einrichten.
-   Die Angaben für die EDI-Abgabe (Standort, Verantwortlicher, Antenne …) stehen dort pro Station.
-4. Im Reiter **Loggen** Station wählen, mit Stations-Passwort freischalten, loslegen.
+## Dokumentation
 
-Tastatur: `Enter` springt zum nächsten Feld bzw. loggt, `Leertaste` springt Rufzeichen → Nr. erhalten → Locator → Kommentar, `↑`/`↓` wählt Vorschläge, `Esc` leert die Eingabe, `F1`–`F8` Makros, `F9` Makro-Übersicht.
-
-## Eigene Sprache hinzufügen
-
-Verwaltung → Sprachen → „Übersetzungsvorlage herunterladen“. Die Datei enthält alle deutschen
-Originaltexte als Schlüssel; die Werte übersetzen, `_name` setzen und als `data/lang/<code>.json`
-(z. B. `data/lang/nl.json`) neben der Datenbank speichern, Server neu starten. Leere Werte bleiben deutsch.
-
-## Alte WinContest-Logs komplett übernehmen
-
-```bash
-python tools/import_dd3ku.py "D:\Contest"            # ganzer WinContest-Ordner
-python tools/import_dd3ku.py "D:\Contest" --callbook-only
-```
-
-Jedes Log wird als archivierter Contest mit Station angelegt; alle Rufzeichen und Locator
-landen im Call-Buch und erscheinen danach als Vorschläge.
-
-Hinweis: Die Datei `Contest.dat` von WinContest (Call-Datenbank) ist verschlüsselt und kann
-nicht direkt gelesen werden. Das Call-Buch wird stattdessen aus den eigenen Logs aufgebaut
-und kann zusätzlich mit jeder Call/Locator-Liste (CSV) gefüttert werden.
-
-## Portable Version bauen (ohne Python auf dem Zielrechner)
-
-```bash
-build.bat          # Windows  → dist\ContestLogger-<version>-windows-x86_64.zip
-./build.sh         # Linux / macOS / Raspberry Pi
-```
-
-Das ZIP enthält `ContestLogger[.exe]` (Server + Oberfläche), `ContestLogger-CAT` (CAT-Bridge),
-`ContestLogger-Import` (WinContest-Import), `START.txt` und einen leeren `data/`-Ordner. Alles liegt
-in einem Ordner, der ganze Ordner ist umziehbar (USB-Stick, anderer Rechner). Doppelklick auf
-`ContestLogger.exe` startet den Server und öffnet den Browser; Datenbank, Backups und eigene
-Sprachen landen in `data/` neben dem Programm.
-
-Gebaut wird mit PyInstaller **auf dem jeweiligen Betriebssystem** (Windows-Build auf Windows usw.).
-Der GitHub-Workflow `.github/workflows/build.yml` baut bei einem Tag `v*` automatisch für
-Windows, Linux und macOS und hängt die ZIPs an das Release.
-
-## Als Dienst auf einem Debian-Server (nginx + systemd)
-
-```bash
-git clone https://github.com/NoobKeksTV/ContestLogger.git && cd ContestLogger
-sudo bash deploy/install.sh
-```
-
-Details, HTTPS-Variante, Update und Wiederherstellung: siehe [`deploy/README.md`](deploy/README.md).
-
-## CAT / Frequenz vom Funkgerät
-
-Auf dem Rechner mit dem Transceiver (Hamlib `rigctld` muss laufen, z. B. `rigctld -m 3081 -r COM5`):
-
-```bash
-python tools/cat_bridge.py --server http://192.168.1.10:8000 --station 1 --password 70cm --cw
-```
-
-`--cw` gibt die F-Tasten-Makros als CW über `rigctld` aus (Hamlib `send_morse`).
-
-Die Stations-ID steht in der Verwaltung. Alternativ `--flrig http://localhost:12345` für flrig.
-
-## ON4KST-Chat
-
-Verwaltung → „ON4KST-Chat“: KST-Rufzeichen, Passwort (eigenes Passwort verwenden – Telnet überträgt es im
-Klartext), Raum (2 = 144/432 MHz, 3 = Mikrowelle …), optional „beim Start verbinden“, dann „Verbinden“.
-Im Chat-Fenster erscheinen die Reiter **KST** (alles), **An mich** (`/CQ` an das eigene Call oder Call im
-Text) und **DM** (nur ein Gesprächspartner). Der Server fragt die Nutzerliste automatisch ab (KST erlaubt
-ein Kommando pro Minute); jeder Nutzer mit Locator landet in der Stationsdatenbank.
-
-## Roadmap
-
-- Rotor-Steuerung (Hamlib `rotctld`), Lücken-Liste aus früheren Contests, weitere Wertungsregeln, Cabrillo.
+Das [Wiki](docs/wiki/Home.md) erklärt alles ausführlich: [Installation](docs/wiki/Installation.md), [Server-Deploy](docs/wiki/Deploy.md), [Erste Schritte](docs/wiki/Erste-Schritte.md), [Loggen](docs/wiki/Loggen.md), [Tastenkürzel](docs/wiki/Tastenkuerzel.md), [Chat/KST/DM](docs/wiki/Chat-KST.md), [Operator-Fenster](docs/wiki/Operator-Fenster.md), [Statistik](docs/wiki/Statistik.md), [Import/Export](docs/wiki/Import-Export.md), [Log-Prüfung](docs/wiki/Log-Pruefung.md), [Stationsdatenbank](docs/wiki/Stationsdatenbank.md), [Flugzeug-Scatter](docs/wiki/Flugzeug-Scatter.md), [CAT/CW](docs/wiki/CAT.md), [Verwaltung](docs/wiki/Verwaltung.md), [Updates](docs/wiki/Updates.md), [Fehlersuche](docs/wiki/Fehlersuche.md).
 
 ## Technik
 
-- Backend: Python, FastAPI, SQLite, WebSockets (`contestlogger/`)
-- Frontend: reines HTML/CSS/JS ohne Build-Schritt (`contestlogger/static/`)
-- Tests: `python -m pytest`
+Python 3.11, FastAPI + uvicorn, SQLite (WAL, synchron), WebSockets, Vanilla JS/HTML/CSS, Leaflet (lokal gebündelt), PyInstaller-Builds über GitHub Actions. Tests: `python -m pytest -q`. Portable Pakete: `python build_tools/build.py`.
 
-Die Versionsnummer steht in `contestlogger/__init__.py` und wird in der Oberfläche angezeigt.
+Datenquellen: Flugzeuge von [adsb.fi](https://adsb.fi) (nicht-kommerziell) oder einem eigenen ADS-B-Empfänger; Karten von [OpenStreetMap](https://www.openstreetmap.org); Ergebnislisten vom [DARC-Contest-Hub](https://dxhf2.darc.de).
+
+## Lizenz und Copyright
+
+© 2026 Lars Hölker (DN2LH). Siehe [LICENSE](LICENSE).

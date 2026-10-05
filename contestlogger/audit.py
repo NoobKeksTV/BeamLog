@@ -19,6 +19,8 @@ ACTIONS: list[tuple[str, str, str]] = [
     ("DELETE", r"/api/templates/(?P<tid>\d+)$", "Globale Station {tid} gelöscht"),
     ("POST", r"/api/contests/(?P<cid>\d+)/stations/from_template$", "Station aus globaler Station in Contest {cid} aufgenommen"),
     ("POST", r"/api/callbook/sync_repo$", "Stationsdatenbank aus dem Repo abgeglichen"),
+    ("POST", r"/api/update/check$", "Update-Prüfung"),
+    ("POST", r"/api/update/apply$", "Update eingespielt"),
     ("PATCH", r"/api/contests/(?P<cid>\d+)$", "Contest {cid} geändert"),
     ("DELETE", r"/api/contests/(?P<cid>\d+)$", "Contest {cid} gelöscht"),
     ("POST", r"/api/contests/(?P<cid>\d+)/stations$", "Station in Contest {cid} angelegt"),

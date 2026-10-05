@@ -1,0 +1,13 @@
+Copyright (c) 2026 Lars Hölker (DN2LH)
+
+Alle Rechte vorbehalten. Die Software darf für den privaten, nicht-kommerziellen Amateurfunkbetrieb
+frei verwendet und weitergegeben werden. Eine Weitergabe ohne diesen Hinweis, eine kommerzielle Nutzung
+oder die Entfernung des Copyright-Hinweises in der Software sind nicht gestattet.
+
+DIE SOFTWARE WIRD OHNE JEDE GEWÄHRLEISTUNG BEREITGESTELLT, WEDER AUSDRÜCKLICH NOCH STILLSCHWEIGEND,
+EINSCHLIESSLICH, ABER NICHT BESCHRÄNKT AUF DIE GEWÄHRLEISTUNG DER MARKTGÄNGIGKEIT, DER EIGNUNG FÜR EINEN
+BESTIMMTEN ZWECK UND DER NICHTVERLETZUNG VON RECHTEN DRITTER. IN KEINEM FALL HAFTET DER AUTOR FÜR SCHÄDEN,
+DIE AUS DER NUTZUNG DER SOFTWARE ENTSTEHEN.
+
+Enthaltene Komponenten von Dritten: Leaflet (BSD-2-Clause), access-parser (Apache-2.0), FastAPI, uvicorn,
+Starlette (MIT) – jeweils unter ihrer eigenen Lizenz.

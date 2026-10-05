@@ -31,6 +31,7 @@
     <button id="sound-btn" class="ghost small" title="Töne an/aus">🔔</button>
     <button id="qr-btn" class="ghost small" title="Adresse als QR-Code für Handy/Tablet">📱</button>
     <button id="help-btn" class="ghost small" title="Hilfe und Tastenkürzel (F1)">?</button>
+    <button id="update-badge" class="ghost small update-badge hidden" title="Neue Version verfügbar – Verwaltung → Updates">⬆ Update</button>
     <button id="theme-btn" class="ghost small" title="Hell/Dunkel umschalten">◐</button>
   </div>
 </header>
@@ -270,6 +271,16 @@
         <p class="muted small" id="backup-info">Der Server sichert die Datenbank automatisch (nur wenn sich etwas geändert hat) in den Ordner <code>backup/</code> neben der Datenbank; beim Beenden zusätzlich. Die Datenbank selbst läuft im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt sie nicht.</p>
         <p><button id="btn-backup" class="ghost">Jetzt sichern</button></p>
         <div class="table-wrap" style="max-height:180px"><table id="backup-list" class="compact"><tbody></tbody></table></div>
+        <h3>Updates</h3>
+        <p class="muted small">Der Server prüft stündlich die GitHub-Releases. Die portable Version kann sich selbst aktualisieren (Dateien werden ersetzt, <code>data/</code> bleibt, danach Neustart); eine Quellcode-Installation aktualisiert man mit <code>git pull</code>.</p>
+        <div class="row">
+          <span id="upd-current" class="tag"></span>
+          <button type="button" id="btn-upd-check" class="ghost">Nach Updates suchen</button>
+          <button type="button" id="btn-upd-apply" class="primary hidden">Jetzt aktualisieren</button>
+          <button type="button" id="btn-upd-news" class="ghost">News anzeigen</button>
+          <label class="row small"><input type="checkbox" id="upd-auto" checked> automatisch prüfen</label>
+        </div>
+        <div id="upd-result" class="muted small"></div>
         <h3>Aktionsprotokoll</h3>
         <p class="muted small">Jede Änderung (QSOs, Stationen, Contests, Importe, Einstellungen, KST, Backups) wird mit Zeit, Nutzer und Admin-Kennzeichen festgehalten – auch auf der Server-Konsole.</p>
         <div class="row"><input id="audit-search" placeholder="Suchen (Aktion, Nutzer, Details) …" class="small" style="flex:1;min-width:160px"><button type="button" id="btn-audit-refresh" class="ghost small">Aktualisieren</button><button type="button" id="btn-audit-dl" class="ghost small">Als Textdatei</button></div>

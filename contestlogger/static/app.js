@@ -169,7 +169,53 @@
     loadChat();
     loadKst();
     $("#f-call").focus();
+    checkUpdateBadge(); whatsNew();
   }
+  // ------------------------------------------------------------ Updates / Was ist neu
+  async function checkUpdateBadge() {
+    try { const u = await GET("/api/update/status"); S.update = u; const b = $("#update-badge"); b.classList.toggle("hidden", !u.available); if (u.available) b.textContent = `⬆ v${u.latest}`; } catch (_) { /* */ }
+  }
+  $("#update-badge").addEventListener("click", () => { showView("admin"); setTimeout(() => $("#btn-upd-check")?.scrollIntoView({ block: "center" }), 100); });
+  function changelogBox(entries, title) {
+    const box = el("div", { class: "news" }, el("h3", {}, title));
+    if (!entries.length) box.append(el("p", { class: "muted" }, t("Kein Änderungsprotokoll vorhanden (wird beim Release-Build erzeugt).")));
+    for (const e of entries) {
+      box.append(el("h4", {}, `v${e.version}${e.date ? " · " + e.date : ""}`));
+      const ul = el("ul", {});
+      for (const ln of e.lines) { if (/^- /.test(ln)) ul.append(el("li", {}, ln.slice(2))); else if (ul.lastChild) ul.lastChild.append(" ", ln.trim().replace(/^- /, "")); }
+      box.append(ul);
+    }
+    box.append(el("div", { class: "row" }, el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen"))));
+    const m = modal(box); m.classList.add("wide"); return m;
+  }
+  async function whatsNew() {
+    const seen = localStorage.getItem("cl.seenver"); const cur = S.info.version;
+    if (!cur || seen === cur) return;
+    localStorage.setItem("cl.seenver", cur);
+    if (!seen) return;  // allererster Besuch: nichts anzeigen
+    try { const r = await GET(`/api/changelog?since=${encodeURIComponent(seen)}`); if (r.entries.length) changelogBox(r.entries, t("Was ist neu in v{v}", { v: cur })); } catch (_) { /* */ }
+  }
+  $("#btn-upd-news").addEventListener("click", async () => { try { const r = await GET("/api/changelog"); changelogBox(r.entries, t("Neuigkeiten der letzten Versionen")); } catch (err) { toast(err.message, "err"); } });
+  $("#btn-upd-check").addEventListener("click", async () => {
+    const out = $("#upd-result"); out.textContent = t("Prüfe …");
+    try {
+      const r = await api("POST", "/api/update/check", {}); S.update = r;
+      out.innerHTML = "";
+      out.append(el("div", {}, r.available ? el("b", { class: "ok" }, t("Neue Version {v} verfügbar", { v: r.version })) : t("Aktuell: v{v} ist die neueste Version", { v: r.current }), r.published_at ? ` · ${fmtDate(r.published_at)}` : "", r.html_url ? [" · ", el("a", { href: r.html_url, target: "_blank" }, "GitHub")] : null),
+        el("pre", { class: "notes" }, (r.body || "").slice(0, 3000)));
+      $("#btn-upd-apply").classList.toggle("hidden", !(r.available && r.can_self_update));
+      if (r.available && !r.frozen) out.append(el("div", { class: "warn" }, t("Quellcode-Installation: aktualisieren mit git pull && pip install -r requirements.txt, dann Dienst neu starten.")));
+      if (r.available && r.frozen && !r.asset) out.append(el("div", { class: "warn" }, t("Kein Paket für diese Plattform im Release.")));
+      checkUpdateBadge();
+    } catch (err) { out.textContent = err.message; }
+  });
+  $("#btn-upd-apply").addEventListener("click", async () => {
+    if (!confirm(t("Jetzt auf die neue Version aktualisieren? Der Server startet danach neu, alle Browser verbinden sich automatisch wieder."))) return;
+    const out = $("#upd-result"); out.textContent = t("Update wird geladen …"); $("#btn-upd-apply").disabled = true;
+    try { const r = await api("POST", "/api/update/apply", {}); out.textContent = t("Version {v} eingespielt – Server startet neu …", { v: r.version }); setTimeout(() => location.reload(), 8000); }
+    catch (err) { out.textContent = err.message; $("#btn-upd-apply").disabled = false; }
+  });
+  $("#upd-auto").addEventListener("change", async (e) => { try { await api("POST", "/api/settings", { update_check: e.target.checked ? "1" : "0" }); } catch (err) { toast(err.message, "err"); } });
 
   function askSetup() {
     return new Promise((resolve) => {
@@ -937,6 +983,8 @@
       else if (m.type === "rig") { S.rig[m.station_id] = { freq: m.freq, mode: m.mode, ts: m.ts }; if (m.station_id === S.stationId) renderStationBar(); renderScoreboard(); }
       else if (m.type === "presence") renderPresence(m.users);
       else if (m.type === "opnote") { if (m.station_id === S.stationId && m.by !== S.nick) $("#opnote").value = m.text; }
+      else if (m.type === "update_available") { const b = $("#update-badge"); b.textContent = `⬆ v${m.version}`; b.classList.remove("hidden"); toast(t("Neue Version {v} verfügbar – Verwaltung → Updates", { v: m.version })); }
+      else if (m.type === "restarting") { toast(t("Server startet neu (Version {v}) …", { v: m.version })); setTimeout(() => location.reload(), 8000); }
       else if (m.type === "typing") { /* nur für das Operator-Fenster */ }
       else if (m.type === "update") {
         if (m.scope === "contests") await loadContests();
@@ -1449,7 +1497,8 @@
       const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider; $("#lookup-user").value = cfg.lookup_user || ""; $("#lookup-pass").placeholder = cfg.lookup_pass_set ? t("Passwort (gespeichert)") : t("Passwort");
       S.kstRooms = cfg.kst_rooms || {};
       $("#adsb-source").value = cfg.adsb_source || "adsb.fi"; $("#adsb-local").value = cfg.adsb_local_url || ""; $("#adsb-corridor").value = cfg.adsb_corridor_km ?? 12; $("#adsb-antenna").value = cfg.adsb_antenna_m ?? 15;
-      $("#repo-url").value = cfg.repo_url || ""; $("#repo-token").placeholder = cfg.repo_token_set ? t("Token (gespeichert)") : t("GitHub-Token (nur bei privatem Repo)");
+      $("#repo-url").value = cfg.repo_url || ""; $("#upd-auto").checked = cfg.update_check !== false; $("#upd-current").textContent = `v${S.info.version}`;
+      if (S.update?.available) { $("#upd-result").textContent = t("Neue Version {v} verfügbar", { v: S.update.latest }); $("#btn-upd-apply").classList.toggle("hidden", !S.update.can_self_update); } $("#repo-token").placeholder = cfg.repo_token_set ? t("Token (gespeichert)") : t("GitHub-Token (nur bei privatem Repo)");
     } catch (_) { /* */ }
     renderBackups(); renderCallbook(); renderAudit();
   }

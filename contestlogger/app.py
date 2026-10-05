@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import time
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -16,7 +17,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __version__, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes
+from . import __app_name__, __copyright__, __version__, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, updater
 from .db import Database
 
 STATIC = Path(__file__).parent / "static"
@@ -60,6 +61,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         db.add_audit("Server gestartet", details=f"Version {__version__}", nick="Server")
         db.prune_audit()
         task = asyncio.create_task(backup_loop()) if interval > 0 else None
+        update_task = asyncio.create_task(update_loop())
         for st in db.rows("SELECT id FROM stations WHERE kst_autostart=1 AND kst_user<>'' AND kst_pass<>''"):
             try:
                 await kst_start(st["id"])
@@ -71,6 +73,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             await c.stop()
         if task:
             task.cancel()
+        update_task.cancel()
         try:
             db.create_backup("shutdown")
         except Exception:  # noqa: BLE001
@@ -83,6 +86,34 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     app.state.hub = hub
     rig: dict[int, dict] = {}  # station_id -> {"freq": "432.200", "mode": "USB", "ts": ...}
     cw_queue: dict[int, list[str]] = {}  # station_id -> Texte, die die CAT-Bridge als CW senden soll
+    # ------------------------------------------------------------ Updates (GitHub-Releases)
+    update_state: dict[str, Any] = {"latest": None, "checked_at": 0.0, "error": "", "busy": False, "progress": ""}
+
+    async def do_update_check(force: bool = False) -> dict:
+        if db.get_setting("update_check", "1") == "0" and not force:
+            return {"current": __version__, "available": False, "disabled": True}
+        if not force and update_state["latest"] and time.time() - update_state["checked_at"] < 3600:
+            return update_state["latest"]
+        try:
+            latest = await asyncio.to_thread(updater.check_latest, db.get_setting("repo_token", "") or "")
+            was = (update_state["latest"] or {}).get("version")
+            update_state.update(latest=latest, checked_at=time.time(), error="")
+            if latest["available"] and latest["version"] != was:
+                await hub.broadcast({"type": "update_available", "version": latest["version"], "current": __version__})
+            return latest
+        except Exception as e:  # noqa: BLE001
+            update_state.update(checked_at=time.time(), error=str(e))
+            raise
+
+    async def update_loop() -> None:
+        await asyncio.sleep(20)
+        while True:
+            try:
+                await do_update_check()
+            except Exception:  # noqa: BLE001
+                pass
+            await asyncio.sleep(3600)
+
     kst_state: dict[int, kst.KstClient] = {}  # station_id -> Verbindung (eine je Station)
     app.state.kst_clients = kst_state
 
@@ -203,7 +234,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.post("/api/settings", dependencies=[Depends(require_admin)])
     def set_settings(body: dict):
-        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros", "repo_url", "repo_token", "adsb_source", "adsb_local_url", "adsb_corridor_km", "adsb_antenna_m"):
+        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros", "repo_url", "repo_token", "adsb_source", "adsb_local_url", "adsb_corridor_km", "adsb_antenna_m", "update_check"):
             if k in body:
                 db.set_setting(k, json.dumps(body[k]) if k == "kst_macros" else str(body[k] or ""))
         lookup_state["client"] = None
@@ -217,7 +248,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 "providers": lookup.PROVIDERS,
                 "kst_rooms": kst.ROOMS, "repo_url": db.get_setting("repo_url", "") or REPO_CALLBOOK_URL, "repo_token_set": bool(db.get_setting("repo_token", "")),
                 "adsb_source": db.get_setting("adsb_source", "adsb.fi") or "adsb.fi", "adsb_local_url": db.get_setting("adsb_local_url", "") or "",
-                "adsb_corridor_km": float(db.get_setting("adsb_corridor_km", "12") or 12), "adsb_antenna_m": float(db.get_setting("adsb_antenna_m", "15") or 15)}
+                "adsb_corridor_km": float(db.get_setting("adsb_corridor_km", "12") or 12), "adsb_antenna_m": float(db.get_setting("adsb_antenna_m", "15") or 15),
+                "update_check": db.get_setting("update_check", "1") != "0"}
 
     @app.post("/api/lookup/test", dependencies=[Depends(require_admin)])
     async def lookup_test():
@@ -991,6 +1023,61 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         else:
             res["lookup"] = {"provider": "none", "checked_now": 0}
         return res
+
+    # ------------------------------------------------------------ Update-API
+    @app.get("/api/update/status")
+    def update_status():
+        """Für alle Nutzer: läuft eine neue Version? (aus dem stündlichen Check, ohne Netzzugriff)"""
+        latest = update_state["latest"] or {}
+        return {"current": __version__, "latest": latest.get("version", ""), "available": bool(latest.get("available")), "html_url": latest.get("html_url", ""),
+                "can_self_update": bool(latest.get("can_self_update")), "frozen": updater.is_frozen(), "platform": updater.platform_tag(),
+                "busy": update_state["busy"], "progress": update_state["progress"], "error": update_state["error"], "checked_at": update_state["checked_at"]}
+
+    @app.post("/api/update/check", dependencies=[Depends(require_admin)])
+    async def update_check():
+        try:
+            latest = await do_update_check(force=True)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, f"Update-Prüfung fehlgeschlagen: {e}")
+        return {**latest, "frozen": updater.is_frozen()}
+
+    @app.post("/api/update/apply", dependencies=[Depends(require_admin)])
+    async def update_apply(body: dict | None = None):
+        """Neueste Version laden, einspielen und neu starten (nur portable Version)."""
+        if update_state["busy"]:
+            raise HTTPException(409, "Update läuft bereits")
+        latest = update_state["latest"] or await do_update_check(force=True)
+        if not latest.get("available") and not (body or {}).get("force"):
+            raise HTTPException(400, "Keine neuere Version verfügbar")
+        if not updater.is_frozen():
+            raise HTTPException(400, "Quellcode-Installation: bitte mit „git pull“ und „pip install -r requirements.txt“ aktualisieren und den Dienst neu starten.")
+        if not latest.get("asset"):
+            raise HTTPException(400, f"Kein Paket für diese Plattform ({updater.platform_tag()}) im Release")
+        update_state.update(busy=True, progress="lade …")
+
+        def prog(done, total):
+            update_state["progress"] = f"lade … {done // 1048576} / {total // 1048576} MB" if total else f"lade … {done // 1048576} MB"
+        try:
+            res = await asyncio.to_thread(updater.apply_update, latest["asset"], db.get_setting("repo_token", "") or "", prog)
+        except Exception as e:  # noqa: BLE001
+            update_state.update(busy=False, progress="", error=str(e))
+            raise HTTPException(500, f"Update fehlgeschlagen: {e}")
+        update_state["progress"] = "neu starten …"
+        db.add_audit(f"Update auf {latest['version']} eingespielt", details=f"von {__version__}, Neustart ({res['restart']})", nick="Admin", admin=True)
+        try:
+            db.create_backup("update")
+        except Exception:  # noqa: BLE001
+            pass
+        await hub.broadcast({"type": "restarting", "version": latest["version"]})
+        asyncio.get_event_loop().call_later(1.0, lambda: asyncio.get_event_loop().run_in_executor(None, updater.restart_now, res["restart"], res.get("bat", "")))
+        return {"ok": True, "version": latest["version"], "restart": res["restart"]}
+
+    @app.get("/api/changelog")
+    def changelog(since: str = ""):
+        """Mitgeliefertes Änderungsprotokoll (für „Was ist neu“ und „News anzeigen“)."""
+        entries = updater.changelog_since(since) if since else updater.load_changelog()
+        entries = [e for e in entries if updater.parse_version(e["version"]) <= updater.parse_version(__version__)]  # nichts Unveröffentlichtes zeigen
+        return {"current": __version__, "entries": entries[:30]}
 
     # ------------------------------------------------------------ Flugzeug-Scatter (ADS-B, wie AirScout)
     @app.get("/api/aircraft")

@@ -62,7 +62,16 @@ def main() -> None:
     shutil.rmtree(dist, ignore_errors=True)
     static = ROOT / "contestlogger" / "static"
     seed = ROOT / "contestlogger" / "seed"
+    changelog = ROOT / "contestlogger" / "CHANGELOG.md"
+    try:  # Änderungsprotokoll aus der Git-Historie (für „Was ist neu“ im Programm, offline)
+        txt = subprocess.run([sys.executable, str(ROOT / "build_tools" / "release_notes.py"), "--changelog", __version__], capture_output=True, text=True, encoding="utf-8", check=True).stdout
+        if txt.strip():
+            changelog.write_text(txt, encoding="utf-8")
+    except Exception as e:  # noqa: BLE001
+        print(f"CHANGELOG nicht erzeugt: {e}")
     server_extra = [f"--add-data={static}{SEP}contestlogger/static", f"--add-data={seed}{SEP}contestlogger/seed"] + [f"--hidden-import={h}" for h in HIDDEN]
+    if changelog.exists():
+        server_extra.append(f"--add-data={changelog}{SEP}contestlogger")
     icon = ROOT / "build_tools" / "icon.ico"
     if icon.exists() and os.name == "nt":
         server_extra.append(f"--icon={icon}")
