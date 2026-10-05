@@ -347,6 +347,7 @@
       const rig = S.rig[st.id];
       $("#station-meta").innerHTML = `${esc(st.locator)} · ${esc(st.mode)} · ${t("nächste Nr.")} <span class="serial-badge">${pad3(st.serial_next)}</span>` + (rig?.freq ? ` · 📻 ${esc(rig.freq)} MHz ${esc(rig.mode || "")}` : "");
       $("#f-nr-sent").value = pad3(st.serial_next);
+      applyExchangeMode();
       const unlocked = canLog();
       $("#station-state").innerHTML = unlocked
         ? `<span class="tag me">${t("freigeschaltet")}</span>`
@@ -406,8 +407,8 @@
   function qsoRow(q, full) {
     const tr = el("tr", { class: q.dupe ? "dupe" : "" });
     const cells = full
-      ? [q.serial_sent, fmtDate(q.ts_utc), fmtTime(q.ts_utc), q.call, q.rst_sent, pad3(q.serial_sent), q.rst_rcvd, q.serial_rcvd, q.locator, q.km, q.bearing, q.points, q.country, q.mode, q.freq || "", q.comment, q.logged_by]
-      : [fmtTime(q.ts_utc), q.call, `${q.rst_sent} ${pad3(q.serial_sent)}`, `${q.rst_rcvd} ${q.serial_rcvd}`, q.locator, q.km, q.bearing, q.points, q.country, q.logged_by];
+      ? [q.serial_sent, fmtDate(q.ts_utc), fmtTime(q.ts_utc), q.call, q.rst_sent, pad3(q.serial_sent), q.rst_rcvd, q.serial_rcvd, q.exch_rcvd || "", q.locator, q.km, q.bearing, q.points, q.country, q.mode, q.freq || "", q.comment, q.logged_by]
+      : [fmtTime(q.ts_utc), q.call, hasSerial() ? `${q.rst_sent} ${pad3(q.serial_sent)}` : q.rst_sent, `${q.rst_rcvd} ${hasSerial() ? q.serial_rcvd : ""}${q.exch_rcvd ? " " + q.exch_rcvd : ""}`.trim(), q.locator, q.km, q.bearing, q.points, q.country, q.logged_by];
     cells.forEach((c, i) => tr.append(el("td", { class: typeof c === "number" ? "num" : "" }, c)));
     if (q.dupe) tr.title = t("Doppel-QSO (0 Punkte)");
     const act = el("td", { class: "actions" });
@@ -477,14 +478,25 @@
     box.append(k(valid.length, t("QSOs")), k(pts.toLocaleString("de"), t("Punkte")), k(squares, t("Großfelder")),
       k(valid.length ? Math.round(pts / valid.length) : 0, t("Ø km")), k(rate, t("QSOs / letzte h")), k(S.qsos.length - valid.length, t("Dupes")),
       k(odx ? `${odx.call} ${odx.km} km` : "–", "ODX", "odx"));
+    if (hasDok()) box.append(k(new Set(valid.map((q) => q.exch_rcvd).filter(Boolean)).size, t("DOKs")));
   }
 
   // ---- Eingabeformular
-  const F = { call: $("#f-call"), rs: $("#f-rst-sent"), ns: $("#f-nr-sent"), rr: $("#f-rst-rcvd"), nr: $("#f-nr-rcvd"), loc: $("#f-loc"), cmt: $("#f-comment") };
-  const order = [F.call, F.rs, F.rr, F.nr, F.loc, F.cmt];
+  const F = { call: $("#f-call"), rs: $("#f-rst-sent"), ns: $("#f-nr-sent"), rr: $("#f-rst-rcvd"), nr: $("#f-nr-rcvd"), dok: $("#f-dok"), loc: $("#f-loc"), cmt: $("#f-comment") };
+  const order = [F.call, F.rs, F.rr, F.nr, F.dok, F.loc, F.cmt];
+  // Austausch des Contests: "serial" (Nummer), "dok" (DOK/OV, z. B. Köln-Aachen-Contest) oder "serial_dok" (beides)
+  const exchangeMode = () => contest()?.exchange || "serial";
+  const hasDok = () => exchangeMode().includes("dok");
+  const hasSerial = () => exchangeMode() !== "dok";
+  const firstRcvd = () => (hasSerial() ? F.nr : F.dok);  // erstes Feld nach dem Rufzeichen
+  function applyExchangeMode() {
+    const form = $("#qso-form"); form.classList.remove("x-serial", "x-dok", "x-serial_dok"); form.classList.add("x-" + exchangeMode());
+    F.dok.parentElement.classList.toggle("hidden", !hasDok());
+    F.nr.parentElement.classList.toggle("hidden", !hasSerial()); F.ns.parentElement.classList.toggle("hidden", !hasSerial());
+  }
 
   function clearForm() {
-    F.call.value = ""; F.rs.value = "59"; F.rr.value = "59"; F.nr.value = ""; F.loc.value = ""; F.cmt.value = "";
+    F.call.value = ""; F.rs.value = "59"; F.rr.value = "59"; F.nr.value = ""; F.dok.value = ""; F.loc.value = ""; F.cmt.value = "";
     S.locAuto = false; F.loc.classList.remove("auto");
     S.editingId = null; $("#qso-form button.primary").textContent = t("Loggen ⏎");
     hideSuggest(); updateHints(); F.call.focus();
@@ -508,15 +520,17 @@
       if (e.key === "Enter") {
         e.preventDefault();
         const ready = F.call.value.trim().length >= 3 && F.loc.value.trim().length >= 4;
-        if (ready && (inp === F.loc || inp === F.cmt || inp === F.nr)) submitQso();
-        else if (inp === F.call && ready) F.nr.focus();
-        else (order[i + 1] || F.call).focus();
+        const dokOk = !hasDok() || F.dok.value.trim() || inp === F.dok;
+        if (ready && dokOk && (inp === F.loc || inp === F.cmt || inp === F.nr || inp === F.dok)) submitQso();
+        else if (inp === F.call && ready) firstRcvd().focus();
+        else { let n = order[i + 1]; while (n && n.parentElement.classList.contains("hidden")) n = order[order.indexOf(n) + 1]; (n || F.call).focus(); }
       }
-      // Leertaste springt: Rufzeichen -> Nr erhalten -> Locator -> Kommentar -> Rufzeichen
+      // Leertaste springt: Rufzeichen -> Nr erhalten (-> DOK) -> Locator -> Kommentar -> Rufzeichen
       if (e.key === " " && inp !== F.cmt) {
         e.preventDefault();
         if (inp === F.call) lookupCall();
-        const hop = { [F.call.id]: F.nr, [F.rs.id]: F.nr, [F.rr.id]: F.nr, [F.nr.id]: F.loc, [F.loc.id]: F.cmt };
+        const afterNr = hasDok() ? F.dok : F.loc;
+        const hop = { [F.call.id]: firstRcvd(), [F.rs.id]: firstRcvd(), [F.rr.id]: firstRcvd(), [F.nr.id]: afterNr, [F.dok.id]: F.loc, [F.loc.id]: F.cmt };
         (hop[inp.id] || F.call).focus();
       }
     });
@@ -529,6 +543,7 @@
     if (!$("#macro-bar").classList.contains("hidden")) renderMacroBar();
   });
   F.loc.addEventListener("input", () => { F.loc.value = F.loc.value.toUpperCase(); updateHints(); });
+  F.dok.addEventListener("input", () => { F.dok.value = F.dok.value.toUpperCase().replace(/\s+/g, ""); });
   F.call.addEventListener("blur", () => setTimeout(hideSuggest, 150));
   F.nr.addEventListener("blur", () => { if (/^\d+$/.test(F.nr.value)) F.nr.value = pad3(Number(F.nr.value)); });
 
@@ -601,7 +616,8 @@
   function applySuggest(s) {
     if (!s) return;
     F.call.value = s.call; if (s.locator) F.loc.value = s.locator;
-    hideSuggest(); updateHints(); F.nr.focus();
+    if (hasDok() && s.dok && !F.dok.value) { F.dok.value = s.dok; F.dok.classList.add("auto"); }
+    hideSuggest(); updateHints(); firstRcvd().focus();
   }
 
   let hintTimer;
@@ -644,7 +660,7 @@
     clearTimeout(typingTimer);
     typingTimer = setTimeout(() => {
       if (!S.stationId || S.ws?.readyState !== 1) return;
-      const data = { call: F.call.value.trim(), rs: F.rs.value.trim(), rr: F.rr.value.trim(), nr: F.nr.value.trim(), loc: F.loc.value.trim(), serial: F.ns.value, cmt: F.cmt.value.trim(),
+      const data = { call: F.call.value.trim(), rs: F.rs.value.trim(), rr: F.rr.value.trim(), nr: F.nr.value.trim(), dok: F.dok.value.trim(), loc: F.loc.value.trim(), serial: F.ns.value, cmt: F.cmt.value.trim(),
         geo: $("#hint-geo").textContent, dupe: $("#hint-dupe").classList.contains("hidden") ? "" : $("#hint-dupe").textContent, editing: !!S.editingId };
       const key = JSON.stringify(data); if (key === typingLast) return; typingLast = key;
       S.ws.send(JSON.stringify({ type: "typing", station_id: S.stationId, data }));
@@ -654,7 +670,7 @@
   const _mo = new MutationObserver(sendTyping); _mo.observe($("#hint-geo"), { childList: true, characterData: true, subtree: true }); _mo.observe($("#hint-dupe"), { attributes: true, childList: true, subtree: true });
   async function submitQso() {
     if (!canLog()) return toast(t("Station ist nicht freigeschaltet"), "err");
-    const body = { call: F.call.value.trim(), locator: F.loc.value.trim(), rst_sent: F.rs.value.trim() || "59", rst_rcvd: F.rr.value.trim() || "59", serial_rcvd: F.nr.value.trim(), comment: F.cmt.value.trim() };
+    const body = { call: F.call.value.trim(), locator: F.loc.value.trim(), rst_sent: F.rs.value.trim() || "59", rst_rcvd: F.rr.value.trim() || "59", serial_rcvd: F.nr.value.trim(), exch_rcvd: F.dok.value.trim(), comment: F.cmt.value.trim() };
     if (!S.editingId && S.rig[S.stationId]?.freq) body.freq = S.rig[S.stationId].freq;
     if (body.call.length < 3) return F.call.focus();
     try {
@@ -682,6 +698,7 @@
           lab(t("RST gegeben"), el("input", { id: "e-rs", value: q.rst_sent })),
           lab(t("RST erhalten"), el("input", { id: "e-rr", value: q.rst_rcvd })),
           lab(t("Nr erhalten"), el("input", { id: "e-nr", value: q.serial_rcvd })),
+          lab(t("DOK erhalten"), el("input", { id: "e-dok", value: q.exch_rcvd || "", maxlength: 8 })),
           lab(t("Modus"), el("input", { id: "e-mode", value: q.mode })),
           lab(t("Kommentar"), el("input", { id: "e-cmt", value: q.comment }))),
         el("div", { class: "row" }, el("button", { class: "primary" }, t("Speichern")), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Abbrechen")),
@@ -692,7 +709,7 @@
       const ts = g("#e-ts").replace(" ", "T");
       if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(ts)) return toast(t("Zeitformat: JJJJ-MM-TT HH:MM"), "err");
       try {
-        await api("PATCH", `/api/qsos/${q.id}`, { ts_utc: ts.slice(0, 16) + ":00Z", call: g("#e-call"), locator: g("#e-loc"), serial_sent: Number(g("#e-ns")), rst_sent: g("#e-rs"), rst_rcvd: g("#e-rr"), serial_rcvd: g("#e-nr"), mode: g("#e-mode"), comment: g("#e-cmt") }, { stationId: q.station_id });
+        await api("PATCH", `/api/qsos/${q.id}`, { ts_utc: ts.slice(0, 16) + ":00Z", call: g("#e-call"), locator: g("#e-loc"), serial_sent: Number(g("#e-ns")), rst_sent: g("#e-rs"), rst_rcvd: g("#e-rr"), serial_rcvd: g("#e-nr"), exch_rcvd: g("#e-dok"), mode: g("#e-mode"), comment: g("#e-cmt") }, { stationId: q.station_id });
         closeModal(); toast(t("QSO gespeichert"), "ok");
       } catch (err) { toast(err.message, "err"); }
     });
@@ -717,7 +734,7 @@
     const st = station() || {};
     return text.replace(/\{(\w+)\}/g, (_, k) => ({
       mycall: st.call || "", myloc: st.locator || "", call: F.call.value.trim() || "?", rst: F.rs.value.trim() || "59",
-      nr: pad3(st.serial_next || 1), loc: F.loc.value.trim() || "?", nick: S.nick, band: st.band || "",
+      nr: pad3(st.serial_next || 1), loc: F.loc.value.trim() || "?", nick: S.nick, band: st.band || "", dok: F.dok.value.trim() || "?", mydok: (st.info || {}).exchange || "",
     })[k] ?? `{${k}}`);
   }
   function renderMacroBar() {
@@ -763,6 +780,7 @@
       ...H(t("Loggen (Eingabeformular)"),
         K(["Enter"], t("Weiter zum nächsten Feld. Stehen Rufzeichen und Locator, wird im Feld Nr erh., Locator oder Kommentar das QSO geloggt.")),
         K(["Leertaste"], t("Springt Rufzeichen → Nr erh. → Locator → Kommentar → Rufzeichen (im Rufzeichenfeld wird dabei die Stationsdatenbank abgefragt). Im Kommentar bleibt die Leertaste ein Leerzeichen.")),
+        K(["DOK"], t("Ist der Austausch des Contests „DOK/OV“ (Verwaltung → Contest), erscheint statt der Nummer das Feld „DOK erh.“; bei „Nummer + DOK“ beides. Der DOK wird aus der Stationsdatenbank vorbelegt.")),
         K(["↑", "↓"], t("In der Vorschlagsliste unter dem Rufzeichen blättern.")),
         K(["Enter", "Tab"], t("Markierten Vorschlag übernehmen (Rufzeichen und Locator).")),
         K(["Esc"], t("Formular leeren (bzw. offenes Fenster schließen); laufende CW-Ausgabe stoppen.")),
@@ -1433,7 +1451,7 @@
 
   // ------------------------------------------------------------ Verwaltung
   const BANDS = ["50MHz", "70MHz", "144MHz", "432MHz", "1296MHz", "2320MHz", "3400MHz", "5760MHz", "10368MHz", "24048MHz", "47088MHz", "76032MHz"];
-  const INFO_FIELDS = [["section", t("Wertungsgruppe (Single/Multi …)")], ["club", t("Club / DOK")], ["operators", t("Operatoren (MOpe1)")], ["site_address", t("Standort Adresse")], ["site_city", t("Standort PLZ Ort")],
+  const INFO_FIELDS = [["section", t("Wertungsgruppe (Single/Multi …)")], ["exchange", t("Eigener DOK/OV bzw. Austausch (PExch)")], ["club", t("Club")], ["operators", t("Operatoren (MOpe1)")], ["site_address", t("Standort Adresse")], ["site_city", t("Standort PLZ Ort")],
     ["resp_name", t("Verantwortlicher Name")], ["resp_call", t("Verantwortlicher Call")], ["resp_address", t("Straße")], ["resp_zip", "PLZ"], ["resp_city", t("Ort")], ["resp_country", t("Land")], ["resp_phone", t("Telefon")], ["resp_email", t("E-Mail")],
     ["tx", t("Sender")], ["rx", t("Empfänger")], ["power", t("Leistung (W)")], ["antenna", t("Antenne")], ["antenna_height", t("Antennenhöhe über Grund (m)")], ["asl", t("Höhe über NN (m)")]];
 
@@ -1568,6 +1586,8 @@
           lab(t("Beginn (UTC)"), el("input", { id: "c-start", type: "datetime-local", value: toLocal(c?.start_utc) })),
           lab(t("Ende (UTC)"), el("input", { id: "c-end", type: "datetime-local", value: toLocal(c?.end_utc) }))),
         lab(t("Notizen"), el("input", { id: "c-notes", value: c?.notes || "" })),
+        lab(t("Austausch (was geloggt wird)"), el("select", { id: "c-exch" }, [["serial", t("RST + laufende Nummer (Standard, IARU/DARC-UKW)")], ["dok", t("RST + DOK/OV (z. B. Köln-Aachen-Contest)")], ["serial_dok", t("RST + Nummer + DOK/OV")]]
+          .map(([v, l]) => el("option", { value: v, selected: (c?.exchange || "serial") === v ? 1 : null }, l)))),
         c ? null : el("div", { class: "stack" }, el("span", { class: "muted small" }, t("Teilnehmende Stationen (aus den globalen Stationen):")),
           el("div", { class: "tpl-list" }, (S.templates || []).map((s) => el("label", { class: "check" }, el("input", { type: "checkbox", class: "c-tpl", value: s.id, checked: 1 }), `${s.call} · ${s.band} · ${s.locator}`)),
             (S.templates || []).length ? null : el("span", { class: "muted small" }, t("Keine globalen Stationen angelegt – Stationen können auch später aufgenommen werden.")))),
@@ -1575,7 +1595,7 @@
     box.querySelector("#c-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const body = { name: box.querySelector("#c-name").value, start_utc: fromLocal(box.querySelector("#c-start").value), end_utc: fromLocal(box.querySelector("#c-end").value), notes: box.querySelector("#c-notes").value,
-        template_ids: $$("#c-form .c-tpl:checked").map((x) => Number(x.value)) };
+        exchange: box.querySelector("#c-exch").value, template_ids: $$("#c-form .c-tpl:checked").map((x) => Number(x.value)) };
       try {
         const r = c ? await api("PATCH", `/api/contests/${c.id}`, body) : await api("POST", "/api/contests", body);
         if (!c) { S.contestId = r.id; save(); }
@@ -1653,8 +1673,9 @@
       $("#cb-count").textContent = r.total;
       for (const c of r.rows) tb.append(el("tr", {},
         el("td", {}, el("b", {}, c.call)), el("td", {}, c.locator, c.alt_locators ? el("span", { class: "muted small", title: t("weitere bekannte Standorte") }, ` (${c.alt_locators.split(",").join(", ")})`) : null), el("td", { class: "muted small" }, c.name || ""),
+        el("td", { class: "small", title: "DOK / OV" }, c.dok || ""),
         el("td", { class: "num muted small" }, c.qso_count ? `${c.qso_count}×` : ""), el("td", { class: "muted small" }, c.last_seen ? fmtDate(c.last_seen) : ""),
-        el("td", { class: "actions" }, el("button", { class: "ghost", onclick: () => { $("#cb-call").value = c.call; $("#cb-loc").value = c.locator; $("#cb-name").value = c.name || ""; } }, "✎"), " ",
+        el("td", { class: "actions" }, el("button", { class: "ghost", onclick: () => { $("#cb-call").value = c.call; $("#cb-loc").value = c.locator; $("#cb-name").value = c.name || ""; $("#cb-dok").value = c.dok || ""; } }, "✎"), " ",
           el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("{call} aus der Stationsdatenbank löschen?", c))) { await api("DELETE", `/api/callbook/${encodeURIComponent(c.call)}`); renderCallbook(); } } }, "✕"))));
       if (!r.rows.length) tb.append(el("tr", {}, el("td", { class: "muted" }, t("Keine Einträge."))));
     } catch (_) { /* */ }
@@ -1708,7 +1729,7 @@
   });
   $("#cb-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    try { await api("POST", "/api/callbook", { call: $("#cb-call").value, locator: $("#cb-loc").value, name: $("#cb-name").value }); toast(t("Call gespeichert"), "ok"); $("#cb-call").value = $("#cb-loc").value = $("#cb-name").value = ""; renderCallbook(); } catch (err) { toast(err.message, "err"); }
+    try { await api("POST", "/api/callbook", { call: $("#cb-call").value, locator: $("#cb-loc").value, name: $("#cb-name").value, dok: $("#cb-dok").value }); toast(t("Call gespeichert"), "ok"); $("#cb-call").value = $("#cb-loc").value = $("#cb-name").value = $("#cb-dok").value = ""; renderCallbook(); } catch (err) { toast(err.message, "err"); }
   });
 
   boot().catch((e) => toast(t("Start fehlgeschlagen: ") + e.message, "err"));

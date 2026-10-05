@@ -16,6 +16,9 @@ Kommandozeile: `ContestLogger-Import "D:\Contest" --db data\contestlogger.db`.
 
 ## Einzelne Datei importieren
 
+EDI (Spalte „Exchange received“), ADIF (`DARC_DOK`, `SRX_STRING`) und Call-Listen mit DOK-Spalte bringen den DOK/OV mit; er landet im QSO und in der Stationsdatenbank.
+
+
 WinContest `.txt`/`.EXP`/`.mdb`, EDI/REG1TEST, ADIF oder Call-Listen (`Call;Locator;Name`). Ziel: neuer Contest, bestehende Station oder nur die Stationsdatenbank.
 
 ## Ergebnislisten (DARC / IARU / UKW-Contest-Club)
@@ -35,7 +38,7 @@ Verwaltung → **Export / Abgabe** (je Contest):
 | Knopf | Ergebnis |
 |---|---|
 | EDI (mit Prüfung) | REG1TEST-Datei der Station/des Bandes für die Abgabe. Vorher läuft die [Log-Prüfung](Log-Pruefung.md); mit Fehlern exportiert nur der Admin nach Rückfrage. |
-| ADIF | Alle QSOs der Station als ADIF (mit Frequenz, wenn CAT lief). |
+| ADIF | Alle QSOs der Station als ADIF (mit Frequenz, wenn CAT lief; DOK als `DARC_DOK`/`SRX_STRING`). |
 | CSV | Tabelle. |
 | Alle Bänder als EDI-ZIP | Die EDI-Dateien aller geprüften Stationen des Contests; nicht bestandene Logs stehen in `NICHT_EXPORTIERT.txt`. |
 

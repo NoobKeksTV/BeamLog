@@ -112,6 +112,9 @@ label > input, label > select { color: var(--text); font-size: 15px; }
   display: grid; gap: 8px; align-items: end;
   grid-template-columns: 2.2fr .8fr .8fr .8fr .9fr 1.3fr 1.6fr auto;
 }
+/* Austausch je Contest: Nummer, DOK/OV oder beides – die Spalten passen sich an */
+.qso-form.x-serial_dok .fields { grid-template-columns: 2.2fr .7fr .7fr .7fr .8fr .9fr 1.2fr 1.5fr auto; }
+.qso-form input#f-dok.auto { border-color: var(--ok); box-shadow: inset 0 0 0 1px var(--ok); }
 .qso-form input { font-family: var(--mono); font-size: 20px; text-transform: uppercase; padding: 10px 12px; }
 .qso-form input#f-comment { text-transform: none; font-size: 16px; }
 .qso-form input[readonly] { color: var(--muted); background: var(--card2); }

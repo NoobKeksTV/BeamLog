@@ -31,6 +31,7 @@ class ImportedQso:
     mode: str = "SSB"
     band: str = ""
     comment: str = ""
+    exch_rcvd: str = ""  # empfangener Austausch außer der Nummer, z. B. DOK/OV
 
 
 @dataclass
@@ -39,7 +40,17 @@ class ImportResult:
     qsos: list[ImportedQso] = field(default_factory=list)
     header: dict = field(default_factory=dict)  # call, locator, band, name ...
     callbook: list[tuple[str, str, str]] = field(default_factory=list)  # (call, locator, name)
+    doks: dict[str, str] = field(default_factory=dict)  # call -> DOK/OV, soweit die Quelle ihn liefert
     warnings: list[str] = field(default_factory=list)
+
+
+# DOK/OV des DARC: Buchstabe + zwei Ziffern (G01), VFDB Z + zwei Ziffern; Sonder-DOKs sind frei (max. 8 Zeichen)
+_DOK_STRICT = re.compile(r"^[A-Z]\d{2}$")
+
+
+def _dok_value(v: str) -> str:
+    v = re.sub(r"\s+", "", (v or "")).upper()
+    return v[:8] if v and v not in ("-", "--", "DOK", "OV") else ""
 
 
 def _decode(data: bytes) -> str:
@@ -202,7 +213,7 @@ def parse_edi(text: str) -> ImportResult:
                     ts_utc=_ts(parts[0], parts[1]), call=parts[2].upper(), locator=parts[9].upper(),
                     mode={"1": "SSB", "2": "CW", "6": "FM", "7": "AM"}.get(parts[3], "SSB"),
                     rst_sent=parts[4], serial_sent=int(parts[5]) if parts[5].isdigit() else None,
-                    rst_rcvd=parts[6], serial_rcvd=parts[7], band=band,
+                    rst_rcvd=parts[6], serial_rcvd=parts[7], band=band, exch_rcvd=_dok_value(parts[8]),
                 ))
             except Exception as e:  # noqa: BLE001
                 res.warnings.append(f"{line[:60]}: {e}")
@@ -247,6 +258,7 @@ def parse_adif(text: str) -> ImportResult:
                 serial_sent=int(fields["STX"]) if fields.get("STX", "").isdigit() else None,
                 serial_rcvd=fields.get("SRX", ""), mode=fields.get("MODE", "SSB"),
                 band=_band_label(band) if band else "", comment=fields.get("COMMENT", ""),
+                exch_rcvd=_dok_value(fields.get("DARC_DOK") or fields.get("SRX_STRING") or ""),
             ))
         except Exception as e:  # noqa: BLE001
             res.warnings.append(f"ADIF-Record: {e}")
@@ -335,8 +347,10 @@ def _parse_mdb_mdbtools(data: bytes) -> ImportResult:
 
 # ---------------------------------------------------------------- Call-Listen
 def parse_callbook_csv(text: str) -> ImportResult:
-    """Call;Locator[;Name] – Trennzeichen ; , Tab oder Leerzeichen."""
+    """Call;Locator[;Name][;DOK] – Trennzeichen ; , Tab oder Leerzeichen.
+    Eine Kopfzeile mit „DOK“ legt die Spalte fest; ohne Kopfzeile gilt ein Feld wie „G01“ als DOK."""
     res = ImportResult("callbook")
+    dok_col = -1
     for line in text.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -346,10 +360,24 @@ def parse_callbook_csv(text: str) -> ImportResult:
             continue
         call, loc = parts[0].upper(), parts[1].upper()
         if not prefixes.is_plausible_call(call) or not geo.is_valid_locator(loc):
-            if call.upper() not in ("CALL", "RUFZEICHEN"):
+            if call.upper() in ("CALL", "RUFZEICHEN"):
+                up = [p.upper() for p in parts]
+                dok_col = up.index("DOK") if "DOK" in up else (up.index("OV") if "OV" in up else -1)
+            else:
                 res.warnings.append(f"übersprungen: {line[:40]}")
             continue
-        res.callbook.append((call, loc, " ".join(parts[2:])))
+        rest = parts[2:]
+        dok = ""
+        if dok_col >= 0 and len(parts) > dok_col:
+            dok = _dok_value(parts[dok_col])
+            rest = [p for i, p in enumerate(parts) if i >= 2 and i != dok_col]
+        else:
+            for p in rest:
+                if _DOK_STRICT.match(p.upper()):
+                    dok = p.upper(); rest = [x for x in rest if x != p]; break
+        if dok:
+            res.doks[prefixes.core_call(call)] = dok
+        res.callbook.append((call, loc, " ".join(rest)))
     return res
 
 
@@ -428,6 +456,11 @@ def parse_results_list(text: str) -> ImportResult:
         seen.add(core)
         pl = prefixes.check_plausibility(call, locs[0])
         res.callbook.append((call, locs[0], ""))
+        # DOK in der Zeile (G01, Z23 …) – nur das strenge Muster, damit kein Rufzeichen/Locator-Teil durchrutscht
+        for tok in re.findall(r"\b([A-Z]\d{2})\b", line):
+            if tok != call and tok not in locs:
+                res.doks[core] = tok
+                break
         if not pl["ok"]:
             res.warnings.append(f"{call} {locs[0]}: {pl['msg'].split(' – ')[0]}")
     return res
@@ -454,6 +487,10 @@ def parse_darc_csv(text: str) -> ImportResult:
                 continue
             seen.add(core)
             res.callbook.append((core, loc, ""))
+            if ck != "ODX Call":
+                dok = _dok_value(next((r.get(k) or "" for k in r if k and k.strip().upper() in ("DOK", "OV")), ""))
+                if dok:
+                    res.doks[core] = dok
     return res
 
 

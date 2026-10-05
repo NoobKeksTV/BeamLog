@@ -2,26 +2,26 @@
 
 ![Stationsdatenbank in der Verwaltung](img/stationsdatenbank.png)
 
-Die Stationsdatenbank ordnet Rufzeichen einem Locator (und ggf. Namen) zu. Sie liefert die Vorschläge und die Locator-Vorbelegung beim Loggen, die Plausibilitätshinweise und die Kandidaten für den Rundruf.
+Die Stationsdatenbank ordnet Rufzeichen einem Locator, ggf. einem Namen und dem **DOK/Ortsverband** zu. Sie liefert die Vorschläge und die Locator-Vorbelegung beim Loggen, die Plausibilitätshinweise und die Kandidaten für den Rundruf.
 
 ## Woher die Einträge kommen
 
 | Quelle | Wann |
 |---|---|
 | Startdatenbank | Beim ersten Start wird `contestlogger/seed/stationsdatenbank.csv` geladen. |
-| Eigene QSOs | Jedes geloggte QSO (auch importierte Logs). |
+| Eigene QSOs | Jedes geloggte QSO (auch importierte Logs); bei DOK-Contests auch der empfangene DOK. |
 | KST-Nutzerliste | Alle 10 Minuten je Verbindung; jeder Nutzer mit Locator. |
-| Ergebnislisten / DARC-Hub | Importe in der Verwaltung. |
+| Ergebnislisten / DARC-Hub | Importe in der Verwaltung; enthält die Liste eine DOK-Spalte (DARC-Hub `result.csv`) oder einen DOK wie `G01` in der Zeile, wird er übernommen. |
 | HamQTH / QRZ | Online-Abfrage beim Loggen und in der Log-Prüfung (Ergebnis wird gespeichert). |
 | Von Hand | Formular unter der Tabelle in der Verwaltung. |
 | Repo-Abgleich | „Nach neuen suchen (Repo)“, siehe unten. |
 
-Regeln: Der neueste Locator wird zum Hauptlocator, ältere wandern in „weitere Standorte“ (bis zu 5) und erscheinen im Logger zur Auswahl. Zusätze wie `/P`, `-2` oder `-23CM` werden entfernt, das Rufzeichen wird als Kern (`DN2LH`) gespeichert.
+Regeln: Der neueste DOK gewinnt (ein Rufzeichen kann den OV wechseln). Der neueste Locator wird zum Hauptlocator, ältere wandern in „weitere Standorte“ (bis zu 5) und erscheinen im Logger zur Auswahl. Zusätze wie `/P`, `-2` oder `-23CM` werden entfernt, das Rufzeichen wird als Kern (`DN2LH`) gespeichert.
 
 ## Export
 
-- **Stationsdatenbank exportieren (CSV)**: alle Spalten (Call, Locator, Name, QSOs, Zuletzt, weitere Locator).
-- **Export im Repo-Format**: `Call;Locator;Zuletzt` – genau das Format der Startdatenbank im Repo.
+- **Stationsdatenbank exportieren (CSV)**: alle Spalten (Call, Locator, Name, DOK, QSOs, Zuletzt, weitere Locator).
+- **Export im Repo-Format**: `Call;Locator;Zuletzt;DOK` – genau das Format der Startdatenbank im Repo.
 
 ## Abgleich mit dem Repo
 

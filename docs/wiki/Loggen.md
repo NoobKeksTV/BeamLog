@@ -10,10 +10,25 @@
 | **RST geg. / RST erh.** | Vorbelegt mit 59 (bzw. 599 bei CW). |
 | **Nr geg.** | Laufende Nummer, automatisch hochzählend, orange hervorgehoben. Rücksetzen über den Knopf „Nr. zurücksetzen“ oder in der Verwaltung. |
 | **Nr erh.** | Empfangene Nummer. |
+| **DOK erh.** | DOK/Ortsverband der Gegenstation – nur bei Contests mit Austausch „DOK/OV“ oder „Nummer + DOK“ (siehe unten). |
 | **Locator** | Wird aus der Stationsdatenbank vorbelegt (grau = automatisch, wird bei eigener Eingabe überschrieben). Hat ein Rufzeichen mehrere bekannte Standorte, erscheinen sie darunter zur Auswahl. |
 | **Kommentar** | Frei. |
 
 Unter dem Formular: Entfernung in km und Richtung in Grad, Dupe-Warnung („⚠ DL8NAS bereits gearbeitet um 10:12 UTC (JN59LE) – DUPE!“) und Plausibilitätshinweise (z. B. deutsches Rufzeichen mit Locator im Ausland, oder Stationsdatenbank kennt den Partner mit anderem Locator).
+
+## Austausch je Contest: Nummer, DOK oder beides
+
+Was geloggt werden muss, legt der Contest fest (Verwaltung → Contest → **Austausch**):
+
+| Austausch | Felder im Logger | Beispiel |
+|---|---|---|
+| RST + laufende Nummer | Nr geg., Nr erh. | DARC-UKW-Contest, IARU-Region-1-Contests |
+| RST + DOK/OV | DOK erh. (die Nummernfelder sind ausgeblendet) | Köln-Aachen-Contest |
+| RST + Nummer + DOK/OV | Nr geg., Nr erh., DOK erh. | Contests mit beidem |
+
+![Loggen mit DOK](img/loggen-dok.png)
+
+Der DOK wird aus der [Stationsdatenbank](Stationsdatenbank.md) vorbelegt (grün umrandet), sobald das Rufzeichen bekannt ist, und mit jedem QSO dort gelernt. Die Leertaste springt Rufzeichen → Nr erh. → DOK erh. → Locator; fehlt die Nummer im Contest, direkt zum DOK. Der eigene DOK steht bei der Station in den EDI-Angaben („Eigener DOK/OV bzw. Austausch“) und landet im EDI-Kopf als `PExch`; der empfangene DOK steht in der EDI-QSO-Zeile (Spalte „Exchange received“), im ADIF (`DARC_DOK`, `SRX_STRING`) und in der CSV. Die Statistikzeile zählt die verschiedenen DOKs, die Log-Prüfung warnt bei fehlendem DOK. Das Operator-Fenster zeigt das DOK-Feld statt bzw. neben den Nummern.
 
 ## Ablauf mit der Tastatur
 

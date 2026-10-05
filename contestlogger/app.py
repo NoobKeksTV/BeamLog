@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import __app_name__, __copyright__, __version__, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, updater
-from .db import Database
+from .db import Database, normalize_dok
 
 STATIC = Path(__file__).parent / "static"
 SEED = Path(__file__).parent / "seed" / "stationsdatenbank.csv"
@@ -49,7 +49,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         import re as _re
         for call, loc, name in res.callbook:
             when = f"{name}T00:00:00Z" if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) else ""
-            db.learn_call(call, loc, source="seed", name="" if when else name, when=when)
+            db.learn_call(call, loc, source="seed", name="" if when else name, when=when, dok=res.doks.get(call, ""))
         db.set_setting("seeded", "1")
         return len(res.callbook)
 
@@ -265,7 +265,6 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     @app.get("/api/lookup")
     async def lookup_call(call: str):
         """Rufzeichen nachschlagen: erst Stationsdatenbank, dann (wenn eingerichtet) HamQTH/QRZ."""
-        from . import prefixes
         core = prefixes.core_call(call)
         known = db.lookup_call(core)
         if known and known.get("locator"):
@@ -323,7 +322,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     async def create_contest(body: dict):
         if not (body.get("name") or "").strip():
             raise HTTPException(400, "Name fehlt")
-        cid = db.create_contest(body["name"], body.get("start_utc"), body.get("end_utc"), body.get("scoring", "km"), body.get("notes", ""))
+        cid = db.create_contest(body["name"], body.get("start_utc"), body.get("end_utc"), body.get("scoring", "km"), body.get("notes", ""), body.get("exchange") or "serial")
         for tid in body.get("template_ids") or []:  # teilnehmende globale Stationen
             try:
                 sid = db.create_station_from_template(cid, int(tid))
@@ -575,7 +574,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.get("/api/calc")
     def calc(my: str, loc: str, call: str = ""):
-        from . import geo, prefixes
+        from . import geo  # noqa: F401
         if not (geo.is_valid_locator(my) and geo.is_valid_locator(loc)):
             return {"valid": False}
         out = {"valid": True, "km": geo.distance_km_int(my, loc), "bearing": round(geo.bearing_deg(my, loc)) % 360, "warnings": []}
@@ -591,11 +590,11 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     @app.get("/api/callbook")
     def callbook_list(q: str = "", limit: int = 200):
         q = q.strip().upper()
-        sql = "SELECT call, locator, name, qso_count, last_seen, alt_locators, source FROM callbook"
+        sql = "SELECT call, locator, name, qso_count, last_seen, alt_locators, source, dok FROM callbook"
         params: list = []
         if q:
-            sql += " WHERE call LIKE ? OR locator LIKE ? OR name LIKE ?"
-            params = [f"%{q}%", f"{q}%", f"%{q}%"]
+            sql += " WHERE call LIKE ? OR locator LIKE ? OR name LIKE ? OR dok=?"
+            params = [f"%{q}%", f"{q}%", f"%{q}%", q]
         rows = db.rows(sql + " ORDER BY call LIMIT ?", params + [min(int(limit), 2000)])
         return {"total": db.callbook_count(), "rows": rows}
 
@@ -608,7 +607,6 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     @app.post("/api/import/folder", dependencies=[Depends(require_admin)])
     async def import_folder(files: list[UploadFile] = File(...), x_nick: str | None = Header(default=None)):
         """Ganzer WinContest-Ordner (mehrere Dateien): jedes Log wird ein archivierter Contest, alle Calls ins Call-Buch."""
-        from . import prefixes
         report: dict[str, Any] = {"files": [], "contests": 0, "qsos": 0, "callbook": 0, "calls_new": 0, "calls_known": 0, "skipped": []}
         seen_logs: set[tuple[str, str]] = set()
         for up in sorted(files, key=lambda f: (0 if (f.filename or "").lower().endswith(".mdb") else 1, f.filename or "")):
@@ -625,7 +623,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 continue
             entry = {"file": name, "kind": res.kind, "qsos": len(res.qsos), "imported": 0, "calls_new": 0, "calls_known": 0}
             for call, loc, nm in res.callbook:
-                r = db.learn_call(call, loc, source="import", name=nm)
+                r = db.learn_call(call, loc, source="import", name=nm, dok=res.doks.get(prefixes.core_call(call), ""))
                 entry["calls_new" if r == "new" else "calls_known"] += 1 if r else 0
             for q in res.qsos:
                 r = db.learn_call(q.call, q.locator, source="import", when=q.ts_utc)
@@ -696,10 +694,9 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             res = importers.parse_results_list(content)
         except ValueError as e:
             raise HTTPException(400, str(e))
-        pairs = [{"call": c, "locator": loc} for c, loc, _ in res.callbook]
+        pairs = [{"call": c, "locator": loc, "dok": res.doks.get(prefixes.core_call(c), "")} for c, loc, _ in res.callbook]
         if not commit:
             known = {r["call"]: r["locator"] for r in db.rows("SELECT call, locator FROM callbook")}
-            from . import prefixes
             for pr in pairs:
                 core = prefixes.core_call(pr["call"])
                 pr["known"] = known.get(core, "")
@@ -710,7 +707,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         for pr in pairs:
             if wanted is not None and pr["call"] not in wanted:
                 continue
-            db.learn_call(pr["call"], pr["locator"], source="results")
+            db.learn_call(pr["call"], pr["locator"], source="results", dok=pr.get("dok", ""))
             n += 1
         return {"imported": n}
 
@@ -914,7 +911,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 report.append({"url": url, "error": str(e)})
                 continue
             for call, loc, _ in res.callbook:
-                db.learn_call(call, loc, source="darc")
+                db.learn_call(call, loc, source="darc", dok=res.doks.get(call, ""))
             total += len(res.callbook)
             report.append({"url": url, "calls": len(res.callbook)})
         return {"total": total, "callbook_count": db.callbook_count(), "files": report}
@@ -927,7 +924,10 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.post("/api/callbook", dependencies=[Depends(require_admin)])
     def callbook_edit(body: dict):
-        db.learn_call(body.get("call", ""), body.get("locator", ""), source="manual", name=body.get("name", ""))
+        db.learn_call(body.get("call", ""), body.get("locator", ""), source="manual", name=body.get("name", ""), dok=body.get("dok", ""))
+        if "dok" in body:  # leeres Feld löscht den DOK bewusst
+            with db.conn:
+                db.conn.execute("UPDATE callbook SET dok=? WHERE call=?", (normalize_dok(body.get("dok")), prefixes.core_call(body.get("call", ""))))
         return db.lookup_call(body.get("call", "")) or {}
 
     # ------------------------------------------------------------ Import
@@ -943,7 +943,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         report: dict[str, Any] = {"kind": res.kind, "warnings": res.warnings[:50], "qsos": 0, "callbook": 0}
         # Call-Listen und – immer – die Rufzeichen/Locator aus den QSOs ins Call-Buch
         for call, loc, name in res.callbook:
-            db.learn_call(call, loc, source="import", name=name)
+            db.learn_call(call, loc, source="import", name=name, dok=res.doks.get(prefixes.core_call(call), ""))
             report["callbook"] += 1
         if target == "callbook" or (target == "auto" and not res.qsos):
             for q in res.qsos:
@@ -970,7 +970,6 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if not station:
             raise HTTPException(404, "Station nicht gefunden")
         existing = {(q["core_call"], q["ts_utc"]) for q in db.list_qsos(sid)}
-        from . import prefixes
         for q in sorted(res.qsos, key=lambda x: x.ts_utc):
             if (prefixes.core_call(q.call), q.ts_utc) in existing:
                 continue
@@ -1135,7 +1134,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         for call, loc, name in res.callbook:
             when = f"{name}T00:00:00Z" if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) else ""
             before = db.lookup_call(call)
-            r = db.learn_call(call, loc, source="repo", name="" if when else name, when=when)
+            r = db.learn_call(call, loc, source="repo", name="" if when else name, when=when, dok=res.doks.get(call, ""))
             if r == "new":
                 new += 1
             elif r == "known":
@@ -1147,9 +1146,9 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.get("/api/callbook/export_seed.csv")
     def callbook_export_seed():
-        """Stationsdatenbank im Repo-Format (Call;Locator;Zuletzt) – zum Einchecken als contestlogger/seed/stationsdatenbank.csv."""
-        rows = db.rows("SELECT call, locator, last_seen FROM callbook WHERE locator<>'' ORDER BY call")
-        lines = ["Call;Locator;Zuletzt"] + [f"{r['call']};{r['locator']};{(r['last_seen'] or '')[:10]}" for r in rows]
+        """Stationsdatenbank im Repo-Format (Call;Locator;Zuletzt;DOK) – zum Einchecken als contestlogger/seed/stationsdatenbank.csv."""
+        rows = db.rows("SELECT call, locator, last_seen, dok FROM callbook WHERE locator<>'' ORDER BY call")
+        lines = ["Call;Locator;Zuletzt;DOK"] + [f"{r['call']};{r['locator']};{(r['last_seen'] or '')[:10]};{r['dok'] or ''}" for r in rows]
         return PlainTextResponse("\n".join(lines) + "\n", media_type="text/csv", headers={"Content-Disposition": "attachment; filename=stationsdatenbank.csv"})
 
     @app.get("/api/contests/{cid}/export.zip")

@@ -228,7 +228,7 @@ def test_templates_and_callbook_repo(tmp_path):
         assert len(c.get("/api/contests").json()[0]["stations"]) == 3
         # Stationsdatenbank: Repo-Format exportieren und aus einer (lokalen) Repo-Datei abgleichen
         seed = c.get("/api/callbook/export_seed.csv").text
-        assert seed.startswith("Call;Locator;Zuletzt\n") and "DA2C;JO30XF" in seed
+        assert seed.startswith("Call;Locator;Zuletzt;DOK\n") and "DA2C;JO30XF" in seed
         repo = tmp_path / "repo.csv"
         repo.write_text("Call;Locator;Zuletzt\nDA2C;JO30XF;2025-05-04\nOK9NEW;JN79XX;2026-01-01\n", encoding="utf-8")
         r = c.post("/api/callbook/sync_repo", json={"url": repo.as_uri()}, headers=H).json()
@@ -251,3 +251,29 @@ def test_migration_creates_templates_from_stations(tmp_path):
     tpl = db2.list_templates()
     assert {(x["call"], x["band"]) for x in tpl} == {("DN2LH/P", "432MHz"), ("DN2LH/P", "144MHz")}
     db2.close()
+
+
+def test_contest_exchange_api(client):
+    admin = client.post("/api/setup", json={"password": "admin1"}).json()["token"]
+    H = {"X-Admin-Token": admin}
+    cid = client.post("/api/contests", json={"name": "KAC", "exchange": "dok"}, headers=H).json()["id"]
+    assert client.get("/api/contests").json()[0]["exchange"] == "dok"
+    client.patch(f"/api/contests/{cid}", json={"exchange": "serial_dok"}, headers=H)
+    assert client.get("/api/contests").json()[0]["exchange"] == "serial_dok"
+    client.patch(f"/api/contests/{cid}", json={"exchange": "nonsense"}, headers=H)
+    assert client.get("/api/contests").json()[0]["exchange"] == "serial"
+    sid = client.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH", "locator": "JO31AA", "band": "432MHz"}, headers=H).json()["id"]
+    q = client.post(f"/api/stations/{sid}/qsos", json={"call": "DL8NAS", "locator": "JN59LE", "serial_rcvd": "010", "exch_rcvd": "b21"}, headers=H).json()
+    assert q["exch_rcvd"] == "B21"
+    assert client.get(f"/api/stations/{sid}/qsos?q=B21").json()[0]["call"] == "DL8NAS"
+    # Callbuch: DOK anzeigen, bearbeiten, exportieren, Repo-Format
+    assert client.get("/api/callbook?q=B21").json()["rows"][0]["call"] == "DL8NAS"
+    client.post("/api/callbook", json={"call": "DL8NAS", "locator": "JN59LE", "dok": "b22"}, headers=H)
+    assert client.get("/api/callbook?q=DL8NAS").json()["rows"][0]["dok"] == "B22"
+    assert "DL8NAS;JN59LE;2" in client.get("/api/callbook/export_seed.csv").text.replace("\r", "") and ";B22\n" in client.get("/api/callbook/export_seed.csv").text
+    assert ";B22;" in client.get("/api/callbook/export.csv").text
+    # Log-Prüfung warnt bei fehlendem DOK
+    client.patch(f"/api/contests/{cid}", json={"exchange": "dok"}, headers=H)
+    client.post(f"/api/stations/{sid}/qsos", json={"call": "OL3Z", "locator": "JN79FX"}, headers=H)
+    chk = client.get(f"/api/stations/{sid}/check", headers=H).json()
+    assert any("DOK" in w["msg"] for w in chk["warnings"])

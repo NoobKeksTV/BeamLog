@@ -8,6 +8,7 @@ import hmac
 import json
 import os
 import secrets
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS contests (
     start_utc TEXT,
     end_utc TEXT,
     scoring TEXT NOT NULL DEFAULT 'km',
+    exchange TEXT NOT NULL DEFAULT 'serial',
     notes TEXT DEFAULT '',
     archived INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
@@ -75,6 +77,7 @@ CREATE TABLE IF NOT EXISTS qsos (
     rst_rcvd TEXT NOT NULL DEFAULT '59',
     serial_sent INTEGER NOT NULL,
     serial_rcvd TEXT NOT NULL DEFAULT '',
+    exch_rcvd TEXT NOT NULL DEFAULT '',
     mode TEXT NOT NULL DEFAULT 'SSB',
     band TEXT NOT NULL,
     comment TEXT NOT NULL DEFAULT '',
@@ -96,6 +99,7 @@ CREATE TABLE IF NOT EXISTS callbook (
     qso_count INTEGER NOT NULL DEFAULT 0,
     last_seen TEXT NOT NULL DEFAULT '',
     alt_locators TEXT NOT NULL DEFAULT '',
+    dok TEXT NOT NULL DEFAULT '',
     ext_locator TEXT NOT NULL DEFAULT '',
     ext_source TEXT NOT NULL DEFAULT '',
     ext_checked TEXT NOT NULL DEFAULT ''
@@ -140,6 +144,15 @@ CREATE TABLE IF NOT EXISTS kst_seen (
 """
 
 
+
+# Austausch je Contest: laufende Nummer, DOK/OV (z. B. Köln-Aachen-Contest) oder beides
+EXCHANGES = ("serial", "dok", "serial_dok")
+
+
+def normalize_dok(v: Any) -> str:
+    """DOK/OV-Kennung vereinheitlichen (Großschreibung, ohne Leerzeichen, max. 8 Zeichen)."""
+    return re.sub(r"\s+", "", str(v or "")).upper()[:8]
+
 def utcnow() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -181,6 +194,12 @@ class Database:
         with self.conn:
             if "freq" not in cols:
                 self.conn.execute("ALTER TABLE qsos ADD COLUMN freq TEXT NOT NULL DEFAULT ''")
+            if "exch_rcvd" not in cols:
+                self.conn.execute("ALTER TABLE qsos ADD COLUMN exch_rcvd TEXT NOT NULL DEFAULT ''")
+            if "exchange" not in {r["name"] for r in self.rows("PRAGMA table_info(contests)")}:
+                self.conn.execute("ALTER TABLE contests ADD COLUMN exchange TEXT NOT NULL DEFAULT 'serial'")
+            if "dok" not in {r["name"] for r in self.rows("PRAGMA table_info(callbook)")}:
+                self.conn.execute("ALTER TABLE callbook ADD COLUMN dok TEXT NOT NULL DEFAULT ''")
             if "kst_user" not in scols:
                 # KST-Zugang ist jetzt je Station; bisherige globale Einstellung auf alle Stationen übernehmen
                 for col, typ in (("kst_user", "TEXT NOT NULL DEFAULT ''"), ("kst_pass", "TEXT NOT NULL DEFAULT ''"), ("kst_room", "INTEGER NOT NULL DEFAULT 2"),
@@ -336,17 +355,19 @@ class Database:
     def get_contest(self, cid: int) -> dict | None:
         return self.row("SELECT * FROM contests WHERE id=?", (cid,))
 
-    def create_contest(self, name: str, start_utc: str | None, end_utc: str | None, scoring: str = "km", notes: str = "") -> int:
+    def create_contest(self, name: str, start_utc: str | None, end_utc: str | None, scoring: str = "km", notes: str = "", exchange: str = "serial") -> int:
         with self.conn:
             cur = self.conn.execute(
-                "INSERT INTO contests(name,start_utc,end_utc,scoring,notes,created_at) VALUES(?,?,?,?,?,?)",
-                (name.strip(), start_utc or None, end_utc or None, scoring, notes, utcnow()),
+                "INSERT INTO contests(name,start_utc,end_utc,scoring,notes,exchange,created_at) VALUES(?,?,?,?,?,?,?)",
+                (name.strip(), start_utc or None, end_utc or None, scoring, notes, exchange if exchange in EXCHANGES else "serial", utcnow()),
             )
             return int(cur.lastrowid)
 
     def update_contest(self, cid: int, **fields: Any) -> None:
-        allowed = {"name", "start_utc", "end_utc", "scoring", "notes", "archived"}
+        allowed = {"name", "start_utc", "end_utc", "scoring", "notes", "archived", "exchange"}
         sets = {k: v for k, v in fields.items() if k in allowed}
+        if "exchange" in sets and sets["exchange"] not in EXCHANGES:
+            sets["exchange"] = "serial"
         if not sets:
             return
         with self.conn:
@@ -522,6 +543,7 @@ class Database:
         q["locator"] = loc
         q["square"] = geo.square(loc)
         q["country"] = prefixes.country(call)
+        q["exch_rcvd"] = normalize_dok(q.get("exch_rcvd"))
         if geo.is_valid_locator(loc) and geo.is_valid_locator(station["locator"]):
             q["km"] = geo.distance_km_int(station["locator"], loc)
             q["bearing"] = int(round(geo.bearing_deg(station["locator"], loc))) % 360
@@ -557,18 +579,18 @@ class Database:
             points = 0 if dupe else (q["km"] if q["km"] > 0 else (1 if q["locator"] else 0))
             cur = self.conn.execute(
                 """INSERT INTO qsos(station_id,ts_utc,call,core_call,locator,square,country,rst_sent,rst_rcvd,
-                   serial_sent,serial_rcvd,mode,band,comment,km,bearing,points,dupe,logged_by,created_at,updated_at,freq)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   serial_sent,serial_rcvd,mode,band,comment,km,bearing,points,dupe,logged_by,created_at,updated_at,freq,exch_rcvd)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (station_id, ts, q["call"], q["core_call"], q["locator"], q["square"], q["country"],
                  str(q.get("rst_sent") or "59"), str(q.get("rst_rcvd") or "59"), serial,
                  str(q.get("serial_rcvd") or ""), q.get("mode") or station["mode"], band,
-                 q.get("comment") or "", q["km"], q["bearing"], points, dupe, logged_by, now, now, str(q.get("freq") or "")),
+                 q.get("comment") or "", q["km"], q["bearing"], points, dupe, logged_by, now, now, str(q.get("freq") or ""), q["exch_rcvd"]),
             )
             qid = int(cur.lastrowid)
             # Seriennummer weiterzählen (auch wenn manuell eine kleinere eingegeben wurde: Maximum + 1)
             nxt = max(station["serial_next"], serial + 1)
             self.conn.execute("UPDATE stations SET serial_next=? WHERE id=?", (nxt, station_id))
-        self.learn_call(q["call"], q["locator"], source="log", when=ts)
+        self.learn_call(q["call"], q["locator"], source="log", when=ts, dok=q["exch_rcvd"])
         return self.get_qso(qid)  # type: ignore[return-value]
 
     def update_qso(self, qid: int, data: dict) -> dict:
@@ -583,13 +605,13 @@ class Database:
             points = 0 if dupe else (q["km"] if q["km"] > 0 else (1 if q["locator"] else 0))
             self.conn.execute(
                 """UPDATE qsos SET ts_utc=?,call=?,core_call=?,locator=?,square=?,country=?,rst_sent=?,rst_rcvd=?,
-                   serial_sent=?,serial_rcvd=?,mode=?,band=?,comment=?,km=?,bearing=?,points=?,dupe=?,updated_at=?,freq=? WHERE id=?""",
+                   serial_sent=?,serial_rcvd=?,mode=?,band=?,comment=?,km=?,bearing=?,points=?,dupe=?,updated_at=?,freq=?,exch_rcvd=? WHERE id=?""",
                 (q["ts_utc"], q["call"], q["core_call"], q["locator"], q["square"], q["country"],
                  str(q["rst_sent"]), str(q["rst_rcvd"]), int(q["serial_sent"]), str(q["serial_rcvd"]),
-                 q["mode"], q["band"], q["comment"] or "", q["km"], q["bearing"], points, dupe, utcnow(), str(q.get("freq") or ""), qid),
+                 q["mode"], q["band"], q["comment"] or "", q["km"], q["bearing"], points, dupe, utcnow(), str(q.get("freq") or ""), q["exch_rcvd"], qid),
             )
         self.recheck_dupes(old["station_id"])
-        self.learn_call(q["call"], q["locator"], source="log", when=q["ts_utc"])
+        self.learn_call(q["call"], q["locator"], source="log", when=q["ts_utc"], dok=q["exch_rcvd"])
         return self.get_qso(qid)  # type: ignore[return-value]
 
     def delete_qso(self, qid: int) -> int | None:
@@ -637,9 +659,9 @@ class Database:
         sql = "SELECT * FROM qsos WHERE station_id=?"
         params: list[Any] = [station_id]
         if search:
-            sql += " AND (call LIKE ? OR locator LIKE ? OR comment LIKE ?)"
+            sql += " AND (call LIKE ? OR locator LIKE ? OR comment LIKE ? OR exch_rcvd LIKE ?)"
             like = f"%{search.upper()}%"
-            params += [like, like, like]
+            params += [like, like, like, like]
         sql += " ORDER BY ts_utc DESC, id DESC"
         if limit:
             sql += f" LIMIT {int(limit)}"
@@ -660,6 +682,7 @@ class Database:
         ) or {}
         squares = self.row("SELECT COUNT(DISTINCT square) AS n FROM qsos WHERE station_id=? AND dupe=0 AND square<>''", (station_id,))
         countries = self.row("SELECT COUNT(DISTINCT country) AS n FROM qsos WHERE station_id=? AND dupe=0 AND country<>'' AND country<>'?'", (station_id,))
+        exchanges = self.row("SELECT COUNT(DISTINCT exch_rcvd) AS n FROM qsos WHERE station_id=? AND dupe=0 AND exch_rcvd<>''", (station_id,))
         odx = self.row("SELECT call, locator, km FROM qsos WHERE station_id=? AND dupe=0 ORDER BY km DESC LIMIT 1", (station_id,))
         last_hour = self.row(
             "SELECT COUNT(*) AS n FROM qsos WHERE station_id=? AND ts_utc >= strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 hour')",
@@ -670,6 +693,7 @@ class Database:
             "avg_km": round(s.get("avg_km") or 0),
             "squares": squares["n"] if squares else 0,
             "countries": countries["n"] if countries else 0,
+            "exchanges": exchanges["n"] if exchanges else 0,
             "odx": odx,
             "rate_last_hour": last_hour["n"] if last_hour else 0,
         }
@@ -769,8 +793,9 @@ class Database:
         return out
 
     # ----- Call-Buch und Vorschläge --------------------------------------
-    def learn_call(self, call: str, locator: str, source: str = "log", when: str = "", name: str = "") -> str:
-        """Rufzeichen ins Call-Buch übernehmen. Rückgabe: "new" (neu), "known" (schon vorhanden) oder "" (ungültig)."""
+    def learn_call(self, call: str, locator: str, source: str = "log", when: str = "", name: str = "", dok: str = "") -> str:
+        """Rufzeichen ins Call-Buch übernehmen. Rückgabe: "new" (neu), "known" (schon vorhanden) oder "" (ungültig).
+        dok: DOK/OV des Rufzeichens (DARC-Ortsverband), falls bekannt – der neueste gewinnt."""
         call = (call or "").strip().upper()
         core = prefixes.core_call(call)
         if not core:
@@ -778,12 +803,13 @@ class Database:
         locator = geo.normalize_locator(locator)
         if locator and not geo.is_valid_locator(locator):
             locator = ""
+        dok = normalize_dok(dok)
         existing = self.row("SELECT * FROM callbook WHERE call=?", (core,))
         with self.conn:
             if not existing:
                 self.conn.execute(
-                    "INSERT INTO callbook(call,locator,name,source,qso_count,last_seen,alt_locators) VALUES(?,?,?,?,?,?,?)",
-                    (core, locator, name, source, 1 if source == "log" else 0, when, ""),
+                    "INSERT INTO callbook(call,locator,name,source,qso_count,last_seen,alt_locators,dok) VALUES(?,?,?,?,?,?,?,?)",
+                    (core, locator, name, source, 1 if source == "log" else 0, when, "", dok),
                 )
                 return "new"
             alts = [a for a in (existing["alt_locators"] or "").split(",") if a]
@@ -796,9 +822,12 @@ class Database:
                     new_loc = locator
                 elif locator not in alts:
                     alts.append(locator)
+            new_dok = existing["dok"] or ""
+            if dok and (not new_dok or when >= (existing["last_seen"] or "")):
+                new_dok = dok
             self.conn.execute(
-                "UPDATE callbook SET locator=?, name=COALESCE(NULLIF(?,''),name), qso_count=qso_count+?, last_seen=MAX(last_seen,?), alt_locators=? WHERE call=?",
-                (new_loc, name, 1 if source == "log" else 0, when, ",".join(alts[:5]), core),
+                "UPDATE callbook SET locator=?, name=COALESCE(NULLIF(?,''),name), qso_count=qso_count+?, last_seen=MAX(last_seen,?), alt_locators=?, dok=? WHERE call=?",
+                (new_loc, name, 1 if source == "log" else 0, when, ",".join(alts[:5]), new_dok, core),
             )
         return "known"
 
@@ -807,7 +836,7 @@ class Database:
         if len(partial) < 2:
             return []
         rows = self.rows(
-            """SELECT call, locator, name, qso_count, last_seen, alt_locators, source FROM callbook
+            """SELECT call, locator, name, qso_count, last_seen, alt_locators, source, dok FROM callbook
                WHERE call LIKE ? ORDER BY (call=?) DESC, (call LIKE ?) DESC, qso_count DESC, call LIMIT ?""",
             (f"%{partial}%", partial, f"{partial}%", limit),
         )

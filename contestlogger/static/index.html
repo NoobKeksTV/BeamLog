@@ -70,6 +70,7 @@
             <label class="f-nrs">Nr geg.<input id="f-nr-sent" readonly tabindex="-1"></label>
             <label class="f-rstr">RST erh.<input id="f-rst-rcvd" value="59"></label>
             <label class="f-nrr">Nr erh.<input id="f-nr-rcvd" placeholder="001" inputmode="numeric"></label>
+            <label class="f-dok hidden" title="DOK / Ortsverband der Gegenstation (Austausch dieses Contests)">DOK erh.<input id="f-dok" placeholder="G01" spellcheck="false" maxlength="8"></label>
             <label class="f-loc">Locator<input id="f-loc" placeholder="JO31AA" spellcheck="false" maxlength="8"></label>
             <label class="f-cmt">Kommentar<input id="f-comment"></label>
             <button type="submit" class="primary f-btn">Loggen ⏎</button>
@@ -159,7 +160,7 @@
       </div>
       <div class="table-wrap tall">
         <table id="full-table" class="qsos">
-          <thead><tr><th>#</th><th>Datum</th><th>UTC</th><th>Rufzeichen</th><th>RST g</th><th>Nr g</th><th>RST e</th><th>Nr e</th><th>Locator</th><th class="num">km</th><th class="num">°</th><th class="num">Pkt</th><th>Land</th><th>Mode</th><th>MHz</th><th>Kommentar</th><th>Op</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Datum</th><th>UTC</th><th>Rufzeichen</th><th>RST g</th><th>Nr g</th><th>RST e</th><th>Nr e</th><th>DOK</th><th>Locator</th><th class="num">km</th><th class="num">°</th><th class="num">Pkt</th><th>Land</th><th>Mode</th><th>MHz</th><th>Kommentar</th><th>Op</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -253,7 +254,7 @@
         <input id="cb-search" placeholder="Suchen (Call, Locator, Name) …" class="small">
         <div class="table-wrap" style="max-height:260px"><table id="cb-table" class="compact"><tbody></tbody></table></div>
         <form id="cb-form" class="row">
-          <input id="cb-call" placeholder="Rufzeichen" required><input id="cb-loc" placeholder="Locator" required><input id="cb-name" placeholder="Name"><button class="ghost">Speichern</button>
+          <input id="cb-call" placeholder="Rufzeichen" required><input id="cb-loc" placeholder="Locator" required><input id="cb-name" placeholder="Name"><input id="cb-dok" placeholder="DOK" maxlength="8" style="max-width:90px"><button class="ghost">Speichern</button>
         </form>
         <div class="row">
           <a href="/api/callbook/export.csv" class="button primary" download>Stationsdatenbank exportieren (CSV)</a>

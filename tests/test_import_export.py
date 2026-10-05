@@ -78,3 +78,37 @@ def test_mdb_pure_python():
     assert r.header == {"call": "DN2LH", "locator": "JO31AA", "band": "432MHz"}
     q = r.qsos[0]
     assert (q.call, q.locator, q.serial_sent, q.serial_rcvd, q.ts_utc) == ("DL0GM", "JO31UB", 1, "078", "2024-10-05T17:13:00Z")
+
+
+def test_dok_exchange_roundtrip(tmp_path):
+    """Contest mit DOK-Austausch (z. B. Köln-Aachen): DOK wird geloggt, exportiert, importiert und ins Callbuch übernommen."""
+    db = Database(tmp_path / "t.db")
+    cid = db.create_contest("Köln-Aachen", None, None, exchange="dok")
+    assert db.get_contest(cid)["exchange"] == "dok"
+    sid = db.create_station(cid, "DN2LH", "JO31AA", "432MHz", "SSB", "", {"exchange": "G01"})
+    q = db.add_qso(sid, {"call": "DL8NAS", "locator": "JN59LE", "exch_rcvd": " b 21 ", "ts_utc": "2025-05-03T14:12:00Z"})
+    assert q["exch_rcvd"] == "B21"
+    assert db.lookup_call("DL8NAS")["dok"] == "B21"
+    q = db.update_qso(q["id"], {"exch_rcvd": "b22"})
+    assert q["exch_rcvd"] == "B22" and db.lookup_call("DL8NAS")["dok"] == "B22"
+    assert db.station_summary(sid)["exchanges"] == 1
+    contest, station, qsos = db.get_contest(cid), db.get_station(sid), db.list_qsos(sid)
+    edi = exporters.export_edi(contest, station, qsos)
+    assert "PExch=G01" in edi and "CExcs=1;0;1" in edi and ";59;001;59;;B22;JN59LE;" in edi
+    assert importers.parse_edi(edi).qsos[0].exch_rcvd == "B22"
+    adif = exporters.export_adif(contest, station, qsos)
+    assert "<DARC_DOK:3>B22" in adif and "<STX_STRING:3>G01" in adif
+    assert importers.parse_adif(adif).qsos[0].exch_rcvd == "B22"
+    assert ";B22;" in exporters.export_csv(contest, station, qsos)
+    # Callbook-Listen mit DOK: Kopfzeile oder strenges Muster, Repo-Format
+    r = importers.parse_callbook_csv("Call;Locator;Zuletzt;DOK\nDL8NAS;JN59LE;2025-05-03;B21\nOL3Z;JN79FX;2025-05-03;\n")
+    assert r.doks == {"DL8NAS": "B21"} and r.callbook[0][2] == "2025-05-03"
+    r = importers.parse_callbook_csv("DK0FY JN49KT G01\nDG1E;JO31LE;Peter\n")
+    assert r.doks == {"DK0FY": "G01"} and r.callbook[1][2] == "Peter"
+    r = importers.parse_darc_csv("Rufzeichen (Basis);Locator;DOK;ODX Call;ODX Locator\nDL1ABC;JO31AA;G20;OK1KKW;JN79XX\n")
+    assert r.doks == {"DL1ABC": "G20"} and len(r.callbook) == 2
+    r = importers.parse_results_list("1. DL1ABC  G20  JO31AA  120 QSO\n")
+    assert r.doks == {"DL1ABC": "G20"}
+    db.learn_call("DK0FY", "JN49KT", source="import", dok="G01")
+    assert db.lookup_call("DK0FY")["dok"] == "G01"
+    assert db.suggest("DK0F")[0]["dok"] == "G01"

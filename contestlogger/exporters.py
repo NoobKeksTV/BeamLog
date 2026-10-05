@@ -31,6 +31,7 @@ def export_edi(contest: dict, station: dict, qsos: list[dict]) -> str:
     dates = sorted({_dt(q["ts_utc"]).strftime("%Y%m%d") for q in qsos}) or [datetime.utcnow().strftime("%Y%m%d")]
     squares = {q["square"] for q in valid if q["square"]}
     countries = {q["country"] for q in valid if q["country"] and q["country"] != "?"}
+    exchanges = {q.get("exch_rcvd") for q in valid if q.get("exch_rcvd")}
     points = sum(q["points"] for q in valid)
     odx = max(valid, key=lambda q: q["km"], default=None)
 
@@ -43,7 +44,7 @@ def export_edi(contest: dict, station: dict, qsos: list[dict]) -> str:
         f"TDate={dates[0]};{dates[-1]}",
         f"PCall={station['call']}",
         f"PWWLo={station['locator']}",
-        f"PExch={g('exchange')}",
+        f"PExch={g('exchange') or g('dok')}",
         f"PAdr1={g('site_address')}",
         f"PAdr2={g('site_city')}",
         f"PSect={g('section', 'Single')}",
@@ -69,7 +70,7 @@ def export_edi(contest: dict, station: dict, qsos: list[dict]) -> str:
         f"CQSOP={points}",
         f"CWWLs={len(squares)};0;1",
         "CWWLB=0",
-        "CExcs=0;0;1",
+        f"CExcs={len(exchanges)};0;1",
         "CExcB=",
         f"CDXCs={len(countries)};0;1",
         "CDXCB=0",
@@ -84,7 +85,7 @@ def export_edi(contest: dict, station: dict, qsos: list[dict]) -> str:
         lines.append(";".join([
             d.strftime("%y%m%d"), d.strftime("%H%M"), q["call"], EDI_MODE.get(q["mode"], "1"),
             q["rst_sent"], f"{int(q['serial_sent']):03d}", q["rst_rcvd"], str(q["serial_rcvd"]).zfill(3) if str(q["serial_rcvd"]).isdigit() else str(q["serial_rcvd"]),
-            "", q["locator"], str(q["points"]), "", "", "", "D" if q["dupe"] else "",
+            q.get("exch_rcvd") or "", q["locator"], str(q["points"]), "", "", "", "D" if q["dupe"] else "",
         ]))
     return "\r\n".join(lines) + "\r\n"
 
@@ -110,6 +111,8 @@ def export_adif(contest: dict, station: dict, qsos: list[dict]) -> str:
             _adif_field("RST_SENT", q["rst_sent"]), _adif_field("RST_RCVD", q["rst_rcvd"]),
             _adif_field("GRIDSQUARE", q["locator"]), _adif_field("STX", f"{int(q['serial_sent']):03d}"),
             _adif_field("SRX", q["serial_rcvd"]), _adif_field("BAND", ADIF_BAND.get(q["band"], q["band"])),
+            _adif_field("SRX_STRING", q.get("exch_rcvd") or ""), _adif_field("DARC_DOK", q.get("exch_rcvd") or ""),
+            _adif_field("STX_STRING", (station.get("info") or {}).get("exchange") or ""),
             _adif_field("FREQ", q.get("freq") or ""),
             _adif_field("STATION_CALLSIGN", station["call"]), _adif_field("MY_GRIDSQUARE", station["locator"]),
             _adif_field("CONTEST_ID", contest["name"]), _adif_field("DISTANCE", q["km"]),
@@ -121,11 +124,11 @@ def export_adif(contest: dict, station: dict, qsos: list[dict]) -> str:
 def export_csv(contest: dict, station: dict, qsos: list[dict]) -> str:
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
-    w.writerow(["Datum", "Zeit UTC", "Rufzeichen", "RST geg", "Nr geg", "RST erh", "Nr erh", "Locator", "km", "Grad", "Punkte", "Land", "Modus", "Band", "Dupe", "Kommentar", "Operator"])
+    w.writerow(["Datum", "Zeit UTC", "Rufzeichen", "RST geg", "Nr geg", "RST erh", "Nr erh", "DOK erh", "Locator", "km", "Grad", "Punkte", "Land", "Modus", "Band", "Dupe", "Kommentar", "Operator"])
     for q in sorted(qsos, key=lambda q: (q["ts_utc"], q["id"])):
         d = _dt(q["ts_utc"])
         w.writerow([d.strftime("%d.%m.%Y"), d.strftime("%H:%M"), q["call"], q["rst_sent"], f"{int(q['serial_sent']):03d}",
-                    q["rst_rcvd"], q["serial_rcvd"], q["locator"], q["km"], q["bearing"], q["points"], q["country"],
+                    q["rst_rcvd"], q["serial_rcvd"], q.get("exch_rcvd") or "", q["locator"], q["km"], q["bearing"], q["points"], q["country"],
                     q["mode"], q["band"], "D" if q["dupe"] else "", q["comment"], q["logged_by"]])
     return buf.getvalue()
 
@@ -133,7 +136,7 @@ def export_csv(contest: dict, station: dict, qsos: list[dict]) -> str:
 def export_callbook_csv(rows: list[dict]) -> str:
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")
-    w.writerow(["Call", "Locator", "Name", "QSOs", "Zuletzt", "Weitere Locator"])
+    w.writerow(["Call", "Locator", "Name", "DOK", "QSOs", "Zuletzt", "Weitere Locator"])
     for r in rows:
-        w.writerow([r["call"], r["locator"], r["name"], r["qso_count"], r["last_seen"], r["alt_locators"]])
+        w.writerow([r["call"], r["locator"], r["name"], r.get("dok") or "", r["qso_count"], r["last_seen"], r["alt_locators"]])
     return buf.getvalue()

@@ -46,11 +46,16 @@ def check_station(contest: dict, station: dict, qsos: list[dict]) -> dict:
     start = _ts(contest["start_utc"]) if contest.get("start_utc") else None
     end = _ts(contest["end_utc"]) if contest.get("end_utc") else None
     ordered = sorted(qsos, key=lambda q: (q["ts_utc"], q["id"]))
+    exchange = contest.get("exchange") or "serial"
+    if "dok" in exchange and not str(info.get("exchange") or "").strip():
+        warn("Eigener DOK/OV fehlt (Verwaltung → Station bearbeiten → EDI-Angaben, Feld „Austausch“) – steht im EDI-Kopf als PExch")
     serials: dict[int, dict] = {}
     prev_ts = None
     for q in ordered:
         if not prefixes.is_plausible_call(q["call"]):
             err("Rufzeichen unplausibel", q)
+        if "dok" in exchange and not (q.get("exch_rcvd") or "").strip():
+            warn("DOK/OV fehlt (Austausch dieses Contests)", q)
         if not q["locator"]:
             err("Locator fehlt (0 Punkte, wird vom Auswerter gestrichen)", q)
         elif not geo.is_valid_locator(q["locator"]):

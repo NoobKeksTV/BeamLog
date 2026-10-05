@@ -33,6 +33,11 @@
   .tile.serial b { color:var(--warn); }
   .tile.loc b { color:var(--ok); }
   .tile.geo { text-align:center; display:flex; flex-direction:column; justify-content:center; }
+  .tiles.x-dok .tile.serial, .tiles.x-dok .tile.nr { display:none; }
+  .tiles.x-dok { grid-template-columns: 2.2fr 1fr 1fr 1.2fr 1.5fr 1.6fr; }
+  .tiles.x-serial_dok { grid-template-columns: 2fr .9fr 1.1fr .9fr 1.1fr 1.1fr 1.4fr 1.5fr; }
+  .tile.hidden { display:none; }
+  .x-dok th.col-nr, .x-dok td.col-nr { display:none; }
   .tile.geo b { font-size:clamp(24px, 3vw, 44px); white-space:normal; line-height:1.1; }
   .tile.geo b small { display:block; font-size:.6em; color:var(--muted); font-weight:600; }
   .cmt { color:var(--muted); font-size:16px; min-height:1.3em; }
@@ -80,7 +85,8 @@
   <div class="tile"><span>RST geg.</span><b id="t-rs">–</b></div>
   <div class="tile serial"><span>Nr geg.</span><b id="t-serial">–</b></div>
   <div class="tile"><span>RST erh.</span><b id="t-rr">–</b></div>
-  <div class="tile"><span>Nr erh.</span><b id="t-nr">–</b></div>
+  <div class="tile nr"><span>Nr erh.</span><b id="t-nr">–</b></div>
+  <div class="tile dok hidden"><span>DOK erh.</span><b id="t-dok">–</b></div>
   <div class="tile loc"><span>Locator</span><b id="t-loc">–</b></div>
   <div class="tile geo"><span>Entfernung · Richtung</span><b id="t-geo">–</b></div>
 </div>
@@ -89,7 +95,7 @@
 <div class="main">
   <div class="mapcard"><div class="mh"><span>Karte / Antennenrichtung</span><span id="map-info"></span><button type="button" id="btn-planes" class="pbtn" title="Flugzeuge (ADS-B) einblenden">✈ Flugzeuge</button></div><div id="map"></div><div id="plane-list" class="plist"></div></div>
   <div class="list">
-    <table><thead><tr><th>UTC</th><th>Rufzeichen</th><th>RST</th><th>Nr geg.</th><th>RST</th><th>Nr erh.</th><th>Locator</th><th>km</th><th>°</th></tr></thead><tbody id="qsos"></tbody></table>
+    <table><thead><tr><th>UTC</th><th>Rufzeichen</th><th>RST</th><th class="col-nr">Nr geg.</th><th>RST</th><th class="col-nr">Nr erh.</th><th>DOK</th><th>Locator</th><th>km</th><th>°</th></tr></thead><tbody id="qsos"></tbody></table>
   </div>
 </div>
 <footer><span id="by"></span><span style="flex:1"></span><span id="ver"></span></footer>
@@ -169,8 +175,11 @@
   async function loadStation() {
     info = await GET("/api/info").catch(() => ({}));
     const contests = await GET("/api/contests");
-    for (const c of contests) for (const s of c.stations) if (s.id === sid) { station = s; station.contest = c.name; }
+    for (const c of contests) for (const s of c.stations) if (s.id === sid) { station = s; station.contest = c.name; station.exchange = c.exchange || "serial"; }
     if (!station) { $("#station").textContent = "Station nicht gefunden"; return; }
+    const tiles = document.querySelector(".tiles"); tiles.classList.remove("x-serial", "x-dok", "x-serial_dok"); tiles.classList.add("x-" + station.exchange);
+    document.body.classList.toggle("x-dok", station.exchange === "dok");
+    document.querySelector(".tile.dok").classList.toggle("hidden", !station.exchange.includes("dok"));
     $("#station").textContent = `${station.call} · ${station.band}`;
     $("#meta").textContent = `${station.locator} · ${station.mode} · ${station.contest}`;
     document.title = `Operator ${station.call} ${station.band} – ContestLogger`;
@@ -198,7 +207,7 @@
       const tr = document.createElement("tr");
       if (flash && !lastIds.has(q.id)) tr.className = "new";
       if (q.dupe) tr.className += " dupe";
-      tr.innerHTML = `<td>${fmtTime(q.ts_utc)}</td><td><b>${q.call}</b></td><td>${q.rst_sent || ""}</td><td class="num">${pad3(q.serial_sent)}</td><td>${q.rst_rcvd || ""}</td><td class="num">${pad3(q.serial_rcvd)}</td><td>${q.locator}</td><td class="num">${q.km ?? ""}</td><td class="num">${q.bearing ?? ""}</td>`;
+      tr.innerHTML = `<td>${fmtTime(q.ts_utc)}</td><td><b>${q.call}</b></td><td>${q.rst_sent || ""}</td><td class="num col-nr">${pad3(q.serial_sent)}</td><td>${q.rst_rcvd || ""}</td><td class="num col-nr">${pad3(q.serial_rcvd)}</td><td>${q.exch_rcvd || ""}</td><td>${q.locator}</td><td class="num">${q.km ?? ""}</td><td class="num">${q.bearing ?? ""}</td>`;
       tb.append(tr);
     }
     lastIds = new Set(qsos.map((q) => q.id));
@@ -209,6 +218,7 @@
     $("#t-call").textContent = d.call || "–";
     $("#t-serial").textContent = d.serial || $("#t-serial").textContent;
     $("#t-nr").textContent = d.nr || "–";
+    $("#t-dok").textContent = d.dok || "–";
     $("#t-rs").textContent = d.rs || "–";
     $("#t-rr").textContent = d.rr || "–";
     $("#t-loc").textContent = d.loc || "–";

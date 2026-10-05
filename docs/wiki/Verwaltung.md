@@ -8,7 +8,9 @@ Der Reiter **Verwaltung** ist nur mit Admin-Passwort zugänglich und enthält al
 Stammdaten eurer Stationen (Rufzeichen, Locator, Band, Modus, Passwort, KST-Zugang, EDI-Angaben). Beim Anlegen eines Contests wählt ihr die teilnehmenden. Siehe [Erste Schritte](Erste-Schritte.md).
 
 ## Contests
-Anlegen (mit Stationsauswahl), bearbeiten (Name, Zeitraum, Notizen), archivieren, löschen, „EDI-ZIP“ für alle Bänder. „wählen“ macht den Contest in der Stationsleiste aktiv.
+Anlegen (mit Stationsauswahl), bearbeiten (Name, Zeitraum, Notizen, **Austausch**: laufende Nummer, DOK/OV oder beides – siehe [Loggen](Loggen.md#austausch-je-contest-nummer-dok-oder-beides)), archivieren, löschen, „EDI-ZIP“ für alle Bänder. „wählen“ macht den Contest in der Stationsleiste aktiv.
+
+![Contest anlegen mit Austausch](img/contest-austausch.png)
 
 ## Stationen im Contest
 Die Stationen des gewählten Contests mit ID, Nummer und Passwortstatus. „+ aufnehmen“ fügt eine globale Station hinzu, „+ einmalig“ eine nur für diesen Contest. Je Station: EDI, ADIF, ✎ bearbeiten, Nr. setzen, ✕ löschen.

@@ -503,5 +503,15 @@
  "Der Server prüft stündlich die GitHub-Releases. Die portable Version kann sich selbst aktualisieren (Dateien werden ersetzt,": "The server checks the GitHub releases hourly. The portable version can update itself (files are replaced,",
  "bleibt, danach Neustart); eine Quellcode-Installation aktualisiert man mit": "stays, then restart); a source installation is updated with",
  "Ablauf: Hier „Export im Repo-Format“ herunterladen und als": "Workflow: download “Export in repo format” here and commit it as",
- "ins Repo einchecken; andere Installationen holen sie mit „Nach neuen suchen“.": "into the repo; other installations fetch it with “Check for new”."
+ "ins Repo einchecken; andere Installationen holen sie mit „Nach neuen suchen“.": "into the repo; other installations fetch it with “Check for new”.",
+ "DOK erh.": "DOK rcvd",
+ "DOK erhalten": "DOK received",
+ "DOKs": "DOKs",
+ "Club": "Club",
+ "Eigener DOK/OV bzw. Austausch (PExch)": "Own DOK/club or exchange (PExch)",
+ "Austausch (was geloggt wird)": "Exchange (what is logged)",
+ "RST + laufende Nummer (Standard, IARU/DARC-UKW)": "RST + serial number (default, IARU/DARC VHF)",
+ "RST + DOK/OV (z. B. Köln-Aachen-Contest)": "RST + DOK/club (e.g. Köln-Aachen contest)",
+ "RST + Nummer + DOK/OV": "RST + serial + DOK/club",
+ "Ist der Austausch des Contests „DOK/OV“ (Verwaltung → Contest), erscheint statt der Nummer das Feld „DOK erh.“; bei „Nummer + DOK“ beides. Der DOK wird aus der Stationsdatenbank vorbelegt.": "If the contest exchange is “DOK/club” (Admin → Contest), the “DOK rcvd” field replaces the serial; with “serial + DOK” both are shown. The DOK is prefilled from the station database."
 }
