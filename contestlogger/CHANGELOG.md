@@ -1,6 +1,44 @@
 # Änderungsprotokoll
 
 ## v0.9.28 (2026-10-05)
+- Austausch je Contest wählbar: laufende Nummer, DOK/OV oder beides (z. B. Köln-Aachen-Contest)
+  - Contest-Einstellung „Austausch“: RST + Nummer (Standard), RST + DOK/OV oder RST + Nummer + DOK
+  - Logger blendet die Felder passend ein (DOK erh. statt/neben Nr erh.), Leertaste und Enter springen entsprechend,
+    DOK wird aus der Stationsdatenbank vorbelegt und mit jedem QSO gelernt; Bearbeiten-Dialog mit DOK
+  - Operator-Fenster zeigt die DOK-Kachel bzw. blendet die Nummernkacheln aus, QSO-Liste mit DOK-Spalte
+  - Statistikzeile zählt verschiedene DOKs; Log-Prüfung warnt bei fehlendem DOK und fehlendem eigenem DOK
+  - Export: EDI (PExch = eigener DOK aus den EDI-Angaben, Spalte „Exchange received“, CExcs), ADIF (DARC_DOK,
+    SRX_STRING, STX_STRING), CSV-Spalte „DOK erh“; Komplettes Log mit DOK-Spalte
+  - Import: EDI, ADIF, DARC-Contest-Hub (DOK-Spalte), Ergebnislisten (DOK in der Zeile), Call-Listen mit DOK-Spalte
+  - Stationsdatenbank: DOK-Spalte (Anzeige, Bearbeiten, Suche nach DOK), CSV-Export und Repo-Format
+    Call;Locator;Zuletzt;DOK, Abgleich mit dem Repo übernimmt DOKs; neuester DOK gewinnt
+  - Version 0.9.28; Wiki (Loggen, Verwaltung, Stationsdatenbank, Import/Export) und README ergänzt
+- Server-Einstellungen in contestlogger.env, Token-Feld entfernt, Wiki mit Bildern
+  - Alle Server-Einstellungen (Host, Port, Datenbank, Backup-Takt, öffentliche Adresse, KST-Server, GitHub-Token)
+    stehen jetzt in einer .env-Datei: contestlogger.env neben dem Programm bzw. /etc/contestlogger/contestlogger.env
+    auf dem Server; --config und CONTESTLOGGER_<KEY> werden ebenfalls unterstützt, Kommandozeile überstimmt alles
+  - Vorlage contestlogger.env.example liegt im Paket; die systemd-Units enthalten keine Optionen mehr,
+    install.sh legt die Konfiguration an und übernimmt --url bzw. eine alte --public-url aus der Unit
+  - GitHub-Token-Feld aus der Verwaltung entfernt (Repo wird öffentlich); nur noch optional über GITHUB_TOKEN
+  - Operator-Fenster: Karte füllt jetzt zuverlässig die ganze Fläche (Kacheln nach Layout/Resize nachgezogen)
+  - README: inoffizieller Nachfolger, KST-Chat und Aircraft-Scatter in der Beschreibung, Bildergalerie repariert,
+    Hauptbild mit gerenderter OSM-Karte, Footer
+  - Wiki: jede Seite mit Screenshots (Erster Start, QR-Code, Import, Export, Stationsdatenbank, Backups,
+    Updates, Was ist neu, Aktionsprotokoll, Rufzeichen-Abfrage, ADS-B, Frequenz, KST-Rohdaten)
+- Updates, Was-ist-neu, README mit Badges und Bildern, komplettes Wiki
+  - Update-Prüfung gegen die GitHub-Releases (stündlich, Token für privates Repo), grüner Knopf
+    „⬆ vX“ im Kopf, Verwaltung → Updates: prüfen, Release-Notes, „Jetzt aktualisieren“ (portable
+    Version lädt das ZIP, ersetzt die Dateien, data/ bleibt, Sicherung vorher, Neustart;
+    Linux/macOS per exec, Windows per update.bat), „automatisch prüfen“ abschaltbar.
+  - „Was ist neu in vX“ beim ersten Aufruf eines Browsers nach einem Update; „News anzeigen“
+    mit den letzten Versionen. Grundlage: CHANGELOG.md aus der Git-Historie (im Build erzeugt,
+    mitgeliefert; nur veröffentlichte Versionen werden gezeigt).
+  - README neu: Badges (Release, Build, Downloads, Commit, Python, Plattformen, Stars),
+    Funktionsübersicht, Schnellstart, Bildergalerie, Links ins Wiki. LICENSE ergänzt.
+  - Wiki unter docs/wiki (16 Seiten): Installation, Deploy (nginx/systemd/Port 80), Erste
+    Schritte, Loggen, Tastenkürzel, Chat/KST/DM/Rundruf, Operator-Fenster, Statistik,
+    Import/Export, Log-Prüfung, Stationsdatenbank, Flugzeug-Scatter, CAT/CW, Verwaltung,
+    Updates, Fehlersuche – mit Screenshots aus einem echten Log.
 - Flugzeug-Scatter (ADS-B) wie AirScout: zuschaltbare Flugzeug-Ebene auf Logger- und Operator-Karte
   - Quelle wählbar: adsb.fi (frei, nicht-kommerziell, 1 Abfrage/s, Daten © adsb.fi) oder eigener
     ADS-B-Empfänger (dump1090/readsb/tar1090 aircraft.json). Server holt und cached (4 s).
