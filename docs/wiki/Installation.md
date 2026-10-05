@@ -15,6 +15,7 @@ ContestLogger gibt es als **portable Version** (kein Python nötig) für Windows
    | `ContestLogger-Import(.exe)` | Kommandozeilen-Import eines alten WinContest-Ordners |
    | `start.sh` / `ContestLogger-Port8080.bat` | Startskripte |
    | `data/` | Datenbank, Backups, eigene Sprachdateien – **das ist alles, was gesichert werden muss** |
+   | `contestlogger.env.example` | Vorlage für dauerhafte Einstellungen (als `contestlogger.env` daneben ablegen) |
    | `deploy/` (nur Linux) | Dienst- und nginx-Dateien für einen Debian-Server, siehe [Deploy](Deploy.md) |
    | `START.txt`, `README.md` | Kurzanleitung |
 
@@ -22,6 +23,12 @@ ContestLogger gibt es als **portable Version** (kein Python nötig) für Windows
 4. Andere Rechner im LAN: die beim Start angezeigte Adresse eingeben (z. B. `http://192.168.1.10:8000`) oder den QR-Code über das 📱-Symbol im Kopf scannen.
 
 Beim allerersten Start fragt die Oberfläche nach einem **Admin-Passwort**. Damit werden Stationen und Contests verwaltet; Operatoren brauchen es nicht.
+
+![Erster Start: Admin-Passwort](img/erster-start.png)
+
+Der QR-Code (📱 im Kopf) zeigt die Adresse für Handy und Tablet:
+
+![QR-Code](img/qr-code.png)
 
 ### Optionen
 
@@ -32,6 +39,21 @@ ContestLogger --db D:\Contest\data\log.db  # andere Datenbank
 ContestLogger --backup-min 5               # Sicherung alle 5 Minuten (0 = aus, Standard 15)
 ContestLogger --public-url http://contest.local/   # Adresse für QR-Code und Links
 ```
+
+### Dauerhafte Einstellungen: `contestlogger.env`
+
+Statt jedes Mal Optionen anzugeben, `contestlogger.env.example` nach `contestlogger.env` kopieren (neben das Programm) und die Werte eintragen:
+
+```ini
+HOST=0.0.0.0          # 127.0.0.1 = nur lokal
+PORT=8000
+#DB=D:\Contest\log.db
+BACKUP_MIN=15
+#PUBLIC_URL=http://contest.local/
+OPEN_BROWSER=1        # Windows: Browser beim Start öffnen
+```
+
+Die Datei wird beim Start gemeldet („Konfiguration: …“). Reihenfolge: Kommandozeile überstimmt Umgebungsvariablen `CONTESTLOGGER_<KEY>` (z. B. `CONTESTLOGGER_PORT=8080`), diese überstimmen die Datei. Ein anderer Ort geht mit `--config /pfad/datei.env` oder `CONTESTLOGGER_CONFIG`. Auf einem Server liegt die Datei unter `/etc/contestlogger/contestlogger.env`, siehe [Deploy](Deploy.md).
 
 Umzug auf einen anderen Rechner: einfach den ganzen Ordner kopieren. Die Datenbank liegt in `data/contestlogger.db`, Sicherungen in `data/backup/`.
 

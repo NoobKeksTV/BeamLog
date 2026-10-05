@@ -263,10 +263,9 @@
         </div>
         <form id="repo-form" class="row">
           <input id="repo-url" placeholder="Repo-Datei (GitHub-API-URL oder Raw-URL)" style="flex:1;min-width:260px">
-          <input id="repo-token" type="password" placeholder="GitHub-Token (nur bei privatem Repo)" autocomplete="new-password" style="width:220px">
           <button class="ghost small">Speichern</button>
         </form>
-        <p class="muted small">Ablauf: Hier „Export im Repo-Format“ herunterladen und als <code>contestlogger/seed/stationsdatenbank.csv</code> ins Repo einchecken; andere Installationen holen sie mit „Nach neuen suchen“. Für ein privates Repo braucht der Server ein GitHub-Token mit Lesezugriff (Settings → Developer settings → Fine-grained token, Contents: Read).</p>
+        <p class="muted small">Ablauf: Hier „Export im Repo-Format“ herunterladen und als <code>contestlogger/seed/stationsdatenbank.csv</code> ins Repo einchecken; andere Installationen holen sie mit „Nach neuen suchen“.</p>
         <h3>Backups auf dem Server</h3>
         <p class="muted small" id="backup-info">Der Server sichert die Datenbank automatisch (nur wenn sich etwas geändert hat) in den Ordner <code>backup/</code> neben der Datenbank; beim Beenden zusätzlich. Die Datenbank selbst läuft im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt sie nicht.</p>
         <p><button id="btn-backup" class="ghost">Jetzt sichern</button></p>

@@ -1,5 +1,7 @@
 # Stationsdatenbank (Callbuch)
 
+![Stationsdatenbank in der Verwaltung](img/stationsdatenbank.png)
+
 Die Stationsdatenbank ordnet Rufzeichen einem Locator (und ggf. Namen) zu. Sie liefert die Vorschläge und die Locator-Vorbelegung beim Loggen, die Plausibilitätshinweise und die Kandidaten für den Rundruf.
 
 ## Woher die Einträge kommen
@@ -29,4 +31,4 @@ Ablauf für ein Team mit mehreren Installationen:
 2. Die Datei als `contestlogger/seed/stationsdatenbank.csv` ins Repo einchecken.
 3. Auf den anderen Installationen „Nach neuen suchen (Repo)“ klicken: der Server lädt die Datei über die GitHub-API und übernimmt neue Rufzeichen und geänderte Locator. Das Ergebnis („324 Einträge im Repo: 12 neu, 3 Locator aktualisiert“) erscheint daneben und im Aktionsprotokoll.
 
-Bei einem **privaten Repo** braucht der Server ein GitHub-Token mit Lesezugriff (GitHub → Settings → Developer settings → Fine-grained token, Contents: Read). Es wird im Feld darunter gespeichert (maskiert) und auch für die Update-Prüfung verwendet. Die URL lässt sich ändern, z. B. auf einen eigenen Webserver.
+Die URL lässt sich ändern, z. B. auf einen eigenen Webserver. Das Repo ist öffentlich; nur für einen privaten Fork wird ein GitHub-Token mit Lesezugriff gebraucht, das als `GITHUB_TOKEN` in `contestlogger.env` steht (nicht in der Oberfläche).

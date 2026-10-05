@@ -136,7 +136,9 @@
     const map = L.map("map", { zoomControl: true, attributionControl: true }).setView([51, 10], 5);
     L.tileLayer(info.tile_url || "https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(map);
     M = { map, layer: L.layerGroup().addTo(map), dots: L.layerGroup().addTo(map), planes: L.layerGroup().addTo(map), zone: L.layerGroup().addTo(map) };
-    setTimeout(() => map.invalidateSize(), 100);
+    // Kacheln füllen die Karte erst, wenn Leaflet die endgültige Größe kennt (Layout/Fonts kommen später)
+    [100, 600, 2000].forEach((ms) => setTimeout(() => map.invalidateSize(), ms));
+    if (window.ResizeObserver) new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById("map"));
     return M;
   }
   function drawDots() {

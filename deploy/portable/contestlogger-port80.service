@@ -12,7 +12,8 @@ Type=simple
 User=contestlogger
 Group=contestlogger
 WorkingDirectory=/opt/contestlogger
-ExecStart=/opt/contestlogger/ContestLogger --host 0.0.0.0 --port 80 --db /var/lib/contestlogger/contestlogger.db --backup-min 15 --public-url http://contest.local/
+# Einstellungen aus /etc/contestlogger/contestlogger.env; Host und Port werden hier fest auf 0.0.0.0:80 gesetzt
+ExecStart=/opt/contestlogger/ContestLogger --config /etc/contestlogger/contestlogger.env --host 0.0.0.0 --port 80
 Restart=always
 RestartSec=3
 

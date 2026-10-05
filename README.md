@@ -3,7 +3,8 @@
 # ContestLogger
 
 **Lokaler, webbasierter Contest-Logger für UKW-Contests (DARC / IARU Region 1)**
-Nachfolger von DD3KU WinContest · ein Server im LAN, loggen von jedem Browser · ON4KST-Chat, Operator-Fenster, Aircraft-Scatter
+Inoffizieller Nachfolger von DD3KU WinContest · ein Server im LAN, loggen von jedem Browser
+Integrierter **ON4KST-Chat** (je Station, DMs, Rundruf) · **Aircraft-Scatter** wie AirScout direkt auf der Karte · Operator-Fenster für den zweiten Monitor
 
 [![Release](https://img.shields.io/github/v/release/NoobKeksTV/ContestLogger?label=Release&color=3fb3ff)](https://github.com/NoobKeksTV/ContestLogger/releases/latest)
 [![Build](https://img.shields.io/github/actions/workflow/status/NoobKeksTV/ContestLogger/build.yml?label=Build)](https://github.com/NoobKeksTV/ContestLogger/actions/workflows/build.yml)
@@ -48,26 +49,22 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 3. Admin-Passwort festlegen, unter **Verwaltung** die Stationen anlegen und den ersten Contest erstellen.
 4. Im Reiter **Loggen** Station wählen und loslegen. F1 zeigt alle Tastenkürzel.
 
-Für einen dauerhaft laufenden Server (Debian, nginx, systemd): im Linux-ZIP liegt `deploy/`, Anleitung im [Wiki](docs/wiki/Deploy.md).
+Dauerhafte Einstellungen (Port, Datenbank, Adresse für den QR-Code …) stehen in `contestlogger.env` neben dem Programm (Vorlage `contestlogger.env.example`). Für einen dauerhaft laufenden Server (Debian, nginx, systemd): im Linux-ZIP liegt `deploy/`, Einstellungen dann in `/etc/contestlogger/contestlogger.env`, Anleitung im [Wiki](docs/wiki/Deploy.md).
 
 Aus dem Quellcode: `pip install -r requirements.txt && python run.py` (Python 3.11+).
 
 ## Bilder
 
-<table>
-<tr>
-<td><img src="docs/wiki/img/operator.png" alt="Operator-Fenster"><br><sub>Operator-Fenster für den zweiten Monitor</sub></td>
-<td><img src="docs/wiki/img/statistik.png" alt="Statistik"><br><sub>Statistik mit Karte, Großfeldern und Diagrammen</sub></td>
-</tr>
-<tr>
-<td><img src="docs/wiki/img/chat-kst.png" alt="KST-Chat"><br><sub>ON4KST-Chat je Station</sub></td>
-<td><img src="docs/wiki/img/karte-flugzeuge.png" alt="Flugzeug-Scatter"><br><sub>Flugzeug-Scatter auf der Karte</sub></td>
-</tr>
-<tr>
-<td><img src="docs/wiki/img/verwaltung.png" alt="Verwaltung"><br><sub>Verwaltung: Stationen, Contests, Importe, Export</sub></td>
-<td><img src="docs/wiki/img/logpruefung.png" alt="Log-Prüfung"><br><sub>Log-Prüfung vor der EDI-Abgabe</sub></td>
-</tr>
-</table>
+| Operator-Fenster für den zweiten Monitor | Flugzeug-Scatter auf der Karte |
+|:---:|:---:|
+| <img src="docs/wiki/img/operator.png" width="440" alt="Operator-Fenster"> | <img src="docs/wiki/img/karte-flugzeuge.png" width="440" alt="Flugzeug-Scatter"> |
+| **ON4KST-Chat je Station** | **Direktnachrichten** |
+| <img src="docs/wiki/img/chat-kst.png" width="300" alt="KST-Chat"> | <img src="docs/wiki/img/dm.png" width="300" alt="Direktnachrichten"> |
+| **Log-Prüfung vor der EDI-Abgabe** | **Rundruf an Stationen im Umkreis** |
+| <img src="docs/wiki/img/logpruefung.png" width="440" alt="Log-Prüfung"> | <img src="docs/wiki/img/rundruf.png" width="440" alt="Rundruf"> |
+
+<p align="center"><img src="docs/wiki/img/statistik.png" width="880" alt="Statistik"><br><sub>Statistik mit Karte, Großfeldern und Diagrammen</sub></p>
+<p align="center"><img src="docs/wiki/img/verwaltung.png" width="880" alt="Verwaltung"><br><sub>Verwaltung: Stationen, Contests, Importe, Export, Updates</sub></p>
 
 ## Dokumentation
 
@@ -82,3 +79,7 @@ Datenquellen: Flugzeuge von [adsb.fi](https://adsb.fi) (nicht-kommerziell) oder 
 ## Lizenz und Copyright
 
 © 2026 Lars Hölker (DN2LH). Siehe [LICENSE](LICENSE).
+
+---
+
+<div align="center"><sub>Made by Lars Hölker (DN2LH), geholfen von Claude · 73!</sub></div>

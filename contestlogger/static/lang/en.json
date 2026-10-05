@@ -466,11 +466,7 @@
  "Nach neuen suchen (Repo)": "Check for new (repo)",
  "Die Stationen eures Teams mit allen Stammdaten (Rufzeichen, Locator, Band, Passwort, KST-Zugang, EDI-Angaben). Beim Anlegen eines Contests wählst du, welche davon teilnehmen – jede bekommt dort ihr eigenes Log mit eigener Nummer und eigenem KST-Chat.": "Your team's stations with all master data (callsign, locator, band, password, KST login, EDI details). When creating a contest you choose which take part – each gets its own log with its own serial and KST chat there.",
  "Die Stationen dieses Contests mit eigenem Log und eigener laufender Nummer. Operatoren schalten die Station mit dem Passwort frei. Die Stations-ID (für CAT-Bridge und Operator-Fenster) steht in der Tabelle.": "The stations of this contest with their own log and serial number. Operators unlock the station with the password. The station ID (for CAT bridge and operator window) is shown in the table.",
- "Token (gespeichert)": "Token (saved)",
- "GitHub-Token (nur bei privatem Repo)": "GitHub token (private repo only)",
  "Repo-Datei (GitHub-API-URL oder Raw-URL)": "Repo file (GitHub API URL or raw URL)",
- "Ablauf: Hier „Export im Repo-Format“ herunterladen und als": "Workflow: download “Export in repo format” here and commit it as",
- "ins Repo einchecken; andere Installationen holen sie mit „Nach neuen suchen“. Für ein privates Repo braucht der Server ein GitHub-Token mit Lesezugriff (Settings → Developer settings → Fine-grained token, Contents: Read).": "into the repo; other installations fetch it with “Check for new”. For a private repo the server needs a GitHub token with read access (Settings → Developer settings → fine-grained token, Contents: Read).",
  "✈ Flugzeuge": "✈ Aircraft",
  "Flugzeuge (ADS-B) einblenden – Aircraft-Scatter wie AirScout: Flugzeuge im Korridor zwischen dir und dem Partner, Zone gemeinsamer Sichtbarkeit": "Show aircraft (ADS-B) – aircraft scatter like AirScout: planes in the corridor between you and the partner, zone of mutual visibility",
  "Zone gemeinsamer Sichtbarkeit (Reiseflughöhe): km {a}–{b} des Pfads": "Zone of mutual visibility (cruise altitude): km {a}–{b} of the path",
@@ -505,5 +501,7 @@
  "Neue Version {v} verfügbar – Verwaltung → Updates": "New version {v} available – Administration → Updates",
  "Server startet neu (Version {v}) …": "Server restarting (version {v}) …",
  "Der Server prüft stündlich die GitHub-Releases. Die portable Version kann sich selbst aktualisieren (Dateien werden ersetzt,": "The server checks the GitHub releases hourly. The portable version can update itself (files are replaced,",
- "bleibt, danach Neustart); eine Quellcode-Installation aktualisiert man mit": "stays, then restart); a source installation is updated with"
+ "bleibt, danach Neustart); eine Quellcode-Installation aktualisiert man mit": "stays, then restart); a source installation is updated with",
+ "Ablauf: Hier „Export im Repo-Format“ herunterladen und als": "Workflow: download “Export in repo format” here and commit it as",
+ "ins Repo einchecken; andere Installationen holen sie mit „Nach neuen suchen“.": "into the repo; other installations fetch it with “Check for new”."
 }

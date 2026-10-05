@@ -14,11 +14,16 @@ Das Script
 
 - installiert `nginx`, `sqlite3` und `rsync`,
 - kopiert das Programm nach `/opt/contestlogger` und legt den Systemnutzer `contestlogger` an,
-- richtet den Dienst `contestlogger` ein (Binary auf `127.0.0.1:8000`, Datenbank in `/var/lib/contestlogger/`, Backups alle 15 Minuten, Neustart bei Absturz),
+- legt die Konfiguration `/etc/contestlogger/contestlogger.env` an (Dienst auf `127.0.0.1:8000`, Datenbank in `/var/lib/contestlogger/`, Backups alle 15 Minuten),
+- richtet den Dienst `contestlogger` ein (liest die Konfiguration, Neustart bei Absturz),
 - legt die nginx-Site auf Port 80 mit WebSocket-Weiterleitung an,
 - richtet ein tägliches gepacktes Backup (03:15 Uhr, 30 Tage) ein.
 
 Danach läuft der Logger unter `http://<server-ip>/`. `--url` setzt die Adresse, die im QR-Code und in Links erscheint.
+
+Die Sicherungen des Servers lassen sich in der Verwaltung einsehen und anstoßen:
+
+![Backups auf dem Server](img/backups.png)
 
 **Update später:** neues ZIP entpacken und im entpackten Ordner `sudo bash deploy/install.sh --update`. Daten und Einstellungen bleiben erhalten. Alternativ aktualisiert sich der Server selbst über Verwaltung → Updates, siehe [Updates](Updates.md).
 
@@ -32,45 +37,63 @@ sudo useradd --system --home /opt/contestlogger --shell /usr/sbin/nologin contes
 sudo chown -R contestlogger:contestlogger /opt/contestlogger /var/lib/contestlogger
 sudo chmod +x /opt/contestlogger/ContestLogger*
 
-# 2. systemd-Dienst kopieren, aktivieren und starten
+# 2. Konfiguration anlegen (Werte bei Bedarf anpassen: nano /etc/contestlogger/contestlogger.env)
+sudo mkdir -p /etc/contestlogger
+sudo cp /opt/contestlogger/deploy/contestlogger.env /etc/contestlogger/contestlogger.env
+sudo chown root:contestlogger /etc/contestlogger/contestlogger.env && sudo chmod 640 /etc/contestlogger/contestlogger.env
+
+# 3. systemd-Dienst kopieren, aktivieren und starten
 sudo cp /opt/contestlogger/deploy/contestlogger.service /etc/systemd/system/contestlogger.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now contestlogger
 
-# 3. nginx-Site einrichten (Port 80 -> Dienst)
+# 4. nginx-Site einrichten (Port 80 -> Dienst)
 sudo apt-get install -y nginx
 sudo cp /opt/contestlogger/deploy/nginx-contestlogger.conf /etc/nginx/sites-available/contestlogger
 sudo ln -sf /etc/nginx/sites-available/contestlogger /etc/nginx/sites-enabled/contestlogger
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 
-# 4. (optional) tägliches Backup
+# 5. (optional) tägliches Backup
 sudo apt-get install -y sqlite3
 sudo cp /opt/contestlogger/deploy/backup.sh /usr/local/bin/contestlogger-backup
 sudo chmod +x /usr/local/bin/contestlogger-backup
 echo "15 3 * * * root /usr/local/bin/contestlogger-backup" | sudo tee /etc/cron.d/contestlogger-backup
 ```
 
-## Die Unit-Datei
+## Einstellungen: `/etc/contestlogger/contestlogger.env`
 
-`deploy/contestlogger.service` (Auszug):
+Alle Server-Einstellungen stehen in einer Datei im `.env`-Format; die Unit selbst enthält keine Optionen mehr:
+
+```ini
+HOST=127.0.0.1                                  # hinter nginx nur lokal
+PORT=8000
+DB=/var/lib/contestlogger/contestlogger.db
+BACKUP_MIN=15                                   # automatische Sicherung alle N Minuten (0 = aus)
+PUBLIC_URL=http://contest.local/                # Adresse im QR-Code und in Links
+#KST_HOST=www.on4kst.info                       # ON4KST-Server (normalerweise unverändert)
+#KST_PORT=23000
+#GITHUB_TOKEN=                                  # nur für ein privates Repo (Updates, Stationsdatenbank)
+```
+
+Nach Änderungen `sudo systemctl restart contestlogger`. `install.sh` legt die Datei beim ersten Lauf aus `deploy/contestlogger.env` an und lässt sie bei `--update` unverändert; `--url` trägt nur `PUBLIC_URL` ein. Reihenfolge der Quellen: Kommandozeile überstimmt Umgebungsvariablen `CONTESTLOGGER_<KEY>`, diese überstimmen die Datei.
+
+Die Unit `deploy/contestlogger.service` (Auszug):
 
 ```ini
 [Service]
 User=contestlogger
 WorkingDirectory=/opt/contestlogger
-ExecStart=/opt/contestlogger/ContestLogger --host 127.0.0.1 --port 8000 --db /var/lib/contestlogger/contestlogger.db --backup-min 15 --public-url http://contest.local/
+ExecStart=/opt/contestlogger/ContestLogger --config /etc/contestlogger/contestlogger.env
 Restart=always
 PrivateTmp=true
 ProtectSystem=strict
 ReadWritePaths=/var/lib/contestlogger
 ```
 
-Öffentliche Adresse ändern: `--public-url` anpassen, dann `sudo systemctl daemon-reload && sudo systemctl restart contestlogger`.
-
 ## Ohne nginx: direkt auf Port 80
 
-Ein normaler Nutzer darf Port 80 nicht öffnen (`[Errno 13] permission denied`). Die Unit `deploy/contestlogger-port80.service` gibt dem Dienst über `AmbientCapabilities=CAP_NET_BIND_SERVICE` genau diese Berechtigung und lauscht auf `0.0.0.0:80`:
+Ein normaler Nutzer darf Port 80 nicht öffnen (`[Errno 13] permission denied`). Die Unit `deploy/contestlogger-port80.service` gibt dem Dienst über `AmbientCapabilities=CAP_NET_BIND_SERVICE` genau diese Berechtigung und setzt `0.0.0.0:80` fest (alle anderen Werte kommen weiter aus `contestlogger.env`):
 
 ```bash
 sudo systemctl disable --now nginx            # falls nginx Port 80 belegt

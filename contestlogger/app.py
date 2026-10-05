@@ -95,7 +95,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if not force and update_state["latest"] and time.time() - update_state["checked_at"] < 3600:
             return update_state["latest"]
         try:
-            latest = await asyncio.to_thread(updater.check_latest, db.get_setting("repo_token", "") or "")
+            latest = await asyncio.to_thread(updater.check_latest, github_token())
             was = (update_state["latest"] or {}).get("version")
             update_state.update(latest=latest, checked_at=time.time(), error="")
             if latest["available"] and latest["version"] != was:
@@ -172,6 +172,10 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             await c.stop()
 
     REPO_CALLBOOK_URL = "https://api.github.com/repos/NoobKeksTV/ContestLogger/contents/contestlogger/seed/stationsdatenbank.csv?ref=main"
+
+    def github_token() -> str:
+        """Optionales GitHub-Token nur aus Umgebung/Config (CONTESTLOGGER_GITHUB_TOKEN) – das Repo ist öffentlich, normalerweise leer."""
+        return os.environ.get("CONTESTLOGGER_GITHUB_TOKEN", "")
     lookup_state = {"client": None}
     lookup_cache: dict[str, float] = {}  # Call -> Zeitpunkt der letzten erfolglosen Abfrage
 
@@ -234,7 +238,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.post("/api/settings", dependencies=[Depends(require_admin)])
     def set_settings(body: dict):
-        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros", "repo_url", "repo_token", "adsb_source", "adsb_local_url", "adsb_corridor_km", "adsb_antenna_m", "update_check"):
+        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros", "repo_url", "adsb_source", "adsb_local_url", "adsb_corridor_km", "adsb_antenna_m", "update_check"):
             if k in body:
                 db.set_setting(k, json.dumps(body[k]) if k == "kst_macros" else str(body[k] or ""))
         lookup_state["client"] = None
@@ -246,7 +250,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return {"tile_url": db.get_setting("tile_url", ""), "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
                 "lookup_user": db.get_setting("lookup_user", ""), "lookup_pass_set": bool(db.get_setting("lookup_pass", "")),
                 "providers": lookup.PROVIDERS,
-                "kst_rooms": kst.ROOMS, "repo_url": db.get_setting("repo_url", "") or REPO_CALLBOOK_URL, "repo_token_set": bool(db.get_setting("repo_token", "")),
+                "kst_rooms": kst.ROOMS, "repo_url": db.get_setting("repo_url", "") or REPO_CALLBOOK_URL,
                 "adsb_source": db.get_setting("adsb_source", "adsb.fi") or "adsb.fi", "adsb_local_url": db.get_setting("adsb_local_url", "") or "",
                 "adsb_corridor_km": float(db.get_setting("adsb_corridor_km", "12") or 12), "adsb_antenna_m": float(db.get_setting("adsb_antenna_m", "15") or 15),
                 "update_check": db.get_setting("update_check", "1") != "0"}
@@ -1058,7 +1062,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         def prog(done, total):
             update_state["progress"] = f"lade … {done // 1048576} / {total // 1048576} MB" if total else f"lade … {done // 1048576} MB"
         try:
-            res = await asyncio.to_thread(updater.apply_update, latest["asset"], db.get_setting("repo_token", "") or "", prog)
+            res = await asyncio.to_thread(updater.apply_update, latest["asset"], github_token(), prog)
         except Exception as e:  # noqa: BLE001
             update_state.update(busy=False, progress="", error=str(e))
             raise HTTPException(500, f"Update fehlgeschlagen: {e}")
@@ -1116,7 +1120,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         Standard: GitHub-API (liefert mit Token auch aus privaten Repos); eine andere URL ist in den Einstellungen möglich."""
         import urllib.request
         url = (body or {}).get("url") or db.get_setting("repo_url", "") or REPO_CALLBOOK_URL
-        token = db.get_setting("repo_token", "") or ""
+        token = github_token()
         headers = {"User-Agent": f"ContestLogger/{__version__}", "Accept": "application/vnd.github.raw"}
         if token and "github" in url:
             headers["Authorization"] = f"Bearer {token}"

@@ -7,10 +7,13 @@
 #   sudo bash deploy/install.sh                 # Erstinstallation (nginx, Dienst, Backup-Cron)
 #   sudo bash deploy/install.sh --update        # neue Version einspielen und Dienst neu starten
 #   sudo bash deploy/install.sh --url http://contest.local/   # Adresse für QR-Code/Links setzen
+#
+# Alle Server-Einstellungen stehen in /etc/contestlogger/contestlogger.env (wird beim ersten Lauf angelegt).
 set -euo pipefail
 
 APP_DIR=/opt/contestlogger
 DATA_DIR=/var/lib/contestlogger
+CONF=/etc/contestlogger/contestlogger.env
 SRC_DIR="$(cd "$(dirname "$0")/.." && pwd)"       # der entpackte ContestLogger-Ordner
 MODE=install
 PUBLIC_URL=""
@@ -39,11 +42,31 @@ rsync -a --delete --exclude data "$SRC_DIR/" "$APP_DIR/"
 chmod +x "$APP_DIR"/ContestLogger* "$APP_DIR"/*.sh 2>/dev/null || true
 chown -R contestlogger:contestlogger "$APP_DIR" "$DATA_DIR"
 
+echo "== Konfiguration $CONF"
+mkdir -p "$(dirname "$CONF")"
+if [ ! -f "$CONF" ]; then
+  cp "$APP_DIR/deploy/contestlogger.env" "$CONF"
+  echo "   neu angelegt (Vorlage deploy/contestlogger.env)"
+else
+  echo "   vorhanden, bleibt unverändert"
+fi
+if [ -n "$PUBLIC_URL" ]; then
+  if grep -q '^#\?PUBLIC_URL=' "$CONF"; then
+    sed -i "s#^\#\?PUBLIC_URL=.*#PUBLIC_URL=$PUBLIC_URL#" "$CONF"
+  else
+    echo "PUBLIC_URL=$PUBLIC_URL" >> "$CONF"
+  fi
+fi
+chmod 640 "$CONF"; chown root:contestlogger "$CONF"
+# alte Unit mit Optionen in ExecStart? -> Werte in die env-Datei übernehmen, damit nichts verloren geht
+OLD_UNIT=/etc/systemd/system/contestlogger.service
+if [ -f "$OLD_UNIT" ] && grep -q -- '--public-url' "$OLD_UNIT" && [ -z "$PUBLIC_URL" ]; then
+  OLD_URL=$(grep -o -- '--public-url [^ ]*' "$OLD_UNIT" | awk '{print $2}')
+  [ -n "$OLD_URL" ] && sed -i "s#^\#\?PUBLIC_URL=.*#PUBLIC_URL=$OLD_URL#" "$CONF"
+fi
+
 echo "== systemd-Dienst"
 cp "$APP_DIR/deploy/contestlogger.service" /etc/systemd/system/contestlogger.service
-if [ -n "$PUBLIC_URL" ]; then
-  sed -i "s#--public-url [^ ]*#--public-url $PUBLIC_URL#" /etc/systemd/system/contestlogger.service
-fi
 systemctl daemon-reload
 systemctl enable contestlogger >/dev/null
 systemctl restart contestlogger
@@ -66,4 +89,5 @@ IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 echo
 echo "Fertig. ContestLogger läuft: http://${IP:-<server-ip>}/   (Status: systemctl status contestlogger)"
 echo "Datenbank: $DATA_DIR/contestlogger.db   Logs: journalctl -u contestlogger -f"
+echo "Einstellungen: $CONF   (danach: sudo systemctl restart contestlogger)"
 echo "Update später: neues ZIP entpacken und dort  sudo bash deploy/install.sh --update"

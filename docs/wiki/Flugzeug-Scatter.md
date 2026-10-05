@@ -16,6 +16,8 @@ Flugzeuge am Boden und unter 1500 m werden ignoriert.
 
 ## Datenquellen (Verwaltung → Flugzeug-Scatter)
 
+![Einstellungen Flugzeug-Scatter](img/adsb-einstellungen.png)
+
 | Quelle | Hinweise |
 |---|---|
 | **adsb.fi** (Standard) | Frei, ohne Schlüssel, nicht-kommerziell, max. 1 Abfrage/s, Daten © adsb.fi. Der Server fragt nur, solange die Ebene in einem Browser eingeschaltet ist, und cached 4 s. |

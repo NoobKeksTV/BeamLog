@@ -2,6 +2,8 @@
 
 `ContestLogger-CAT` (bzw. `tools/cat_bridge.py`) läuft auf dem Rechner, an dem das Funkgerät hängt, und meldet die Frequenz an den Server. Sie erscheint in der Stationsleiste, im Operator-Fenster und wird je QSO gespeichert (ADIF `FREQ`).
 
+![Frequenz in der Stationsleiste](img/cat-frequenz.png)
+
 ## Voraussetzungen
 
 - Hamlib `rigctld` (z. B. `rigctld -m 3073 -r COM5 -s 38400`) oder flrig.

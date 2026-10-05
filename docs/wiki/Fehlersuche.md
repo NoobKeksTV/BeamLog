@@ -12,9 +12,14 @@
 | KST: nach Neustart alles ungelesen oder Nachrichten doppelt | Verwaltung → Station → „Rohdaten“ zeigt, wie der Server den Verlauf schickt. Der Logger erkennt Wiederholungen; bei Abweichungen bitte die Rohdaten melden. |
 | Viele Töne auf einmal | Nachrichtenschub (z. B. Verlauf nach Neuverbinden). Töne sind auf einen je 1,5 s gedrosselt; in den ersten Sekunden nach Verbindung bleibt es still. |
 | HamQTH liefert nichts | HamQTH verlangt für die Abfrage-Schnittstelle einen (kostenlosen) Account; Benutzername und Passwort in der Verwaltung eintragen und „Testen“. |
-| „Repo nicht erreichbar: 404“ | Privates Repo: GitHub-Token mit Lesezugriff eintragen (Verwaltung → Stationsdatenbank). |
+| „Repo nicht erreichbar: 404“ | URL in Verwaltung → Stationsdatenbank prüfen. Nur bei einem privaten Fork: `GITHUB_TOKEN` in `contestlogger.env` setzen. |
+| Einstellung (Port, Adresse) wirkt nicht | Reihenfolge: Kommandozeile > Umgebungsvariable `CONTESTLOGGER_<KEY>` > `contestlogger.env`. Beim Start steht „Konfiguration: …“, welche Datei gelesen wurde; Server: `/etc/contestlogger/contestlogger.env`, danach `systemctl restart contestlogger`. |
 | Karte ohne Kacheln | Kein Internet oder Kachelserver nicht erreichbar. Linien und Marker funktionieren trotzdem; für Offline-Betrieb eigenen Kachelserver eintragen. |
 | EDI-Export verweigert | Log-Prüfung hat Fehler gefunden; Einträge anklicken und beheben. Admin kann erzwingen. |
 | Flugzeuge: „ADS-B-Quelle nicht erreichbar“ | Server hat kein Internet (adsb.fi) oder die URL des eigenen Empfängers stimmt nicht. |
+
+Die Rohdaten der KST-Verbindung (Verwaltung → Station ✎ → „Rohdaten“) zeigen jede Zeile, die der Server vom ON4KST-Chat erhalten hat:
+
+![KST-Rohdaten](img/kst-rohdaten.png)
 
 Logs: Server-Konsole bzw. `journalctl -u contestlogger -f`; dort steht auch das Aktionsprotokoll. Die Datenbank liegt in `data/contestlogger.db` (portable) bzw. `/var/lib/contestlogger/contestlogger.db` (Server), Sicherungen daneben in `backup/`.

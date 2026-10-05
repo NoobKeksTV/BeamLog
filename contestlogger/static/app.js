@@ -1498,7 +1498,7 @@
       S.kstRooms = cfg.kst_rooms || {};
       $("#adsb-source").value = cfg.adsb_source || "adsb.fi"; $("#adsb-local").value = cfg.adsb_local_url || ""; $("#adsb-corridor").value = cfg.adsb_corridor_km ?? 12; $("#adsb-antenna").value = cfg.adsb_antenna_m ?? 15;
       $("#repo-url").value = cfg.repo_url || ""; $("#upd-auto").checked = cfg.update_check !== false; $("#upd-current").textContent = `v${S.info.version}`;
-      if (S.update?.available) { $("#upd-result").textContent = t("Neue Version {v} verfügbar", { v: S.update.latest }); $("#btn-upd-apply").classList.toggle("hidden", !S.update.can_self_update); } $("#repo-token").placeholder = cfg.repo_token_set ? t("Token (gespeichert)") : t("GitHub-Token (nur bei privatem Repo)");
+      if (S.update?.available) { $("#upd-result").textContent = t("Neue Version {v} verfügbar", { v: S.update.latest }); $("#btn-upd-apply").classList.toggle("hidden", !S.update.can_self_update); }
     } catch (_) { /* */ }
     renderBackups(); renderCallbook(); renderAudit();
   }
@@ -1548,8 +1548,8 @@
   });
   $("#repo-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const body = { repo_url: $("#repo-url").value.trim() }; if ($("#repo-token").value) body.repo_token = $("#repo-token").value;
-    try { await api("POST", "/api/settings", body); $("#repo-token").value = ""; toast(t("Einstellungen gespeichert"), "ok"); renderAdmin(); } catch (err) { toast(err.message, "err"); }
+    const body = { repo_url: $("#repo-url").value.trim() };
+    try { await api("POST", "/api/settings", body); toast(t("Einstellungen gespeichert"), "ok"); renderAdmin(); } catch (err) { toast(err.message, "err"); }
   });
   $("#btn-cb-sync").addEventListener("click", async () => {
     const out = $("#cb-sync-result"); out.textContent = t("Lade aus dem Repo …");

@@ -20,7 +20,7 @@ EDI je Station (mit Prüfung), ADIF, CSV, alle Bänder als EDI-ZIP. Siehe [Impor
 WinContest-Ordner, Ergebnislisten, DARC-Contest-Hub, einzelne Datei. Siehe [Import und Export](Import-Export.md).
 
 ## Stationsdatenbank (Callbuch)
-Suche, Bearbeiten, Löschen, Export (CSV, Repo-Format), Abgleich mit dem Repo (URL, Token). Siehe [Stationsdatenbank](Stationsdatenbank.md).
+Suche, Bearbeiten, Löschen, Export (CSV, Repo-Format), Abgleich mit dem Repo (URL). Siehe [Stationsdatenbank](Stationsdatenbank.md).
 
 ## Backups auf dem Server
 Der Server sichert die Datenbank automatisch (nur bei Änderungen) in den Ordner `backup/` neben der Datenbank, zusätzlich beim Beenden und vor jedem Update. „Jetzt sichern“ erzeugt eine Sicherung sofort. Die Liste zeigt die vorhandenen Sicherungen. Es gibt bewusst keine Sicherung im Browser und keinen Offline-Modus: die Daten liegen nur auf dem Server.
@@ -29,9 +29,15 @@ Der Server sichert die Datenbank automatisch (nur bei Änderungen) in den Ordner
 Update-Prüfung, Selbst-Aktualisierung, „News anzeigen“. Siehe [Updates](Updates.md).
 
 ## Aktionsprotokoll
+
+![Aktionsprotokoll](img/aktionsprotokoll.png)
+
 Jede Änderung (QSOs, Stationen, Contests, Importe, Einstellungen, KST, Backups, Exporte, Anmeldungen) mit Zeit, Nutzername, Admin-Kennzeichen und Ergebnis; Passwörter werden maskiert. Suche, Aktualisieren, Download als Textdatei. Die gleichen Zeilen stehen auf der Server-Konsole bzw. im `journalctl`.
 
 ## Externe Rufzeichen-Abfrage
+
+![Externe Rufzeichen-Abfrage](img/rufzeichen-abfrage.png)
+
 HamQTH (kostenlos, aber Account nötig) oder QRZ.com (XML-Abo) für unbekannte Rufzeichen und den Online-Abgleich in der Log-Prüfung. „Testen“ prüft die Zugangsdaten.
 
 ## Karte

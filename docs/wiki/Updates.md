@@ -2,9 +2,11 @@
 
 ## Update-Prüfung
 
+![Updates in der Verwaltung](img/updates.png)
+
 Der Server prüft stündlich die GitHub-Releases (Verwaltung → Updates → „automatisch prüfen“). Liegt eine neuere Version vor, erscheint bei allen Nutzern im Kopf der grüne Knopf **⬆ v0.9.28** und ein kurzer Hinweis; der Knopf führt zur Verwaltung. „Nach Updates suchen“ prüft sofort und zeigt die Release-Notes.
 
-Bei einem privaten Repo braucht der Server das GitHub-Token aus dem Abschnitt Stationsdatenbank (Lesezugriff).
+Das Repo ist öffentlich, ein Token ist nicht nötig. (Nur für ein privates Fork: `GITHUB_TOKEN` in `contestlogger.env` setzen.)
 
 ## Jetzt aktualisieren (portable Version)
 
@@ -18,5 +20,7 @@ Bei einem privaten Repo braucht der Server das GitHub-Token aus dem Abschnitt St
 Jedes Update steht im Aktionsprotokoll.
 
 ## Was ist neu
+
+![Was ist neu](img/was-ist-neu.png)
 
 Ruft ein Browser den Server nach einem Update zum ersten Mal auf, erscheint „Was ist neu in v…“ mit den Änderungen seit der zuletzt gesehenen Version. „News anzeigen“ in der Verwaltung zeigt die letzten Versionen jederzeit. Grundlage ist das mitgelieferte Änderungsprotokoll (`CHANGELOG.md`), das beim Release-Build aus der Git-Historie erzeugt wird; dieselben Texte stehen in den Release-Notes auf GitHub.

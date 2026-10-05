@@ -97,7 +97,8 @@ def main() -> None:
         f"   Andere Rechner im LAN: die beim Start angezeigte Adresse eingeben (oder QR-Code in der Oberfläche).\n"
         f"2. Alle Daten liegen im Ordner data/ neben dem Programm (Datenbank, Backups, eigene Sprachen).\n"
         f"   Zum Umziehen auf einen anderen Rechner einfach den ganzen Ordner kopieren.\n"
-        f"3. Optionen: ContestLogger{exe} --port 8080   --backup-min 5   --public-url http://contest.local/\n\n"
+        f"3. Optionen: ContestLogger{exe} --port 8080   --backup-min 5   --public-url http://contest.local/\n"
+        f"   Dauerhaft: contestlogger.env.example nach contestlogger.env kopieren und Werte eintragen.\n\n"
         f"ContestLogger-CAT{exe}: Frequenz/CW vom Funkgerät (Hamlib rigctld) an den Server melden, z. B.\n"
         f"   ContestLogger-CAT{exe} --server http://192.168.1.10:8000 --station 1 --password 70cm --cw\n"
         f"ContestLogger-Import{exe}: alten WinContest-Ordner übernehmen, z. B.\n"
@@ -109,6 +110,7 @@ def main() -> None:
     else:
         (pkg / "start.sh").write_text('#!/usr/bin/env bash\ncd "$(dirname "$0")"\n./ContestLogger "$@"\n')
         os.chmod(pkg / "start.sh", 0o755)
+    shutil.copy(ROOT / "contestlogger.env.example", pkg / "contestlogger.env.example")
     if platform.system() == "Linux":
         # Deploy-Paket für Debian-Server (nginx + systemd) liegt im Linux-ZIP immer bei
         shutil.copytree(ROOT / "deploy" / "portable", pkg / "deploy")

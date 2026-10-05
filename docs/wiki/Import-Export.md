@@ -2,6 +2,8 @@
 
 Alles in der Verwaltung (Admin).
 
+![Import-Karten in der Verwaltung](img/import.png)
+
 ## WinContest-Ordner (DD3KU) übernehmen
 
 Den kompletten Ordner von WinContest auswählen (z. B. `D:\Contest`). Übernommen werden alle Logs aus `Datenbank/*.mdb` und `*.txt`, `DD3KU/*.EXP`, `Auswertung/*.edi` und `ADIF/*.adi` als archivierte Contests; jedes Rufzeichen mit Locator landet in der Stationsdatenbank. Dasselbe Log in mehreren Dateien wird nur einmal übernommen.
@@ -25,6 +27,8 @@ Veröffentlichte Ergebnislisten enthalten Rufzeichen und Locator aller Teilnehme
 Lädt die offiziellen `result.csv`-Dateien vom DARC-Contest-Hub (`dxhf2.darc.de`) für ein Jahr oder alle Jahre seit 2017 – pro Contest 500–900 Rufzeichen mit Locator, dazu die ODX-Gegenstationen. Braucht Internet auf dem Server.
 
 ## Export / Abgabe
+
+![Export / Abgabe](img/export.png)
 
 Verwaltung → **Export / Abgabe** (je Contest):
 
