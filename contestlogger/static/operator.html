@@ -46,6 +46,12 @@
   .mapcard .mh { display:flex; justify-content:space-between; color:var(--muted); font-size:13px; padding:0 4px 6px; }
   #map { flex:1; min-height:200px; border-radius:8px; background:var(--bg2); position:relative; z-index:0; isolation:isolate; overflow:hidden; }
   .arrow-icon { font-size:26px; color:#ff5c6c; text-shadow:0 0 4px #000; line-height:1; }
+  .plane-icon { line-height:1; text-shadow:0 0 3px #000; }
+  .pbtn { background:var(--bg2); color:var(--muted); border:1px solid var(--line); border-radius:6px; padding:2px 8px; font-size:12px; cursor:pointer; margin-left:8px; }
+  .pbtn.active { color:var(--warn); border-color:var(--warn); }
+  .plist { display:flex; flex-wrap:wrap; gap:4px 10px; font:13px var(--mono); color:var(--muted); padding:4px 4px 0; min-height:0; }
+  .plist:empty { display:none; }
+  .plist .hot { color:var(--warn); font-weight:700; }
   .map-label { background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:2px 6px; font-family:var(--mono); font-size:13px; white-space:nowrap; }
   .list { min-height:0; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:auto; }
   table { width:100%; border-collapse:collapse; font:16px var(--mono); }
@@ -81,7 +87,7 @@
 <div class="cmt" id="cmt"></div>
 <div class="statline" id="stats"></div>
 <div class="main">
-  <div class="mapcard"><div class="mh"><span>Karte / Antennenrichtung</span><span id="map-info"></span></div><div id="map"></div></div>
+  <div class="mapcard"><div class="mh"><span>Karte / Antennenrichtung</span><span id="map-info"></span><button type="button" id="btn-planes" class="pbtn" title="Flugzeuge (ADS-B) einblenden">✈ Flugzeuge</button></div><div id="map"></div><div id="plane-list" class="plist"></div></div>
   <div class="list">
     <table><thead><tr><th>UTC</th><th>Rufzeichen</th><th>RST</th><th>Nr geg.</th><th>RST</th><th>Nr erh.</th><th>Locator</th><th>km</th><th>°</th></tr></thead><tbody id="qsos"></tbody></table>
   </div>
@@ -129,7 +135,7 @@
     if (M || typeof L === "undefined") return M;
     const map = L.map("map", { zoomControl: true, attributionControl: true }).setView([51, 10], 5);
     L.tileLayer(info.tile_url || "https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(map);
-    M = { map, layer: L.layerGroup().addTo(map), dots: L.layerGroup().addTo(map) };
+    M = { map, layer: L.layerGroup().addTo(map), dots: L.layerGroup().addTo(map), planes: L.layerGroup().addTo(map), zone: L.layerGroup().addTo(map) };
     setTimeout(() => map.invalidateSize(), 100);
     return M;
   }
@@ -212,6 +218,7 @@
     if (d.dupe) { dupe.textContent = d.dupe.replace(/\s*–\s*DUPE!?$/, "").replace(/^⚠\s*/, "⚠ "); dupe.classList.remove("hidden"); } else dupe.classList.add("hidden");
     $("#by").textContent = by ? `Logger: ${by}${d.editing ? " (bearbeitet ein QSO)" : ""}` : "";
     drawBearing((d.loc || "").toUpperCase(), locToLatLon(d.loc) ? `${d.call || d.loc} · ${geo}` : "");
+    const nl = locToLatLon(d.loc) ? (d.loc || "").toUpperCase() : ""; if (nl !== curLoc) { curLoc = nl; if (planesOn) refreshPlanes(); }
   }
   function connect() {
     ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?nick=${encodeURIComponent("Operator")}`);
@@ -226,7 +233,24 @@
       else if (m.type === "update" && (m.scope === "qsos" ? m.station_id === sid : m.scope === "contests")) loadStation().then(() => loadQsos(true));
     };
   }
-  loadStation().then(() => loadQsos(false)).catch((e) => { $("#station").textContent = e.message; });
+  // Flugzeug-Scatter-Ebene (gleiche Auswertung wie im Logger)
+  let planesOn = localStorage.getItem("cl.planes.op") === "1", planeTimer = null, curLoc = "";
+  async function refreshPlanes() {
+    clearTimeout(planeTimer); if (!planesOn || !station) return;
+    try {
+      const r = await GET(`/api/aircraft?my=${station.locator}&loc=${curLoc}`);
+      const m = makeMap(); m.planes.clearLayers(); m.zone.clearLayers();
+      if (r.zone) L.polyline([r.zone.from, r.zone.to], { color: "#3ddc84", weight: 9, opacity: .45 }).addTo(m.zone);
+      for (const p of r.planes) { const hot = p.in_corridor && p.visible_both; L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${hot ? "#ffb347" : (p.visible_both ? "#9fd3ff" : "#6b7785")};font-size:${hot ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) }).bindTooltip(`${p.flight || p.hex} ${p.type || ""} FL${p.fl}`).addTo(m.planes); }
+      const box = $("#plane-list"); box.innerHTML = "";
+      for (const p of r.planes.filter((p) => p.in_corridor && p.visible_both).slice(0, 5)) { const s = document.createElement("span"); s.className = "hot"; s.textContent = `✈ ${p.flight || p.hex} FL${p.fl} · ${Math.abs(p.xt_km)} km vom Pfad`; box.append(s); }
+      for (const p of r.planes.filter((p) => !p.in_corridor && p.visible_both && p.eta_min != null && p.eta_min <= 15).slice(0, 3)) { const s = document.createElement("span"); s.textContent = `${p.flight || p.hex} kreuzt in ~${Math.round(p.eta_min)} min`; box.append(s); }
+    } catch (e) { $("#plane-list").textContent = "✈ " + e.message; }
+    planeTimer = setTimeout(refreshPlanes, 5000);
+  }
+  $("#btn-planes").addEventListener("click", () => { planesOn = !planesOn; localStorage.setItem("cl.planes.op", planesOn ? "1" : "0"); $("#btn-planes").classList.toggle("active", planesOn); if (planesOn) refreshPlanes(); else { clearTimeout(planeTimer); const m = makeMap(); if (m) { m.planes.clearLayers(); m.zone.clearLayers(); } $("#plane-list").innerHTML = ""; } });
+  if (planesOn) $("#btn-planes").classList.add("active");
+  loadStation().then(() => loadQsos(false)).then(() => { if (planesOn) refreshPlanes(); }).catch((e) => { $("#station").textContent = e.message; });
   connect();
   window.addEventListener("resize", () => M && M.map.invalidateSize());
 })();

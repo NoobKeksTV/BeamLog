@@ -45,7 +45,7 @@ ACTIONS: list[tuple[str, str, str]] = [
     ("POST", r"/api/kst/rundruf_texts$", "Rundruf-Texte gespeichert"),
     ("POST", r"/api/lang/(?P<code>[^/]+)$", "Sprache {code} gespeichert"),
 ]
-SKIP = (re.compile(r"/api/stations/\d+/rig$"), re.compile(r"/api/stations/\d+/cw/next$"), re.compile(r"/api/kst/seen$"))
+SKIP = (re.compile(r"/api/aircraft$"), re.compile(r"/api/stations/\d+/rig$"), re.compile(r"/api/stations/\d+/cw/next$"), re.compile(r"/api/kst/seen$"))
 SECRET_KEYS = ("pass", "password", "token", "secret", "kst_pass", "lookup_pass")
 
 

@@ -341,3 +341,10 @@ kbd { display: inline-block; padding: 1px 6px; margin-right: 3px; border: 1px so
 #modal-box.wide { width: min(820px, 100%); }
 .tpl-list { display:flex; flex-wrap:wrap; gap:4px 14px; }
 .tpl-list label.check { flex-direction:row; align-items:center; gap:6px; color:var(--text); font-size:13.5px; }
+.plane-icon { line-height:1; text-shadow:0 0 3px #000; }
+.plane-list { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:center; margin-top:6px; font-size:12.5px; }
+.plane-list .pl { background:var(--bg2); border:1px solid var(--line); border-radius:6px; padding:2px 7px; font-family:var(--mono); color:var(--muted); }
+.plane-list .pl.hot { border-color:var(--warn); color:var(--warn); font-weight:600; }
+.plane-list .attrib { margin-left:auto; }
+.plane-list .warn { color:var(--warn); }
+#btn-planes.active { border-color:var(--warn); color:var(--warn); }

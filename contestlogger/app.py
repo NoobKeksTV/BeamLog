@@ -16,7 +16,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __version__, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes
+from . import __app_name__, __copyright__, __version__, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes
 from .db import Database
 
 STATIC = Path(__file__).parent / "static"
@@ -203,7 +203,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.post("/api/settings", dependencies=[Depends(require_admin)])
     def set_settings(body: dict):
-        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros", "repo_url", "repo_token"):
+        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros", "repo_url", "repo_token", "adsb_source", "adsb_local_url", "adsb_corridor_km", "adsb_antenna_m"):
             if k in body:
                 db.set_setting(k, json.dumps(body[k]) if k == "kst_macros" else str(body[k] or ""))
         lookup_state["client"] = None
@@ -215,7 +215,9 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return {"tile_url": db.get_setting("tile_url", ""), "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
                 "lookup_user": db.get_setting("lookup_user", ""), "lookup_pass_set": bool(db.get_setting("lookup_pass", "")),
                 "providers": lookup.PROVIDERS,
-                "kst_rooms": kst.ROOMS, "repo_url": db.get_setting("repo_url", "") or REPO_CALLBOOK_URL, "repo_token_set": bool(db.get_setting("repo_token", ""))}
+                "kst_rooms": kst.ROOMS, "repo_url": db.get_setting("repo_url", "") or REPO_CALLBOOK_URL, "repo_token_set": bool(db.get_setting("repo_token", "")),
+                "adsb_source": db.get_setting("adsb_source", "adsb.fi") or "adsb.fi", "adsb_local_url": db.get_setting("adsb_local_url", "") or "",
+                "adsb_corridor_km": float(db.get_setting("adsb_corridor_km", "12") or 12), "adsb_antenna_m": float(db.get_setting("adsb_antenna_m", "15") or 15)}
 
     @app.post("/api/lookup/test", dependencies=[Depends(require_admin)])
     async def lookup_test():
@@ -988,6 +990,36 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             res["lookup"] = {"provider": client.provider, "checked_now": checked}
         else:
             res["lookup"] = {"provider": "none", "checked_now": 0}
+        return res
+
+    # ------------------------------------------------------------ Flugzeug-Scatter (ADS-B, wie AirScout)
+    @app.get("/api/aircraft")
+    async def aircraft(my: str, loc: str = "", dist: float = 0):
+        """Flugzeuge um die eigene Station bzw. entlang des Pfads zum Partner-Locator, mit Scatter-Bewertung."""
+        if not geo.is_valid_locator(my):
+            raise HTTPException(400, "Eigener Locator ungültig")
+        source = db.get_setting("adsb_source", "adsb.fi") or "adsb.fi"
+        local_url = db.get_setting("adsb_local_url", "") or ""
+        corridor = float(db.get_setting("adsb_corridor_km", "12") or 12)
+        antenna = float(db.get_setting("adsb_antenna_m", "15") or 15)
+        a = geo.locator_to_latlon(my)
+        if loc and geo.is_valid_locator(loc):
+            b = geo.locator_to_latlon(loc)
+            center = adsb.point_along(a, b, 0.5)
+            radius = max(dist or 0, adsb.dist_ll(a, b) / 2 + 60)
+        else:
+            center, radius = a, (dist or 150)
+        try:
+            planes = await asyncio.to_thread(adsb.fetch, source, center[0], center[1], min(radius, 460), local_url)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, f"ADS-B-Quelle nicht erreichbar ({'eigener Empfänger' if source == 'local' else 'adsb.fi'}): {e}")
+        if loc and geo.is_valid_locator(loc):
+            res = adsb.scatter(my, loc, planes, corridor_km=corridor, antenna_m=antenna)
+        else:
+            res = {"my": my, "other": "", "dist_km": 0, "corridor_km": corridor, "zone": None, "horizon_km": 0,
+                   "planes": [{**p, "xt_km": None, "at_km": None, "d1_km": round(adsb.dist_ll(a, (p["lat"], p["lon"]))), "d2_km": None, "visible_both": False, "in_corridor": False, "eta_min": None} for p in planes if not p["ground"]][:120]}
+        res["source"] = "adsb.fi" if source != "local" else "local"
+        res["attribution"] = "Flugzeugdaten: adsb.fi (https://adsb.fi)" if source != "local" else "Flugzeugdaten: eigener ADS-B-Empfänger"
         return res
 
     # ------------------------------------------------------------ Stationsdatenbank aus dem Repo abgleichen

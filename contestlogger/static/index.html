@@ -86,8 +86,9 @@
         <div class="statline" id="kpis"></div>
         <div class="card map-card">
           <div class="row opnote-row"><input id="opnote" placeholder="Hinweis für das Operator-Fenster (z. B. 432.200 CQ, QSY nach 432.250, Antenne 90°) …" maxlength="300"><button type="button" id="btn-opnote" class="ghost small">Anzeigen</button><button type="button" id="btn-opnote-clear" class="ghost small" title="Hinweis löschen">✕</button></div>
-          <div class="card-head"><h3>Karte / Antennenrichtung</h3><span id="map-info" class="muted small"></span></div>
+          <div class="card-head"><h3>Karte / Antennenrichtung</h3><span id="map-info" class="muted small"></span><button type="button" id="btn-planes" class="ghost small" title="Flugzeuge (ADS-B) einblenden – Aircraft-Scatter wie AirScout: Flugzeuge im Korridor zwischen dir und dem Partner, Zone gemeinsamer Sichtbarkeit">✈ Flugzeuge</button></div>
           <div id="map-log" class="map"></div>
+          <div id="plane-list" class="plane-list hidden"></div>
         </div>
 
         <div class="card">
@@ -290,6 +291,17 @@
         <h3>Karte</h3>
         <form id="tile-form" class="row"><input id="tile-url" placeholder="https://tile.openstreetmap.org/{z}/{x}/{y}.png" style="flex:1;min-width:260px"><button class="ghost">Speichern</button></form>
         <p class="muted small">Kachel-URL für die Karte. Standard: OpenStreetMap (braucht Internet). Für reinen Offline-Betrieb einen lokalen Kachel-Server eintragen (z. B. <code>http://192.168.1.10:8080/tile/{z}/{x}/{y}.png</code>) – Linien und Marker funktionieren auch ohne Kacheln.</p>
+        <h3>Flugzeug-Scatter (ADS-B)</h3>
+        <p class="muted small">Zeigt auf der Karte Flugzeuge zwischen dir und dem Partner (Knopf „✈ Flugzeuge“ an der Karte), wie AirScout: Zone gemeinsamer Sichtbarkeit auf dem Pfad und Flugzeuge im Korridor, die beide Stationen über dem Funkhorizont sehen. Quelle: <b>adsb.fi</b> (frei, nicht-kommerziell, max. 1 Abfrage/s, Daten © adsb.fi) oder ein eigener ADS-B-Empfänger (dump1090/readsb/tar1090: <code>http://&lt;host&gt;:8080/data/aircraft.json</code>). Ohne Geländemodell – Berge im Pfad werden nicht berücksichtigt.</p>
+        <form id="adsb-form" class="stack">
+          <div class="row">
+            <select id="adsb-source"><option value="adsb.fi">adsb.fi (Internet)</option><option value="local">eigener Empfänger (aircraft.json)</option></select>
+            <input id="adsb-local" placeholder="http://192.168.1.20:8080/data/aircraft.json" style="flex:1;min-width:240px">
+            <label class="row small">Korridor ± km <input id="adsb-corridor" type="number" min="2" max="60" step="1" style="width:70px"></label>
+            <label class="row small">Antennenhöhe m <input id="adsb-antenna" type="number" min="1" max="500" step="1" style="width:70px"></label>
+            <button class="ghost">Speichern</button>
+          </div>
+        </form>
         <h3>Sprachen</h3>
         <p class="muted small">Eigene Übersetzung: Vorlage herunterladen, Werte übersetzen, als <code>lang/&lt;code&gt;.json</code> neben der Datenbank ablegen (z. B. <code>data/lang/nl.json</code>) und den Server neu starten. Die Sprache erscheint dann in der Auswahl.</p>
         <p><a href="/api/lang/template.json" class="button ghost" download>Übersetzungsvorlage herunterladen</a></p>

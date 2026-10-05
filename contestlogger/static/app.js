@@ -723,7 +723,8 @@
         K(["F1"], t("Diese Hilfe.")),
         K(["F2", "…", "F8"], t("Sprachbausteine F2–F8 (F1 ist die Hilfe): Text wird groß eingeblendet und, wenn eine CAT-Bridge mit CW läuft, als CW gesendet. Platzhalter: {mycall} {myloc} {call} {rst} {nr} {loc} {band} {nick}. Bearbeiten über ✎ in der Makroleiste.")),
         K(["F9"], t("Makroleiste ein-/ausblenden (Übersicht aller Sprachbausteine mit ausgefülltem Text).")),
-        K(["Klick auf Standort"], t("Hat ein Rufzeichen mehrere bekannte Locator, erscheinen sie unter dem Formular zur Auswahl."))),
+        K(["Klick auf Standort"], t("Hat ein Rufzeichen mehrere bekannte Locator, erscheinen sie unter dem Formular zur Auswahl.")),
+        K(["✈ Flugzeuge"], t("Knopf an der Karte: Flugzeuge (ADS-B) einblenden – wie AirScout. Grüner Balken = Zone gemeinsamer Sichtbarkeit auf dem Pfad, orange Flugzeuge = im Korridor und von beiden Stationen sichtbar, darunter die Liste mit Entfernung vom Pfad und Kreuzungszeit. Quelle in der Verwaltung (adsb.fi oder eigener Empfänger)."))),
       ...H(t("Chat, KST und DM"),
         K(["Enter"], t("Nachricht senden (Chat, KST-Tab, DM-Gespräch).")),
         K(["Klick auf Rufzeichen"], t("Im KST-Tab, im DM-Gespräch oder in der Nutzerliste: Rufzeichen und Locator in den Logger übernehmen.")),
@@ -814,7 +815,51 @@
     const geo = $("#hint-geo").textContent;
     drawBearing(m, st.locator, loc, locToLatLon(loc) ? `${F.call.value.trim() || loc} · ${geo}` : "");
     $("#map-info").textContent = locToLatLon(loc) ? `${loc}: ${geo}` : `${st.locator} · ${S.qsos.filter((q) => !q.dupe).length} QSOs`;
+    if (Planes.on) Planes.refresh(true);
   }
+  // ------------------------------------------------------------ Flugzeug-Scatter (ADS-B, wie AirScout) – zuschaltbare Ebene
+  const Planes = {
+    on: localStorage.getItem("cl.planes") === "1", timer: null, last: "", busy: false,
+    layer() { const m = makeMap("map-log"); if (!m) return null; if (!m.planes) { m.planes = L.layerGroup().addTo(m.map); m.zone = L.layerGroup().addTo(m.map); } return m; },
+    toggle() { this.on = !this.on; localStorage.setItem("cl.planes", this.on ? "1" : "0"); $("#btn-planes").classList.toggle("active", this.on); $("#plane-list").classList.toggle("hidden", !this.on);
+      if (this.on) this.refresh(true); else { this.stop(); const m = this.layer(); if (m) { m.planes.clearLayers(); m.zone.clearLayers(); } } },
+    stop() { clearTimeout(this.timer); this.timer = null; },
+    async refresh(now) {
+      this.stop(); if (!this.on) return;
+      const st = station(); const loc = F.loc.value.trim().toUpperCase();
+      if (!st) { $("#plane-list").textContent = t("Keine Station gewählt"); return; }
+      const key = `${st.locator}|${/^[A-R]{2}\d{2}([A-X]{2})?$/.test(loc) ? loc : ""}`;
+      if (!this.busy && (now || key !== this.last)) {
+        this.busy = true; this.last = key;
+        try { this.draw(await GET(`/api/aircraft?my=${st.locator}&loc=${key.split("|")[1]}`)); } catch (err) { $("#plane-list").innerHTML = ""; $("#plane-list").append(el("span", { class: "warn" }, `✈ ${err.message}`)); }
+        this.busy = false;
+      }
+      this.timer = setTimeout(() => this.refresh(true), 5000);
+    },
+    draw(r) {
+      const m = this.layer(); if (!m) return;
+      m.planes.clearLayers(); m.zone.clearLayers();
+      if (r.zone) L.polyline([r.zone.from, r.zone.to], { color: "#3ddc84", weight: 9, opacity: .45 }).bindTooltip(t("Zone gemeinsamer Sichtbarkeit (Reiseflughöhe): km {a}–{b} des Pfads", { a: r.zone.from_km, b: r.zone.to_km })).addTo(m.zone);
+      for (const p of r.planes) {
+        const hot = p.in_corridor && p.visible_both;
+        const col = hot ? "#ffb347" : (p.visible_both ? "#9fd3ff" : "#6b7785");
+        L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${col};font-size:${hot ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }), interactive: true })
+          .bindTooltip(`${p.flight || p.hex} ${p.type || ""} · FL${p.fl} · ${p.gs_kmh} km/h${p.xt_km != null ? ` · ${Math.abs(p.xt_km)} km ${t("vom Pfad")}` : ""}${p.eta_min != null ? ` · ${t("kreuzt in")} ~${Math.round(p.eta_min)} min` : ""}`).addTo(m.planes);
+      }
+      const box = $("#plane-list"); box.innerHTML = "";
+      const hot = r.planes.filter((p) => p.in_corridor && p.visible_both), soon = r.planes.filter((p) => !p.in_corridor && p.visible_both && p.eta_min != null && p.eta_min <= 15).sort((a, b) => a.eta_min - b.eta_min);
+      box.append(el("span", { class: "muted small" }, r.other ? `✈ ${r.planes.length} ${t("Flugzeuge")} · ${t("Korridor")} ±${r.corridor_km} km · ${r.zone ? t("Zone km {a}–{b}", { a: r.zone.from_km, b: r.zone.to_km }) : t("keine gemeinsame Sichtbarkeit (Pfad zu lang)")}` : `✈ ${r.planes.length} ${t("Flugzeuge im Umkreis")} – ${t("Locator eingeben für Pfad-Auswertung")}`));
+      for (const p of hot.slice(0, 5)) box.append(el("span", { class: "pl hot" }, `${p.flight || p.hex} ${p.type} FL${p.fl} · ${Math.abs(p.xt_km)} km ${t("vom Pfad")} · km ${p.at_km}`));
+      for (const p of soon.slice(0, 4)) box.append(el("span", { class: "pl" }, `${p.flight || p.hex} ${p.type} FL${p.fl} · ${t("kreuzt in")} ~${Math.round(p.eta_min)} min`));
+      box.append(el("span", { class: "muted small attrib" }, r.attribution));
+    },
+  };
+  $("#btn-planes").addEventListener("click", () => Planes.toggle());
+  if (Planes.on) { $("#btn-planes").classList.add("active"); $("#plane-list").classList.remove("hidden"); setTimeout(() => Planes.refresh(true), 1500); }
+  $("#adsb-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try { await api("POST", "/api/settings", { adsb_source: $("#adsb-source").value, adsb_local_url: $("#adsb-local").value.trim(), adsb_corridor_km: $("#adsb-corridor").value, adsb_antenna_m: $("#adsb-antenna").value }); toast(t("Einstellungen gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
+  });
   $("#lookup-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const body = { lookup_provider: $("#lookup-provider").value, lookup_user: $("#lookup-user").value.trim() };
@@ -1403,6 +1448,7 @@
     try {
       const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider; $("#lookup-user").value = cfg.lookup_user || ""; $("#lookup-pass").placeholder = cfg.lookup_pass_set ? t("Passwort (gespeichert)") : t("Passwort");
       S.kstRooms = cfg.kst_rooms || {};
+      $("#adsb-source").value = cfg.adsb_source || "adsb.fi"; $("#adsb-local").value = cfg.adsb_local_url || ""; $("#adsb-corridor").value = cfg.adsb_corridor_km ?? 12; $("#adsb-antenna").value = cfg.adsb_antenna_m ?? 15;
       $("#repo-url").value = cfg.repo_url || ""; $("#repo-token").placeholder = cfg.repo_token_set ? t("Token (gespeichert)") : t("GitHub-Token (nur bei privatem Repo)");
     } catch (_) { /* */ }
     renderBackups(); renderCallbook(); renderAudit();
