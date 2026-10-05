@@ -31,7 +31,7 @@ def test_check_latest_mocked(monkeypatch):
 
 
 def test_install_files_keeps_data(tmp_path):
-    src = tmp_path / "src"; (src / "contestlogger").mkdir(parents=True); (src / "data").mkdir()
+    src = tmp_path / "src"; (src / "deploy").mkdir(parents=True); (src / "data").mkdir()  # kein Ordner "contestlogger": macOS ist case-insensitiv
     (src / "ContestLogger").write_bytes(b"new"); (src / "README.md").write_text("r"); (src / "data" / "x.db").write_text("NEW")
     dst = tmp_path / "dst"; (dst / "data").mkdir(parents=True)
     (dst / "ContestLogger").write_bytes(b"old"); (dst / "data" / "x.db").write_text("KEEP")
