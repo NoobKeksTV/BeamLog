@@ -74,6 +74,7 @@ PUBLIC_URL=http://contest.local/                # Adresse im QR-Code und in Link
 #KST_HOST=www.on4kst.info                       # ON4KST-Server (normalerweise unverändert)
 #KST_PORT=23000
 #GITHUB_TOKEN=                                  # nur für ein privates Repo (Updates, Stationsdatenbank)
+#MAINTAINER=1                                   # Betreuer-Modus: Quellen-Importe für die zentrale Stationsdatenbank
 ```
 
 Nach Änderungen `sudo systemctl restart contestlogger`. `install.sh` legt die Datei beim ersten Lauf aus `deploy/contestlogger.env` an und lässt sie bei `--update` unverändert; `--url` trägt nur `PUBLIC_URL` ein. Reihenfolge der Quellen: Kommandozeile überstimmt Umgebungsvariablen `CONTESTLOGGER_<KEY>`, diese überstimmen die Datei.

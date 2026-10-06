@@ -37,7 +37,7 @@ def portable_base() -> Path:
     return Path.cwd()
 
 
-CONFIG_KEYS = ("HOST", "PORT", "DB", "BACKUP_MIN", "PUBLIC_URL", "OPEN_BROWSER", "KST_HOST", "KST_PORT", "GITHUB_TOKEN")
+CONFIG_KEYS = ("HOST", "PORT", "DB", "BACKUP_MIN", "PUBLIC_URL", "OPEN_BROWSER", "KST_HOST", "KST_PORT", "GITHUB_TOKEN", "MAINTAINER")
 
 
 def load_env_file(path: Path) -> dict[str, str]:
@@ -76,7 +76,7 @@ def main() -> None:
     for k in CONFIG_KEYS:
         if os.environ.get(f"CONTESTLOGGER_{k}"):
             cfg[k] = os.environ[f"CONTESTLOGGER_{k}"]
-    for k in ("KST_HOST", "KST_PORT", "GITHUB_TOKEN"):  # werden von den Modulen direkt aus der Umgebung gelesen
+    for k in ("KST_HOST", "KST_PORT", "GITHUB_TOKEN", "MAINTAINER"):  # werden von den Modulen direkt aus der Umgebung gelesen
         if cfg.get(k):
             os.environ[f"CONTESTLOGGER_{k}"] = cfg[k]
     p = argparse.ArgumentParser(description=f"{__app_name__} {__version__}  –  Einstellungen auch über contestlogger.env (siehe contestlogger.env.example)")

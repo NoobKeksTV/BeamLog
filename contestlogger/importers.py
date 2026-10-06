@@ -41,6 +41,7 @@ class ImportResult:
     header: dict = field(default_factory=dict)  # call, locator, band, name ...
     callbook: list[tuple[str, str, str]] = field(default_factory=list)  # (call, locator, name)
     doks: dict[str, str] = field(default_factory=dict)  # call -> DOK/OV, soweit die Quelle ihn liefert
+    seen: dict[str, str] = field(default_factory=dict)  # call -> Datum (JJJJ-MM-TT) „zuletzt gesehen“, soweit vorhanden
     warnings: list[str] = field(default_factory=list)
 
 
@@ -350,6 +351,26 @@ def parse_callbook_csv(text: str) -> ImportResult:
     """Call;Locator[;Name][;DOK] – Trennzeichen ; , Tab oder Leerzeichen.
     Eine Kopfzeile mit „DOK“ legt die Spalte fest; ohne Kopfzeile gilt ein Feld wie „G01“ als DOK."""
     res = ImportResult("callbook")
+    first = next((l for l in text.splitlines() if l.strip()), "")
+    if ";" in first and "CALL" in first.upper() and "LOCATOR" in first.upper():
+        # Export der Stationsdatenbank (Call;Locator;Name;DOK;QSOs;Zuletzt;…) oder Repo-Format (Call;Locator;Zuletzt;DOK)
+        for r in csv.DictReader(io.StringIO(text), delimiter=";"):
+            r = {(k or "").strip().upper(): (v or "").strip() for k, v in r.items()}
+            call, loc = r.get("CALL", "").upper(), r.get("LOCATOR", "").upper()
+            if not prefixes.is_plausible_call(call) or not geo.is_valid_locator(loc):
+                if call:
+                    res.warnings.append(f"übersprungen: {call} {loc}")
+                continue
+            core = prefixes.core_call(call)
+            dok = _dok_value(r.get("DOK") or r.get("OV") or "")
+            if dok:
+                res.doks[core] = dok
+            when = r.get("ZULETZT") or r.get("LAST_SEEN") or ""
+            if re.match(r"\d{4}-\d{2}-\d{2}", when):
+                res.seen[core] = when[:10]
+            # ohne Namen steht das Datum im Namensfeld – so lesen Startdatenbank und Repo-Abgleich es bisher
+            res.callbook.append((call, loc, r.get("NAME", "") or res.seen.get(core, "")))
+        return res
     dok_col = -1
     for line in text.splitlines():
         line = line.strip()

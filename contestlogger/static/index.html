@@ -214,8 +214,8 @@
           <div id="folder-result" class="result hidden"></div>
         </form>
       </div>
-      <div class="card">
-        <h3>Ergebnisliste importieren (DARC / IARU / UKW-Contest-Club)</h3>
+      <div class="card maint-only">
+        <h3>Ergebnisliste importieren (DARC / IARU / UKW-Contest-Club) <span class="tag">Betreuer</span></h3>
         <p class="muted small">Die veröffentlichten Ergebnislisten enthalten Rufzeichen und Locator aller Teilnehmer – die größte frei verfügbare Quelle für die Stationsdatenbank. Datei (HTML, PDF, TXT, CSV), eingefügter Text oder Internetadresse der Ergebnisseite; vor der Übernahme gibt es eine Vorschau.</p>
         <form id="results-form" class="stack">
           <input type="file" id="res-file" accept=".htm,.html,.pdf,.txt,.csv">
@@ -226,8 +226,8 @@
           <div class="row hidden" id="res-actions"><button type="button" id="btn-res-commit" class="primary">Ausgewählte übernehmen</button><label class="row small"><input type="checkbox" id="res-only-new" checked> nur neue / geänderte</label></div>
         </form>
       </div>
-      <div class="card">
-        <h3>DARC-Contest-Hub: Ergebnisse direkt laden</h3>
+      <div class="card maint-only">
+        <h3>DARC-Contest-Hub: Ergebnisse direkt laden <span class="tag">Betreuer</span></h3>
         <p class="muted small">Lädt die offiziellen Ergebnislisten (result.csv) vom DARC-Contest-Hub <code>dxhf2.darc.de</code> – alle Teilnehmer mit Locator, dazu die ODX-Gegenstationen. Pro Contest 500–900 Rufzeichen. Braucht Internet auf dem Server.</p>
         <div class="row">
           <select id="darc-year"></select>
@@ -270,6 +270,10 @@
           <button type="button" id="btn-cb-sync" class="ghost" title="Stationsdatenbank aus dem GitHub-Repo laden und neue Einträge übernehmen">Nach neuen suchen (Repo)</button>
           <span id="cb-sync-result" class="muted small"></span>
         </div>
+        <p class="muted small maint-hide">Die Stationsdatenbank wird zentral gepflegt: „Nach neuen suchen (Repo)“ holt die aktuelle Liste. Eigene Funde (neue Rufzeichen, Locator, DOKs) helfen allen – einfach „Stationsdatenbank exportieren (CSV)“ und die Datei an den Betreuer schicken, er pflegt sie in die Liste im Repo ein.</p>
+        <form id="cb-list-form" class="row maint-only">
+          <span class="tag">Betreuer</span><input type="file" id="cb-list-file" accept=".csv,.txt" required><button class="ghost small">Stationsliste einpflegen</button><span id="cb-list-result" class="muted small"></span>
+        </form>
         <form id="repo-form" class="row">
           <input id="repo-url" placeholder="Repo-Datei (GitHub-API-URL oder Raw-URL)" style="flex:1;min-width:260px">
           <button class="ghost small">Speichern</button>

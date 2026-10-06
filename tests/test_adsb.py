@@ -52,3 +52,21 @@ def test_aircraft_endpoint_local_source(tmp_path):
         assert c.get("/api/aircraft", params={"my": "ZZ99"}).status_code == 400
         c.post("/api/settings", json={"adsb_local_url": "http://127.0.0.1:1/nix"}, headers=H)
         assert c.get("/api/aircraft", params={"my": "JO31AA"}).status_code == 502
+
+
+def test_scatter_airscout_details():
+    """Mindesthöhe, Höhenreserve, Elevation, Kreuzungspunkt/-zeit und Status wie in AirScout."""
+    planes = [
+        {"hex": "1", "flight": "DLH123", "type": "A388", "desc": "", "lat": ON_PATH[0] + 0.03, "lon": ON_PATH[1], "alt_m": 11000, "fl": 361, "gs_kmh": 850, "track": 30, "ground": False, "size": "heavy", "vr_ms": 0},
+        {"hex": "3", "flight": "FAR", "type": "B738", "desc": "", "lat": 53.5, "lon": 9.0, "alt_m": 11000, "fl": 361, "gs_kmh": 850, "track": 180, "ground": False, "size": "medium", "vr_ms": 0},
+    ]
+    r = adsb.scatter("JO31AA", "JN59LE", planes)
+    assert r["profile"][0]["req_m"] > 8000 and min(x["req_m"] for x in r["profile"]) < 2500 and r["path_from"] and r["path_to"]
+    by = {p["flight"]: p for p in r["planes"]}
+    d = by["DLH123"]
+    assert d["status"] == "hot" and d["margin_m"] == d["alt_m"] - d["req_m"] > 7000 and 0 < d["elev1"] < 10 and 0 < d["elev2"] < 10
+    f = by["FAR"]
+    assert f["cross"] and f["cross"]["on_path"] and f["cross"]["in_zone"] and f["cross"]["margin_m"] > 0 and len(f["cross"]["utc"]) == 8
+    assert f["status"] in ("soon", "far") and f["margin_m"] < 0  # weit nördlich: noch unter dem Horizont, kreuzt aber in der Zone
+    assert adsb.size_class("A5", "") == "heavy" and adsb.size_class("", "A388") == "heavy" and adsb.size_class("A1", "") == "light" and adsb.size_class("", "A320") == "medium"
+    assert adsb.required_alt_m(0) == 0 and 2400 < adsb.required_alt_m(220) < 2600 and adsb.elevation_deg(100, 11000) > 5

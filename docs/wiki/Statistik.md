@@ -14,6 +14,10 @@ Der Reiter **Statistik** hat zwei Teile.
 
 ## Station
 
+Auf der Karte zeigt jedes gearbeitete Großfeld beim Hovern die Rufzeichen (die ersten zwölf) und beim Klicken alle Rufzeichen mit Locator und Entfernung, sortiert nach Entfernung.
+
+![Großfeld mit Rufzeichen](img/statistik-grossfeld.png)
+
 - Kennzahlen: gültige QSOs, Punkte, Großfelder, Länder, Ø km/QSO, Dupes, ODX.
 - **Karte aller QSOs und Großfelder**: jeder QSO-Partner als Punkt, jedes gearbeitete Großfeld als Rechteck mit Beschriftung „JO31 · 33“ (Füllung je nach QSO-Zahl).
 - **QSOs und Punkte pro Stunde**, **Entfernungsverteilung**, **Richtungsverteilung** (Rose), **Top 10 Entfernungen**, **Großfelder**, **Länder**, **Operatoren**.

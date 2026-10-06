@@ -51,6 +51,7 @@ PORT=8000
 BACKUP_MIN=15
 #PUBLIC_URL=http://contest.local/
 OPEN_BROWSER=1        # Windows: Browser beim Start öffnen
+#MAINTAINER=1         # nur für den Betreuer der zentralen Stationsdatenbank
 ```
 
 Die Datei wird beim Start gemeldet („Konfiguration: …“). Reihenfolge: Kommandozeile überstimmt Umgebungsvariablen `CONTESTLOGGER_<KEY>` (z. B. `CONTESTLOGGER_PORT=8080`), diese überstimmen die Datei. Ein anderer Ort geht mit `--config /pfad/datei.env` oder `CONTESTLOGGER_CONFIG`. Auf einem Server liegt die Datei unter `/etc/contestlogger/contestlogger.env`, siehe [Deploy](Deploy.md).

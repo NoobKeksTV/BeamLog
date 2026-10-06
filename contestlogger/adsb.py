@@ -37,6 +37,44 @@ def radio_horizon_km(alt_m: float, antenna_m: float = 15.0) -> float:
     return 4.12 * (math.sqrt(max(alt_m, 0.0)) + math.sqrt(max(antenna_m, 0.0)))
 
 
+# Größenklasse (wie AirScout: große Flugzeuge reflektieren deutlich besser). ADS-B-Kategorie A1 leicht … A5 schwer;
+# fehlt sie, entscheidet der Typ.
+HEAVY_TYPES = {"A388", "A380", "B744", "B748", "B747", "B77W", "B77L", "B772", "B773", "B777", "A359", "A35K", "A350", "A346", "A345", "A343", "A342", "A340",
+               "B788", "B789", "B78X", "B787", "A332", "A333", "A338", "A339", "A330", "B763", "B764", "B767", "MD11", "A124", "C5M", "C17", "B752", "B753"}
+LIGHT_TYPES = {"C172", "C152", "C182", "PA28", "DA40", "DA42", "SR22", "P28A", "C72R", "GLID", "ULAC", "PC12", "TBM9"}
+
+
+def size_class(category: str, typ: str) -> str:
+    """'heavy' | 'large' | 'medium' | 'light' | '' – aus ADS-B-Kategorie (A1–A5) oder dem Flugzeugtyp."""
+    cat = (category or "").upper().strip()
+    typ = (typ or "").upper().strip()
+    if cat in ("A5",) or typ in HEAVY_TYPES:
+        return "heavy"
+    if cat in ("A4", "A3"):
+        return "large"
+    if cat in ("A2",):
+        return "medium"
+    if cat in ("A1", "A7", "B1", "B2", "B4") or typ in LIGHT_TYPES:
+        return "light"
+    if typ:
+        return "medium"  # Linienflugzeuge (A320, B738 …) ohne Kategorie
+    return ""
+
+
+def required_alt_m(d_km: float, antenna_m: float = 15.0) -> float:
+    """Mindesthöhe (m), ab der ein Objekt in d_km Entfernung über dem Funkhorizont einer Station mit Antennenhöhe antenna_m steht."""
+    x = d_km / 4.12 - math.sqrt(max(antenna_m, 0.0))
+    return x * x if x > 0 else 0.0
+
+
+def elevation_deg(d_km: float, alt_m: float, antenna_m: float = 15.0) -> float:
+    """Elevationswinkel von der Station zum Objekt (4/3-Erde, Erdkrümmung berücksichtigt)."""
+    if d_km <= 0:
+        return 90.0
+    drop_m = (d_km * 1000) ** 2 / (2 * (4 / 3) * R_EARTH * 1000)
+    return math.degrees(math.atan2(alt_m - antenna_m - drop_m, d_km * 1000))
+
+
 def _normalize(raw: dict | list) -> list[dict]:
     items = raw.get("aircraft") or raw.get("ac") or [] if isinstance(raw, dict) else raw
     out = []
@@ -57,6 +95,8 @@ def _normalize(raw: dict | list) -> list[dict]:
             "hex": str(a.get("hex") or ""), "flight": str(a.get("flight") or "").strip(), "type": str(a.get("t") or ""), "desc": str(a.get("desc") or ""),
             "lat": lat, "lon": lon, "alt_m": round(alt_m), "fl": round(alt_m / 30.48) if alt_m else 0,
             "gs_kmh": round(float(a.get("gs") or 0) * 1.852), "track": float(a.get("track") or a.get("true_heading") or 0), "ground": alt in ("ground",),
+            "category": str(a.get("category") or ""), "size": size_class(str(a.get("category") or ""), str(a.get("t") or "")),
+            "vr_ms": round(float(a.get("baro_rate") or a.get("geom_rate") or 0) * 0.00508, 1),  # ft/min -> m/s
         })
     return out
 
@@ -131,6 +171,14 @@ def scatter(my_loc: str, other_loc: str, planes: list[dict], corridor_km: float 
     if dist and dist < 2 * h:
         s0, s1 = max(0.0, dist - h), min(dist, h)
         zone = {"from_km": round(s0), "to_km": round(s1), "from": point_along(a, b, s0 / dist if dist else 0), "to": point_along(a, b, s1 / dist if dist else 1)}
+    # Mindesthöhe entlang des Pfads (Profil für die Seitenansicht wie in AirScout): max. der beiden Stationen
+    def req_at(s_km: float) -> float:
+        return max(required_alt_m(s_km, antenna_m), required_alt_m(dist - s_km, antenna_m))
+
+    steps = 40
+    profile = [{"km": round(dist * i / steps), "req_m": round(req_at(dist * i / steps))} for i in range(steps + 1)] if dist else []
+    min_req = min((x["req_m"] for x in profile), default=0.0)
+    now = time.time()
     out = []
     for p in planes:
         if p["ground"] or p["alt_m"] < 1500:
@@ -140,13 +188,39 @@ def scatter(my_loc: str, other_loc: str, planes: list[dict], corridor_km: float 
             continue
         d1 = dist_ll(a, (p["lat"], p["lon"]))
         d2 = dist_ll(b, (p["lat"], p["lon"]))
-        horizon = radio_horizon_km(p["alt_m"], antenna_m)
-        visible_both = d1 < horizon and d2 < horizon
-        # Zeit bis zum Kreuzen des Pfads: Geschwindigkeitsanteil quer zum Pfad
+        # Mindesthöhe an der aktuellen Position (beide Stationen) und Höhenreserve = Flughöhe minus Mindesthöhe
+        req_m = max(required_alt_m(d1, antenna_m), required_alt_m(d2, antenna_m))
+        margin_m = p["alt_m"] - req_m
+        visible_both = margin_m > 0
+        # Zeit bis zum Kreuzen des Pfads: Geschwindigkeitsanteil quer zum Pfad; Kreuzungspunkt aus dem Anteil längs des Pfads
         path_brg = bearing_rad(a, b)
         v_cross = -p["gs_kmh"] * math.sin(_rad(p["track"]) - path_brg) * (1 if xt > 0 else -1) if p["gs_kmh"] else 0  # km/h Richtung Pfad
+        v_along = p["gs_kmh"] * math.cos(_rad(p["track"]) - path_brg)
         eta_min = (abs(xt) / v_cross * 60) if v_cross > 5 else None
+        cross = None
+        if eta_min is not None and eta_min < 90:
+            s_cross = at + v_along * eta_min / 60
+            alt_cross = p["alt_m"] + p.get("vr_ms", 0) * eta_min * 60
+            req_cross = req_at(s_cross) if 0 <= s_cross <= dist else None
+            cross = {"km": round(s_cross), "utc": time.strftime("%H:%M:%S", time.gmtime(now + eta_min * 60)), "on_path": 0 <= s_cross <= dist,
+                     "in_zone": bool(zone and zone["from_km"] <= s_cross <= zone["to_km"]), "req_m": round(req_cross) if req_cross is not None else None,
+                     "margin_m": round(alt_cross - req_cross) if req_cross is not None else None}
+        in_corridor = abs(xt) <= corridor_km
+        if in_corridor and visible_both:
+            status = "hot"
+        elif cross and cross["on_path"] and (cross["margin_m"] or 0) > 0 and eta_min <= 20:
+            status = "soon"
+        elif visible_both:
+            status = "visible"
+        elif (cross and cross["on_path"] and (cross["margin_m"] or 0) <= 0) or (not cross and p["alt_m"] < min_req):
+            status = "low"  # zu tief: auch am Kreuzungspunkt bzw. überall auf dem Pfad unter dem Funkhorizont
+        else:
+            status = "far"
         out.append({**p, "xt_km": round(xt, 1), "at_km": round(at), "d1_km": round(d1), "d2_km": round(d2), "visible_both": visible_both,
-                    "in_corridor": abs(xt) <= corridor_km, "eta_min": round(eta_min, 1) if eta_min is not None and eta_min < 60 else None})
-    out.sort(key=lambda p: (not (p["in_corridor"] and p["visible_both"]), abs(p["xt_km"])))
-    return {"my": my_loc, "other": other_loc, "dist_km": round(dist), "corridor_km": corridor_km, "zone": zone, "horizon_km": round(h), "planes": out[:60]}
+                    "in_corridor": in_corridor, "eta_min": round(eta_min, 1) if eta_min is not None and eta_min < 60 else None,
+                    "req_m": round(req_m), "margin_m": round(margin_m), "elev1": round(elevation_deg(d1, p["alt_m"], antenna_m), 1),
+                    "elev2": round(elevation_deg(d2, p["alt_m"], antenna_m), 1), "cross": cross, "status": status})
+    order = {"hot": 0, "soon": 1, "visible": 2, "far": 3, "low": 4}
+    out.sort(key=lambda p: (order[p["status"]], p["eta_min"] if p["status"] == "soon" and p["eta_min"] is not None else abs(p["xt_km"])))
+    return {"my": my_loc, "other": other_loc, "dist_km": round(dist), "corridor_km": corridor_km, "zone": zone, "horizon_km": round(h),
+            "antenna_m": antenna_m, "profile": profile, "path_from": a, "path_to": b, "planes": out[:60]}

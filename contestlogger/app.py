@@ -193,6 +193,16 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if not is_admin(x_admin_token):
             raise HTTPException(403, "Admin-Anmeldung erforderlich")
 
+    def is_maintainer() -> bool:
+        """Betreuer-Modus (MAINTAINER=1 in contestlogger.env): Quellen-Importe für die zentrale Stationsdatenbank."""
+        return os.environ.get("CONTESTLOGGER_MAINTAINER", "").strip().lower() in ("1", "true", "yes", "ja", "on")
+
+    def require_maintainer(x_admin_token: str | None = Header(default=None)) -> None:
+        if not is_admin(x_admin_token):
+            raise HTTPException(403, "Admin-Anmeldung erforderlich")
+        if not is_maintainer():
+            raise HTTPException(403, "Nur im Betreuer-Modus (MAINTAINER=1 in contestlogger.env). Normale Installationen holen die Liste über „Nach neuen suchen (Repo)“.")
+
     def require_station(sid: int, token: str | None, admin: str | None) -> dict:
         station = db.get_station(sid)
         if not station:
@@ -227,6 +237,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             "tile_url": db.get_setting("tile_url", "") or "",
             "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
             "mdbtools": True,  # MDB-Import rein in Python eingebaut
+            "maintainer": is_maintainer(),
         }
 
     @app.get("/api/qr.svg")
@@ -664,7 +675,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         await hub.broadcast({"type": "update", "scope": "contests"})
         return report
 
-    @app.post("/api/import/results", dependencies=[Depends(require_admin)])
+    @app.post("/api/import/results", dependencies=[Depends(require_maintainer)])
     async def import_results(file: UploadFile | None = File(None), text: str = Form(""), url: str = Form(""),
                              commit: int = Form(0), selected: str = Form("")):
         """Ergebnisliste (DARC/IARU/…) als Datei, Text oder URL: Vorschau (commit=0) oder Übernahme (commit=1)."""
@@ -867,7 +878,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return out
 
     # ------------------------------------------------------------ DARC-Contest-Hub
-    @app.get("/api/darc/contests", dependencies=[Depends(require_admin)])
+    @app.get("/api/darc/contests", dependencies=[Depends(require_maintainer)])
     async def darc_contests(year: int):
         import urllib.request
         url = importers.DARC_INDEX.format(year=year)
@@ -881,7 +892,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             raise HTTPException(400, f"DARC-Contest-Hub nicht erreichbar: {e}")
         return importers.parse_darc_index(text, year)
 
-    @app.post("/api/darc/import", dependencies=[Depends(require_admin)])
+    @app.post("/api/darc/import", dependencies=[Depends(require_maintainer)])
     async def darc_import(body: dict):
         """{'years': [2024, 2025]} oder {'csv_urls': [...]} – lädt die result.csv-Dateien und übernimmt Call+Locator."""
         import urllib.request
@@ -1143,6 +1154,23 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                     changed += 1
         db.add_audit("Stationsdatenbank aus dem Repo abgeglichen", details=f"{len(res.callbook)} Einträge, {new} neu, {changed} Locator geändert", nick="Admin", admin=True)
         return {"total": len(res.callbook), "new": new, "known": known, "changed": changed, "callbook_count": db.callbook_count(), "url": url}
+
+    @app.post("/api/callbook/import_list", dependencies=[Depends(require_maintainer)])
+    async def callbook_import_list(file: UploadFile = File(...)):
+        """Betreuer: Stationsliste eines anderen Nutzers (CSV-Export der Stationsdatenbank oder Repo-Format) in die zentrale Liste einpflegen."""
+        text = (await file.read()).decode("utf-8-sig", "replace")
+        res = importers.parse_callbook_csv(text)
+        new = known = 0
+        for call, loc, name in res.callbook:
+            core = prefixes.core_call(call)
+            when = res.seen.get(core, "")
+            r = db.learn_call(call, loc, source="list", name=name, when=f"{when}T00:00:00Z" if when else "", dok=res.doks.get(core, ""))
+            if r == "new":
+                new += 1
+            elif r == "known":
+                known += 1
+        db.add_audit("Stationsliste eingepflegt", details=f"{file.filename}: {len(res.callbook)} Einträge, {new} neu", nick="Admin", admin=True)
+        return {"total": len(res.callbook), "new": new, "known": known, "warnings": res.warnings[:20], "callbook_count": db.callbook_count()}
 
     @app.get("/api/callbook/export_seed.csv")
     def callbook_export_seed():

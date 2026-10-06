@@ -163,7 +163,8 @@ def test_seed_and_folder_import(client):
     assert client.delete("/api/callbook/DL0GM", headers=H).json()["ok"]
 
 
-def test_results_import(client):
+def test_results_import(client, monkeypatch):
+    monkeypatch.setenv("CONTESTLOGGER_MAINTAINER", "1")  # Quellen-Importe nur im Betreuer-Modus
     admin = client.post("/api/setup", json={"password": "admin1"}).json()["token"]
     H = {"X-Admin-Token": admin}
     html = b"<table><tr><td>1</td><td>DL0GM</td><td>JO31UB</td><td>312</td></tr><tr><td>2</td><td>OK9ZZZ</td><td>JN79FX</td><td>5</td></tr></table>"
@@ -277,3 +278,26 @@ def test_contest_exchange_api(client):
     client.post(f"/api/stations/{sid}/qsos", json={"call": "OL3Z", "locator": "JN79FX"}, headers=H)
     chk = client.get(f"/api/stations/{sid}/check", headers=H).json()
     assert any("DOK" in w["msg"] for w in chk["warnings"])
+
+
+def test_maintainer_gate_and_list_import(tmp_path, monkeypatch):
+    monkeypatch.delenv("CONTESTLOGGER_MAINTAINER", raising=False)
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        admin = c.post("/api/setup", json={"password": "admin1"}).json()["token"]
+        H = {"X-Admin-Token": admin}
+        assert c.get("/api/info").json()["maintainer"] is False
+        assert c.get("/api/darc/contests?year=2025", headers=H).status_code == 403
+        assert c.post("/api/import/results", data={"text": "DL1ABC JO31AA"}, headers=H).status_code == 403
+        csv_ = "Call;Locator;Name;DOK;QSOs;Zuletzt;Weitere Locator\nDL9XYZ;JO31XX;Peter;G20;3;2026-05-03;\nOE5XX;JN68AA;;;1;;\n"
+        assert c.post("/api/callbook/import_list", files={"file": ("liste.csv", csv_)}, headers=H).status_code == 403
+        monkeypatch.setenv("CONTESTLOGGER_MAINTAINER", "1")
+        assert c.get("/api/info").json()["maintainer"] is True
+        r = c.post("/api/callbook/import_list", files={"file": ("liste.csv", csv_)}, headers=H).json()
+        assert r["total"] == 2 and r["new"] == 2
+        row = c.get("/api/callbook?q=DL9XYZ").json()["rows"][0]
+        assert row["dok"] == "G20" and row["name"] == "Peter" and row["last_seen"].startswith("2026-05-03")
+        # Stationsdatenbank-Export lässt sich wieder einlesen (Rundlauf)
+        exp = c.get("/api/callbook/export.csv").text
+        r = c.post("/api/callbook/import_list", files={"file": ("liste.csv", exp)}, headers=H).json()
+        assert r["new"] == 0 and r["known"] >= 2

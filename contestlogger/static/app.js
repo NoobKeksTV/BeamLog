@@ -160,6 +160,7 @@
     await loadLanguage();
     renderLangSelect();
     $("#version").textContent = "v" + S.info.version;
+    $$(".maint-only").forEach((e) => e.classList.toggle("hidden", !S.info.maintainer)); $$(".maint-hide").forEach((e) => e.classList.toggle("hidden", !!S.info.maintainer));
     $("#footer-text").textContent = `${S.info.app} ${S.info.version} · ${S.info.copyright}`;
     if (!S.info.admin_configured) await askSetup();
     if (!S.nick) await askNick();
@@ -882,8 +883,52 @@
     if (Planes.on) Planes.refresh(true);
   }
   // ------------------------------------------------------------ Flugzeug-Scatter (ADS-B, wie AirScout) – zuschaltbare Ebene
+  // ---- Flugzeug-Darstellung (wie AirScout): Status, Hover-Text, Seitenansicht des Pfads
+  const PLANE_COL = { hot: "#ffb347", soon: "#ffe066", visible: "#9fd3ff", far: "#6b7785", low: "#8b5a5a" };
+  const SIZE_LABEL = { heavy: t("schwer"), large: t("groß"), medium: t("mittel"), light: t("leicht") };
+  const STATUS_LABEL = { hot: t("im Korridor, beidseitig sichtbar"), soon: t("kreuzt bald den Pfad"), visible: t("beidseitig sichtbar, neben dem Pfad"), far: t("außer Reichweite"), low: t("zu tief für beide Stationen") };
+  function pointAlong(a, b, f) {  // Großkreis-Zwischenpunkt (wie adsb.point_along)
+    if (!a || !b) return null; const R = Math.PI / 180;
+    const [la1, lo1, la2, lo2] = [a[0] * R, a[1] * R, b[0] * R, b[1] * R];
+    const d = 2 * Math.asin(Math.sqrt(Math.sin((la2 - la1) / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin((lo2 - lo1) / 2) ** 2));
+    if (d < 1e-9) return a;
+    const A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
+    const x = A * Math.cos(la1) * Math.cos(lo1) + B * Math.cos(la2) * Math.cos(lo2), y = A * Math.cos(la1) * Math.sin(lo1) + B * Math.cos(la2) * Math.sin(lo2), z = A * Math.sin(la1) + B * Math.sin(la2);
+    return [Math.atan2(z, Math.sqrt(x * x + y * y)) / R, Math.atan2(y, x) / R];
+  }
+  const km1 = (m) => (m / 1000).toLocaleString("de", { maximumFractionDigits: 1 });
+  function planeTitle(p) {
+    const name = `${p.flight || p.hex}${p.type ? " · " + p.type : ""}${p.size ? " (" + SIZE_LABEL[p.size] + ")" : ""}`;
+    const lines = [`<b>${esc(name)}</b> – ${STATUS_LABEL[p.status] || ""}`,
+      `${t("Höhe")} FL${p.fl} = ${km1(p.alt_m)} km · ${p.gs_kmh} km/h · ${t("Kurs")} ${Math.round(p.track)}°${p.vr_ms ? ` · ${p.vr_ms > 0 ? "↗" : "↘"} ${Math.abs(p.vr_ms)} m/s` : ""}`,
+      `${t("Mindesthöhe hier")} ${km1(p.req_m)} km → <b style="color:${p.margin_m > 0 ? "#3ddc84" : "#ff6b6b"}">${p.margin_m > 0 ? "+" : ""}${km1(p.margin_m)} km</b> ${t("Höhenreserve")}`,
+      `${Math.abs(p.xt_km)} km ${t("vom Pfad")} · km ${p.at_km} ${t("des Pfads")} · ${t("Elevation")} ${p.elev1}° / ${p.elev2}°`];
+    if (p.cross) lines.push(p.cross.on_path
+      ? `<b>${t("kreuzt in")} ${p.eta_min != null ? Math.round(p.eta_min) : "> 60"} min</b> ${t("um")} ${p.cross.utc} UTC ${t("bei km")} ${p.cross.km}${p.cross.in_zone ? " ✓ " + t("in der Zone") : ""}${p.cross.margin_m != null ? ` · ${t("dort")} ${p.cross.margin_m > 0 ? "+" : ""}${km1(p.cross.margin_m)} km` : ""}`
+      : `${t("kreuzt die Verlängerung des Pfads")} (km ${p.cross.km}) ${t("in")} ${p.eta_min != null ? Math.round(p.eta_min) : "> 60"} min`);
+    return lines.join("<br>");
+  }
+  function planeChip(p) {
+    const txt = p.status === "soon" && p.cross ? `${p.flight || p.hex} ${p.type} FL${p.fl} · ${t("kreuzt in")} ${Math.round(p.eta_min)} min ${t("bei km")} ${p.cross.km} (${p.cross.utc.slice(0, 5)}) · +${km1(p.cross.margin_m || 0)} km`
+      : `${p.flight || p.hex} ${p.type} FL${p.fl} · ${Math.abs(p.xt_km)} km ${t("vom Pfad")} · km ${p.at_km} · ${p.margin_m > 0 ? "+" : ""}${km1(p.margin_m)} km`;
+    const s = el("span", { class: `pl ${p.status}` }, (p.size === "heavy" ? "✈✈ " : "✈ ") + txt); s.innerHTML_title = 1; s.title = planeTitle(p).replace(/<[^>]+>/g, ""); return s;
+  }
+  function planeProfile(r) {
+    // Seitenansicht: x = km entlang des Pfads, y = Höhe; Kurve = Mindesthöhe (Funkhorizont beider Stationen), Punkte = Flugzeuge
+    if (!r.profile || !r.profile.length || !r.dist_km) return null;
+    const W = 520, H = 110, L = 34, Bt = 16, maxAlt = 13000;
+    const x = (km) => L + (W - L - 6) * km / r.dist_km, y = (m) => H - Bt - (H - Bt - 6) * Math.min(m, maxAlt) / maxAlt;
+    const pts = r.profile.map((q) => `${x(q.km).toFixed(1)},${y(q.req_m).toFixed(1)}`).join(" ");
+    let svg = `<svg class="plane-profile" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${t("Pfadprofil")}">`;
+    svg += `<polygon points="${x(0)},${y(0)} ${pts} ${x(r.dist_km)},${y(0)}" fill="rgba(255,107,107,.18)"/><polyline points="${pts}" fill="none" stroke="#ff6b6b" stroke-width="1.2"/>`;
+    for (const fl of [100, 200, 300, 400]) { const m = fl * 30.48; svg += `<line x1="${L}" y1="${y(m)}" x2="${W - 6}" y2="${y(m)}" stroke="currentColor" stroke-opacity=".12"/><text x="2" y="${y(m) + 4}" font-size="9" fill="currentColor" opacity=".6">FL${fl}</text>`; }
+    if (r.zone) svg += `<rect x="${x(r.zone.from_km)}" y="${H - Bt + 2}" width="${Math.max(2, x(r.zone.to_km) - x(r.zone.from_km))}" height="4" fill="#3ddc84" opacity=".7"/>`;
+    for (const p of r.planes) { if (p.at_km < 0 || p.at_km > r.dist_km) continue; svg += `<circle cx="${x(p.at_km)}" cy="${y(p.alt_m)}" r="${p.size === "heavy" ? 5 : 3.5}" fill="${PLANE_COL[p.status]}" stroke="#000" stroke-width=".5"><title>${esc(planeTitle(p).replace(/<[^>]+>/g, ""))}</title></circle>`; }
+    svg += `<text x="${L}" y="${H - 3}" font-size="9" fill="currentColor" opacity=".6">${esc(r.my)}</text><text x="${W - 6}" y="${H - 3}" font-size="9" text-anchor="end" fill="currentColor" opacity=".6">${esc(r.other)} · ${r.dist_km} km</text></svg>`;
+    const box = el("div", { class: "plane-profile-box" }); box.innerHTML = svg; return box;
+  }
   const Planes = {
-    on: localStorage.getItem("cl.planes") === "1", timer: null, last: "", busy: false,
+    on: localStorage.getItem("cl.planes") === "1", timer: null, last: "", busy: false, profile: localStorage.getItem("cl.planes.profile") !== "0",
     layer() { const m = makeMap("map-log"); if (!m) return null; if (!m.planes) { m.planes = L.layerGroup().addTo(m.map); m.zone = L.layerGroup().addTo(m.map); } return m; },
     toggle() { this.on = !this.on; localStorage.setItem("cl.planes", this.on ? "1" : "0"); $("#btn-planes").classList.toggle("active", this.on); $("#plane-list").classList.toggle("hidden", !this.on);
       if (this.on) this.refresh(true); else { this.stop(); const m = this.layer(); if (m) { m.planes.clearLayers(); m.zone.clearLayers(); } } },
@@ -905,17 +950,22 @@
       m.planes.clearLayers(); m.zone.clearLayers();
       if (r.zone) L.polyline([r.zone.from, r.zone.to], { color: "#3ddc84", weight: 9, opacity: .45 }).bindTooltip(t("Zone gemeinsamer Sichtbarkeit (Reiseflughöhe): km {a}–{b} des Pfads", { a: r.zone.from_km, b: r.zone.to_km })).addTo(m.zone);
       for (const p of r.planes) {
-        const hot = p.in_corridor && p.visible_both;
-        const col = hot ? "#ffb347" : (p.visible_both ? "#9fd3ff" : "#6b7785");
-        L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${col};font-size:${hot ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }), interactive: true })
-          .bindTooltip(`${p.flight || p.hex} ${p.type || ""} · FL${p.fl} · ${p.gs_kmh} km/h${p.xt_km != null ? ` · ${Math.abs(p.xt_km)} km ${t("vom Pfad")}` : ""}${p.eta_min != null ? ` · ${t("kreuzt in")} ~${Math.round(p.eta_min)} min` : ""}`).addTo(m.planes);
+        const st = p.status || (p.visible_both ? "visible" : "far"); const big = st === "hot" || p.size === "heavy";
+        L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${PLANE_COL[st]};font-size:${big ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }), interactive: true })
+          .bindTooltip(planeTitle(p), { className: "plane-tip", direction: "top", offset: [0, -10] }).addTo(m.planes);
+        if (p.cross && p.cross.on_path && (st === "soon" || st === "hot")) {  // vorhergesagter Kreuzungspunkt
+          const frac = Math.max(0, Math.min(1, p.cross.km / r.dist_km)); const pt = pointAlong(r.path_from, r.path_to, frac);
+          if (pt) L.circleMarker(pt, { radius: 4, color: PLANE_COL[st], fillColor: PLANE_COL[st], fillOpacity: .9, weight: 1 }).bindTooltip(`${p.flight || p.hex}: ${t("kreuzt")} ${p.cross.utc} UTC · km ${p.cross.km}`).addTo(m.planes);
+        }
       }
       const box = $("#plane-list"); box.innerHTML = "";
-      const hot = r.planes.filter((p) => p.in_corridor && p.visible_both), soon = r.planes.filter((p) => !p.in_corridor && p.visible_both && p.eta_min != null && p.eta_min <= 15).sort((a, b) => a.eta_min - b.eta_min);
-      box.append(el("span", { class: "muted small" }, r.other ? `✈ ${r.planes.length} ${t("Flugzeuge")} · ${t("Korridor")} ±${r.corridor_km} km · ${r.zone ? t("Zone km {a}–{b}", { a: r.zone.from_km, b: r.zone.to_km }) : t("keine gemeinsame Sichtbarkeit (Pfad zu lang)")}` : `✈ ${r.planes.length} ${t("Flugzeuge im Umkreis")} – ${t("Locator eingeben für Pfad-Auswertung")}`));
-      for (const p of hot.slice(0, 5)) box.append(el("span", { class: "pl hot" }, `${p.flight || p.hex} ${p.type} FL${p.fl} · ${Math.abs(p.xt_km)} km ${t("vom Pfad")} · km ${p.at_km}`));
-      for (const p of soon.slice(0, 4)) box.append(el("span", { class: "pl" }, `${p.flight || p.hex} ${p.type} FL${p.fl} · ${t("kreuzt in")} ~${Math.round(p.eta_min)} min`));
+      const hot = r.planes.filter((p) => p.status === "hot"), soon = r.planes.filter((p) => p.status === "soon");
+      box.append(el("span", { class: "muted small" }, r.other ? `✈ ${r.planes.length} ${t("Flugzeuge")} · ${t("Korridor")} ±${r.corridor_km} km · ${r.zone ? t("Zone km {a}–{b}", { a: r.zone.from_km, b: r.zone.to_km }) : t("keine gemeinsame Sichtbarkeit (Pfad zu lang)")}` : `✈ ${r.planes.length} ${t("Flugzeuge im Umkreis")} – ${t("Locator eingeben für Pfad-Auswertung")}`),
+        r.other ? el("button", { type: "button", class: "ghost small", title: t("Seitenansicht des Pfads (Mindesthöhe, Flugzeuge) ein-/ausblenden"), onclick: () => { this.profile = !this.profile; localStorage.setItem("cl.planes.profile", this.profile ? "1" : "0"); this.draw(r); } }, t("Profil")) : null);
+      for (const p of hot.slice(0, 5)) box.append(planeChip(p));
+      for (const p of soon.slice(0, 4)) box.append(planeChip(p));
       box.append(el("span", { class: "muted small attrib" }, r.attribution));
+      if (this.profile && r.other) { const pr = planeProfile(r); if (pr) box.append(pr); }
     },
   };
   $("#btn-planes").addEventListener("click", () => Planes.toggle());
@@ -1339,8 +1389,13 @@
       // gearbeitete Großfelder (JO31 …) als Rechtecke mit QSO-Zahl
       for (const sq of st.squares) {
         const c = locToLatLon(sq.square); if (!c) continue;
+        // Rufzeichen dieses Großfelds: beim Hovern die ersten, beim Klicken alle (mit Locator und km)
+        const inSq = S.qsos.filter((q) => !q.dupe && q.square === sq.square).sort((a, b) => b.km - a.km);
+        const calls = inSq.map((q) => q.call); const shown = calls.slice(0, 12).join(", ") + (calls.length > 12 ? ` … (+${calls.length - 12})` : "");
+        const popup = el("div", { class: "sq-popup" }, el("b", {}, `${sq.square} · ${sq.qsos} QSOs · ${sq.points} ${t("Punkte")}`),
+          el("div", { class: "sq-calls" }, inSq.map((q) => el("span", { class: "sq-call", title: `${fmtTime(q.ts_utc)} UTC` }, `${q.call} `, el("small", { class: "muted" }, `${q.locator} ${q.km} km`)))));
         L.rectangle([[c[0] - 0.5, c[1] - 1], [c[0] + 0.5, c[1] + 1]], { color: "#ffb347", weight: 1, fillColor: "#ffb347", fillOpacity: 0.12 + Math.min(0.4, sq.qsos / 40) })
-          .bindTooltip(`${sq.square}: ${sq.qsos} QSOs, ${sq.points} ${t("Punkte")}`).addTo(m.layer);
+          .bindTooltip(`${sq.square}: ${sq.qsos} QSOs, ${sq.points} ${t("Punkte")}<br><span class="small">${esc(shown)}</span>`, { sticky: true }).bindPopup(popup, { maxWidth: 420 }).addTo(m.layer);
         L.marker(c, { icon: L.divIcon({ className: "map-sq-label", html: `${sq.square} · ${sq.qsos}`, iconAnchor: [28, 7] }), interactive: false }).addTo(m.layer);
       }
       drawQsoDots(m, S.qsos);
@@ -1568,6 +1623,11 @@
     e.preventDefault();
     const body = { repo_url: $("#repo-url").value.trim() };
     try { await api("POST", "/api/settings", body); toast(t("Einstellungen gespeichert"), "ok"); renderAdmin(); } catch (err) { toast(err.message, "err"); }
+  });
+  $("#cb-list-form").addEventListener("submit", async (e) => {
+    e.preventDefault(); const f = $("#cb-list-file").files[0]; if (!f) return;
+    const fd = new FormData(); fd.append("file", f); $("#cb-list-result").textContent = "…";
+    try { const r = await api("POST", "/api/callbook/import_list", fd); $("#cb-list-result").textContent = t("{total} Einträge, {new} neu – jetzt {count} Rufzeichen", { total: r.total, new: r.new, count: r.callbook_count }); renderCallbook(); } catch (err) { $("#cb-list-result").textContent = err.message; }
   });
   $("#btn-cb-sync").addEventListener("click", async () => {
     const out = $("#cb-sync-result"); out.textContent = t("Lade aus dem Repo …");

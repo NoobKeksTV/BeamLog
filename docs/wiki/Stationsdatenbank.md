@@ -11,7 +11,8 @@ Die Stationsdatenbank ordnet Rufzeichen einem Locator, ggf. einem Namen und dem 
 | Startdatenbank | Beim ersten Start wird `contestlogger/seed/stationsdatenbank.csv` geladen. |
 | Eigene QSOs | Jedes geloggte QSO (auch importierte Logs); bei DOK-Contests auch der empfangene DOK. |
 | KST-Nutzerliste | Alle 10 Minuten je Verbindung; jeder Nutzer mit Locator. |
-| Ergebnislisten / DARC-Hub | Importe in der Verwaltung; enthält die Liste eine DOK-Spalte (DARC-Hub `result.csv`) oder einen DOK wie `G01` in der Zeile, wird er übernommen. |
+| Ergebnislisten / DARC-Hub | Nur im **Betreuer-Modus** (`MAINTAINER=1` in `contestlogger.env`): Importe in der Verwaltung; enthält die Liste eine DOK-Spalte (DARC-Hub `result.csv`) oder einen DOK wie `G01` in der Zeile, wird er übernommen. |
+| Stationslisten anderer Nutzer | Nur im Betreuer-Modus: der CSV-Export einer anderen Installation wird mit „Stationsliste einpflegen“ in die zentrale Liste übernommen. |
 | HamQTH / QRZ | Online-Abfrage beim Loggen und in der Log-Prüfung (Ergebnis wird gespeichert). |
 | Von Hand | Formular unter der Tabelle in der Verwaltung. |
 | Repo-Abgleich | „Nach neuen suchen (Repo)“, siehe unten. |
@@ -22,6 +23,13 @@ Regeln: Der neueste DOK gewinnt (ein Rufzeichen kann den OV wechseln). Der neues
 
 - **Stationsdatenbank exportieren (CSV)**: alle Spalten (Call, Locator, Name, DOK, QSOs, Zuletzt, weitere Locator).
 - **Export im Repo-Format**: `Call;Locator;Zuletzt;DOK` – genau das Format der Startdatenbank im Repo.
+
+## Zentrale Pflege: wer importiert was?
+
+Die Liste wird **zentral** gepflegt, damit alle dieselben, geprüften Daten haben:
+
+- **Normale Installation**: bekommt die Liste über „Nach neuen suchen (Repo)“. Die Quellen-Importe (Ergebnislisten, DARC-Contest-Hub) sind ausgeblendet. Eigene Funde (neue Rufzeichen, Locator, DOKs aus den Logs) gibt man weiter: „Stationsdatenbank exportieren (CSV)“ und die Datei an den Betreuer schicken.
+- **Betreuer** (`MAINTAINER=1` in `contestlogger.env`, dann Server neu starten): sieht zusätzlich die Importkarten und unter der Stationsdatenbank „Stationsliste einpflegen“ für die eingeschickten CSV-Dateien (DOK, Name und „zuletzt gesehen“ werden übernommen, der neuere Stand gewinnt). Danach „Export im Repo-Format“ und die Datei als `contestlogger/seed/stationsdatenbank.csv` ins Repo einchecken – beim nächsten „Nach neuen suchen“ haben alle den Stand.
 
 ## Abgleich mit dem Repo
 

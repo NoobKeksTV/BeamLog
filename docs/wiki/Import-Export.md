@@ -23,9 +23,13 @@ WinContest `.txt`/`.EXP`/`.mdb`, EDI/REG1TEST, ADIF oder Call-Listen (`Call;Loca
 
 ## Ergebnislisten (DARC / IARU / UKW-Contest-Club)
 
+Nur im Betreuer-Modus sichtbar (`MAINTAINER=1` in `contestlogger.env`), siehe [Stationsdatenbank](Stationsdatenbank.md#zentrale-pflege-wer-importiert-was).
+
 Veröffentlichte Ergebnislisten enthalten Rufzeichen und Locator aller Teilnehmer. Datei (HTML, PDF, TXT, CSV), eingefügter Text oder die URL der Ergebnisseite; vor der Übernahme gibt es eine Vorschau.
 
 ## DARC-Contest-Hub direkt laden
+
+Nur im Betreuer-Modus sichtbar.
 
 Lädt die offiziellen `result.csv`-Dateien vom DARC-Contest-Hub (`dxhf2.darc.de`) für ein Jahr oder alle Jahre seit 2017 – pro Contest 500–900 Rufzeichen mit Locator, dazu die ODX-Gegenstationen. Braucht Internet auf dem Server.
 

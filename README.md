@@ -34,7 +34,7 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 | **Stationen und Contests** | Globale Stationen mit Stammdaten (Passwort, KST-Zugang, EDI-Angaben), Contest anlegen mit Stationsauswahl, Operatoren schalten per Passwort frei |
 | **Chat, ON4KST, DM** | Lokaler Chat je Contest, KST-Chat je Station (Nutzerliste, Textbausteine, „an mich“-Markierung), Direktnachrichten wie ein Messenger, Rundruf an noch nicht gearbeitete Stationen im Umkreis |
 | **Operator-Fenster** | Zweiter Monitor: live Rufzeichen, Nummern, RST, Locator, Entfernung/Richtung, Dupe-Warnung, Hinweis vom Logger, Statistik, Karte, letzte QSOs |
-| **Karte** | Richtungspfeil zum Partner, alle QSOs, Großfelder; **Flugzeug-Scatter** (ADS-B, wie AirScout) mit Zone gemeinsamer Sichtbarkeit und Flugzeugen im Korridor |
+| **Karte** | Richtungspfeil zum Partner, alle QSOs, Großfelder mit Rufzeichen; **Flugzeug-Scatter** (ADS-B, wie AirScout): Zone gemeinsamer Sichtbarkeit, Flugzeuge im Korridor, Mindesthöhe und Höhenreserve, vorhergesagte Kreuzungszeit und -punkt, Größenklasse, Pfadprofil |
 | **Statistik** | Contest gesamt und je Station: Stundenverlauf, Entfernungs- und Richtungsverteilung, Großfelder, Länder, ODX, Großanzeige |
 | **Import** | WinContest-Ordner (`.mdb` ohne Zusatzsoftware, `.txt`, `.EXP`), EDI, ADIF, Ergebnislisten (DARC/IARU), DARC-Contest-Hub direkt |
 | **Export / Abgabe** | EDI (REG1TEST) mit Pflicht-Log-Prüfung und Online-Abgleich (HamQTH/QRZ), ADIF, CSV, alle Bänder als ZIP |

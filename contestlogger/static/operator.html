@@ -52,6 +52,8 @@
   #map { flex:1; min-height:200px; border-radius:8px; background:var(--bg2); position:relative; z-index:0; isolation:isolate; overflow:hidden; }
   .arrow-icon { font-size:26px; color:#ff5c6c; text-shadow:0 0 4px #000; line-height:1; }
   .plane-icon { line-height:1; text-shadow:0 0 3px #000; }
+  .plane-tip { font-size:12px; line-height:1.4; max-width:360px; white-space:normal; }
+  .plist .soon { color:#ffe066; }
   .pbtn { background:var(--bg2); color:var(--muted); border:1px solid var(--line); border-radius:6px; padding:2px 8px; font-size:12px; cursor:pointer; margin-left:8px; }
   .pbtn.active { color:var(--warn); border-color:var(--warn); }
   .plist { display:flex; flex-wrap:wrap; gap:4px 10px; font:13px var(--mono); color:var(--muted); padding:4px 4px 0; min-height:0; }
@@ -253,10 +255,16 @@
       const r = await GET(`/api/aircraft?my=${station.locator}&loc=${curLoc}`);
       const m = makeMap(); m.planes.clearLayers(); m.zone.clearLayers();
       if (r.zone) L.polyline([r.zone.from, r.zone.to], { color: "#3ddc84", weight: 9, opacity: .45 }).addTo(m.zone);
-      for (const p of r.planes) { const hot = p.in_corridor && p.visible_both; L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${hot ? "#ffb347" : (p.visible_both ? "#9fd3ff" : "#6b7785")};font-size:${hot ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) }).bindTooltip(`${p.flight || p.hex} ${p.type || ""} FL${p.fl}`).addTo(m.planes); }
+      const COL = { hot: "#ffb347", soon: "#ffe066", visible: "#9fd3ff", far: "#6b7785", low: "#8b5a5a" }, SZ = { heavy: "schwer", large: "groß", medium: "mittel", light: "leicht" };
+      const km1 = (m) => (m / 1000).toLocaleString("de", { maximumFractionDigits: 1 });
+      const tip = (p) => [`<b>${p.flight || p.hex}${p.type ? " · " + p.type : ""}${p.size ? " (" + SZ[p.size] + ")" : ""}</b>`,
+        `FL${p.fl} = ${km1(p.alt_m)} km · ${p.gs_kmh} km/h · Kurs ${Math.round(p.track)}°`,
+        `Mindesthöhe ${km1(p.req_m)} km → <b style="color:${p.margin_m > 0 ? "#3ddc84" : "#ff6b6b"}">${p.margin_m > 0 ? "+" : ""}${km1(p.margin_m)} km</b> Reserve · ${Math.abs(p.xt_km)} km vom Pfad · Elevation ${p.elev1}° / ${p.elev2}°`,
+        p.cross && p.cross.on_path ? `<b>kreuzt in ${p.eta_min != null ? Math.round(p.eta_min) : "> 60"} min</b> um ${p.cross.utc} UTC bei km ${p.cross.km}${p.cross.in_zone ? " ✓ Zone" : ""}${p.cross.margin_m != null ? ` · dort ${p.cross.margin_m > 0 ? "+" : ""}${km1(p.cross.margin_m)} km` : ""}` : ""].filter(Boolean).join("<br>");
+      for (const p of r.planes) { const st = p.status || "far"; const big = st === "hot" || p.size === "heavy"; L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${COL[st]};font-size:${big ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) }).bindTooltip(tip(p), { className: "plane-tip", direction: "top", offset: [0, -10] }).addTo(m.planes); }
       const box = $("#plane-list"); box.innerHTML = "";
-      for (const p of r.planes.filter((p) => p.in_corridor && p.visible_both).slice(0, 5)) { const s = document.createElement("span"); s.className = "hot"; s.textContent = `✈ ${p.flight || p.hex} FL${p.fl} · ${Math.abs(p.xt_km)} km vom Pfad`; box.append(s); }
-      for (const p of r.planes.filter((p) => !p.in_corridor && p.visible_both && p.eta_min != null && p.eta_min <= 15).slice(0, 3)) { const s = document.createElement("span"); s.textContent = `${p.flight || p.hex} kreuzt in ~${Math.round(p.eta_min)} min`; box.append(s); }
+      for (const p of r.planes.filter((p) => p.status === "hot").slice(0, 5)) { const s = document.createElement("span"); s.className = "hot"; s.textContent = `✈ ${p.flight || p.hex} ${p.type} FL${p.fl} · ${Math.abs(p.xt_km)} km vom Pfad · +${km1(p.margin_m)} km`; s.title = tip(p).replace(/<[^>]+>/g, ""); box.append(s); }
+      for (const p of r.planes.filter((p) => p.status === "soon").slice(0, 3)) { const s = document.createElement("span"); s.className = "soon"; s.textContent = `${p.flight || p.hex} kreuzt in ${Math.round(p.eta_min)} min bei km ${p.cross.km} (${p.cross.utc.slice(0, 5)} UTC)`; s.title = tip(p).replace(/<[^>]+>/g, ""); box.append(s); }
     } catch (e) { $("#plane-list").textContent = "✈ " + e.message; }
     planeTimer = setTimeout(refreshPlanes, 5000);
   }
