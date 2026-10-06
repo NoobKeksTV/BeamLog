@@ -195,7 +195,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     def is_maintainer() -> bool:
         """Betreuer-Modus (MAINTAINER=1 in contestlogger.env): Quellen-Importe für die zentrale Stationsdatenbank."""
-        return os.environ.get("CONTESTLOGGER_MAINTAINER", "").strip().lower() in ("1", "true", "yes", "ja", "on")
+        on = ("1", "true", "yes", "ja", "on")
+        return os.environ.get("CONTESTLOGGER_MAINTAINER", "").strip().lower() in on or os.environ.get("CONTESTLOGGER_DEV", "").strip().lower() in on
 
     def require_maintainer(x_admin_token: str | None = Header(default=None)) -> None:
         if not is_admin(x_admin_token):
