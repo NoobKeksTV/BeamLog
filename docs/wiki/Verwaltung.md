@@ -8,7 +8,7 @@ Der Reiter **Verwaltung** ist nur mit Admin-Passwort zugänglich und enthält al
 Stammdaten eurer Stationen (Rufzeichen, Locator, Band, Modus, Passwort, KST-Zugang, EDI-Angaben). Beim Anlegen eines Contests wählt ihr die teilnehmenden. Siehe [Erste Schritte](Erste-Schritte.md).
 
 ## Contests
-Anlegen (mit Stationsauswahl), bearbeiten (Name, Zeitraum, Notizen, **Austausch**: laufende Nummer, DOK/OV oder beides – siehe [Loggen](Loggen.md#austausch-je-contest-nummer-dok-oder-beides)), archivieren, löschen, „EDI-ZIP“ für alle Bänder. „wählen“ macht den Contest in der Stationsleiste aktiv.
+Anlegen (mit Stationsauswahl), bearbeiten (Name, Zeitraum, Notizen, **Wertung**: Punkte je QSO (1 je km oder fester Wert) und Multiplikator (keiner, Großfelder, DOKs, beides) – bei Änderung werden alle QSOs des Contests neu bewertet; **Austausch**: laufende Nummer, DOK/OV oder beides – siehe [Loggen](Loggen.md#austausch-je-contest-nummer-dok-oder-beides)), archivieren, löschen, „EDI-ZIP“ für alle Bänder. „wählen“ macht den Contest in der Stationsleiste aktiv.
 
 ![Contest anlegen mit Austausch](img/contest-austausch.png)
 
@@ -43,7 +43,7 @@ Jede Änderung (QSOs, Stationen, Contests, Importe, Einstellungen, KST, Backups,
 HamQTH (kostenlos, aber Account nötig) oder QRZ.com (XML-Abo) für unbekannte Rufzeichen und den Online-Abgleich in der Log-Prüfung. „Testen“ prüft die Zugangsdaten.
 
 ## Karte
-Kachel-URL für die Karten. Standard OpenStreetMap; für Offline-Betrieb ein eigener Kachelserver.
+Kachel-URL für die Karten (Standard OpenStreetMap). **Offline-Cache**: mit „Kacheln über den Server laden und speichern“ holt der Server die Kacheln und legt sie unter `data/tiles/` ab – alles, was einmal angezeigt wurde, bleibt ohne Internet verfügbar. „Region vorab laden“ lädt vor dem Contest einen Umkreis (Locator, Radius, Zoom bis 7–10) im Hintergrund; der öffentliche OpenStreetMap-Server erlaubt keine Massen-Downloads, daher sind Zoom ≤ 10 und ca. 4000 Kacheln je Lauf die Grenze. Für große Gebiete einen eigenen Kachelserver eintragen. „Cache leeren“ löscht die gespeicherten Kacheln.
 
 ## Flugzeug-Scatter (ADS-B)
 Quelle (adsb.fi oder eigener Empfänger), Korridor, Antennenhöhe. Siehe [Flugzeug-Scatter](Flugzeug-Scatter.md).

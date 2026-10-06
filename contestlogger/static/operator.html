@@ -145,7 +145,7 @@
   function makeMap() {
     if (M || typeof L === "undefined") return M;
     const map = L.map("map", { zoomControl: true, attributionControl: true }).setView([51, 10], 5);
-    L.tileLayer(info.tile_url || "https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(map);
+    L.tileLayer(info.tile_cache ? `${location.origin}/tiles/{z}/{x}/{y}.png` : (info.tile_url || "https://tile.openstreetmap.org/{z}/{x}/{y}.png"), { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(map);
     M = { map, layer: L.layerGroup().addTo(map), dots: L.layerGroup().addTo(map), planes: L.layerGroup().addTo(map), zone: L.layerGroup().addTo(map) };
     // Kacheln füllen die Karte erst, wenn Leaflet die endgültige Größe kennt (Layout/Fonts kommen später)
     [100, 600, 2000].forEach((ms) => setTimeout(() => map.invalidateSize(), ms));
@@ -181,7 +181,7 @@
   async function loadStation() {
     info = await GET("/api/info").catch(() => ({}));
     const contests = await GET("/api/contests");
-    for (const c of contests) for (const s of c.stations) if (s.id === sid) { station = s; station.contest = c.name; station.exchange = c.exchange || "serial"; }
+    for (const c of contests) for (const s of c.stations) if (s.id === sid) { station = s; station.contest = c.name; station.exchange = c.exchange || "serial"; station.scoring = c.scoring || "km"; }
     if (!station) { $("#station").textContent = "Station nicht gefunden"; return; }
     const tiles = document.querySelector(".tiles"); tiles.classList.remove("x-serial", "x-dok", "x-serial_dok"); tiles.classList.add("x-" + station.exchange);
     document.body.classList.toggle("x-dok", station.exchange === "dok");
@@ -197,8 +197,10 @@
   function showRig(r) { $("#rig").textContent = r && r.freq ? `📻 ${r.freq} MHz ${r.mode || ""}` : ""; }
   function renderStats() {
     const valid = qsos.filter((q) => !q.dupe);
-    const pts = valid.reduce((a, q) => a + (q.points || 0), 0);
+    let pts = valid.reduce((a, q) => a + (q.points || 0), 0);
     const squares = new Set(valid.map((q) => q.square).filter(Boolean)).size;
+    const mm = /\*(squares|doks|squares_doks)$/.exec((station?.scoring || "km").toLowerCase());  // Multiplikator laut Contest-Wertung
+    if (mm) { const doks = new Set(valid.map((q) => q.exch_rcvd).filter(Boolean)).size; const n = (mm[1].includes("squares") ? squares : 0) + (mm[1].includes("doks") ? doks : 0); pts = pts * (n ? Math.max(1, n) : 0); }
     const odx = valid.reduce((a, q) => (q.km > (a?.km || 0) ? q : a), null);
     const hourAgo = Date.now() - 3600e3;
     const rate = qsos.filter((q) => Date.parse(q.ts_utc) > hourAgo).length;

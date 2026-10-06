@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from . import geo, prefixes
+from . import scoring as scoring_mod
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (
@@ -359,7 +360,7 @@ class Database:
         with self.conn:
             cur = self.conn.execute(
                 "INSERT INTO contests(name,start_utc,end_utc,scoring,notes,exchange,created_at) VALUES(?,?,?,?,?,?,?)",
-                (name.strip(), start_utc or None, end_utc or None, scoring, notes, exchange if exchange in EXCHANGES else "serial", utcnow()),
+                (name.strip(), start_utc or None, end_utc or None, scoring_mod.normalize(scoring), notes, exchange if exchange in EXCHANGES else "serial", utcnow()),
             )
             return int(cur.lastrowid)
 
@@ -368,6 +369,8 @@ class Database:
         sets = {k: v for k, v in fields.items() if k in allowed}
         if "exchange" in sets and sets["exchange"] not in EXCHANGES:
             sets["exchange"] = "serial"
+        if "scoring" in sets:
+            sets["scoring"] = scoring_mod.normalize(sets["scoring"])
         if not sets:
             return
         with self.conn:
@@ -375,6 +378,15 @@ class Database:
                 f"UPDATE contests SET {', '.join(k + '=?' for k in sets)} WHERE id=?",
                 (*sets.values(), cid),
             )
+
+    def rescore_contest(self, cid: int) -> None:
+        """Nach Änderung der Wertung: Punkte aller QSOs des Contests neu berechnen."""
+        for s in self.list_stations(cid):
+            self.recheck_dupes(s["id"])
+
+    def _scoring_of(self, station: dict) -> str:
+        c = self.get_contest(station["contest_id"]) if station else None
+        return (c or {}).get("scoring") or "km"
 
     def delete_contest(self, cid: int) -> None:
         with self.conn:
@@ -576,7 +588,7 @@ class Database:
                 serial = station["serial_next"]
             serial = int(serial)
             dupe = 1 if self._is_dupe(station_id, q["core_call"], band) else 0
-            points = 0 if dupe else (q["km"] if q["km"] > 0 else (1 if q["locator"] else 0))
+            points = scoring_mod.qso_points(self._scoring_of(station), q["km"], q["locator"], bool(dupe))
             cur = self.conn.execute(
                 """INSERT INTO qsos(station_id,ts_utc,call,core_call,locator,square,country,rst_sent,rst_rcvd,
                    serial_sent,serial_rcvd,mode,band,comment,km,bearing,points,dupe,logged_by,created_at,updated_at,freq,exch_rcvd)
@@ -602,7 +614,7 @@ class Database:
         q = self._enrich(station, merged)  # type: ignore[arg-type]
         with self.conn:
             dupe = 1 if self._is_dupe(old["station_id"], q["core_call"], q["band"], exclude_id=qid) else 0
-            points = 0 if dupe else (q["km"] if q["km"] > 0 else (1 if q["locator"] else 0))
+            points = scoring_mod.qso_points(self._scoring_of(station), q["km"], q["locator"], bool(dupe))
             self.conn.execute(
                 """UPDATE qsos SET ts_utc=?,call=?,core_call=?,locator=?,square=?,country=?,rst_sent=?,rst_rcvd=?,
                    serial_sent=?,serial_rcvd=?,mode=?,band=?,comment=?,km=?,bearing=?,points=?,dupe=?,updated_at=?,freq=?,exch_rcvd=? WHERE id=?""",
@@ -629,12 +641,13 @@ class Database:
         if not station:
             return
         seen: set[tuple[str, str]] = set()
+        sc = self._scoring_of(station)
         with self.conn:
             for q in self.rows("SELECT id,core_call,band,km,locator,dupe,points FROM qsos WHERE station_id=? ORDER BY ts_utc, id", (station_id,)):
                 key = (q["core_call"], q["band"])
                 dupe = 1 if key in seen else 0
                 seen.add(key)
-                points = 0 if dupe else (q["km"] if q["km"] > 0 else (1 if q["locator"] else 0))
+                points = scoring_mod.qso_points(sc, q["km"], q["locator"], bool(dupe))
                 if dupe != q["dupe"] or points != q["points"]:
                     self.conn.execute("UPDATE qsos SET dupe=?, points=? WHERE id=?", (dupe, points, q["id"]))
 
@@ -688,12 +701,16 @@ class Database:
             "SELECT COUNT(*) AS n FROM qsos WHERE station_id=? AND ts_utc >= strftime('%Y-%m-%dT%H:%M:%SZ','now','-1 hour')",
             (station_id,),
         )
+        station = self.get_station(station_id) or {}
+        sc = self._scoring_of(station) if station else "km"
+        tot = scoring_mod.total(sc, s.get("points") or 0, squares["n"] if squares else 0, exchanges["n"] if exchanges else 0)
         return {
             **s,
             "avg_km": round(s.get("avg_km") or 0),
             "squares": squares["n"] if squares else 0,
             "countries": countries["n"] if countries else 0,
             "exchanges": exchanges["n"] if exchanges else 0,
+            "scoring": sc, "scoring_label": scoring_mod.label(sc), "multiplier": tot["multiplier"], "score": tot["score"],
             "odx": odx,
             "rate_last_hour": last_hour["n"] if last_hour else 0,
         }
@@ -735,14 +752,16 @@ class Database:
         stations = self.scoreboard(contest_id)
         by_band: dict[str, dict] = {}
         for s in stations:
-            b = by_band.setdefault(s["band"], {"band": s["band"], "qsos": 0, "points": 0, "squares": 0, "odx_km": 0, "stations": []})
+            b = by_band.setdefault(s["band"], {"band": s["band"], "qsos": 0, "points": 0, "score": 0, "squares": 0, "odx_km": 0, "stations": []})
             b["qsos"] += s["qsos"] - s["dupes"]
             b["points"] += s["points"] or 0
+            b["score"] += s.get("score") or s["points"] or 0
             b["squares"] += s["squares"]
             b["odx_km"] = max(b["odx_km"], s["odx_km"] or 0)
             b["stations"].append(s["call"])
         total_qsos = sum(b["qsos"] for b in by_band.values())
         total_points = sum(b["points"] for b in by_band.values())
+        total_score = sum(b["score"] for b in by_band.values())
         all_squares = self.row(
             """SELECT COUNT(DISTINCT q.square) AS n FROM qsos q JOIN stations s ON s.id=q.station_id
                WHERE s.contest_id=? AND q.dupe=0 AND q.square<>''""", (contest_id,))
@@ -750,7 +769,7 @@ class Database:
             """SELECT COUNT(DISTINCT q.core_call) AS n FROM qsos q JOIN stations s ON s.id=q.station_id
                WHERE s.contest_id=? AND q.dupe=0""", (contest_id,))
         return {"bands": sorted(by_band.values(), key=lambda b: int("".join(ch for ch in b["band"] if ch.isdigit()) or 0)),
-                "total_qsos": total_qsos, "total_points": total_points,
+                "total_qsos": total_qsos, "total_points": total_points, "total_score": total_score,
                 "unique_squares": all_squares["n"] if all_squares else 0,
                 "unique_calls": uniq_calls["n"] if uniq_calls else 0}
 
@@ -789,7 +808,7 @@ class Database:
         out = []
         for s in self.list_stations(contest_id):
             out.append({**s, **self.station_summary(s["id"])})
-        out.sort(key=lambda x: -(x.get("points") or 0))
+        out.sort(key=lambda x: -(x.get("score") or x.get("points") or 0))
         return out
 
     # ----- Call-Buch und Vorschläge --------------------------------------

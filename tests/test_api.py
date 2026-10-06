@@ -301,3 +301,30 @@ def test_maintainer_gate_and_list_import(tmp_path, monkeypatch):
         exp = c.get("/api/callbook/export.csv").text
         r = c.post("/api/callbook/import_list", files={"file": ("liste.csv", exp)}, headers=H).json()
         assert r["new"] == 0 and r["known"] >= 2
+
+
+def test_tile_cache(client, tmp_path, monkeypatch):
+    from contestlogger import tiles
+    admin = client.post("/api/setup", json={"password": "admin1"}).json()["token"]
+    H = {"X-Admin-Token": admin}
+    png = b"\x89PNG fake"
+    monkeypatch.setattr(tiles.urllib.request, "urlopen", lambda req, timeout=0: type("R", (), {"read": lambda self: png, "__enter__": lambda self: self, "__exit__": lambda self, *a: None})())
+    assert client.get("/api/info").json()["tile_cache"] is False
+    r = client.get("/tiles/5/16/10.png")
+    assert r.status_code == 200 and r.content == png
+    st = client.get("/api/tiles/status", headers=H).json()
+    assert st["tiles"] == 1 and st["job"]["running"] is False
+    assert client.post("/api/tiles/prefetch", json={"locator": "JO31AA", "radius_km": 5000, "zmin": 4, "zmax": 10}, headers=H).status_code == 400  # zu viele
+    r = client.post("/api/tiles/prefetch", json={"locator": "JO31AA", "radius_km": 100, "zmin": 4, "zmax": 6}, headers=H).json()
+    assert r["total"] >= 3
+    import time
+    for _ in range(50):
+        st = client.get("/api/tiles/status", headers=H).json()
+        if not st["job"]["running"]:
+            break
+        time.sleep(0.1)
+    assert st["job"]["done"] == r["total"] and st["tiles"] >= r["total"]
+    client.post("/api/settings", json={"tile_cache": "1"}, headers=H)
+    assert client.get("/api/info").json()["tile_cache"] is True
+    assert client.delete("/api/tiles", headers=H).json()["deleted"] >= r["total"]
+    assert len(tiles.region_tiles(51, 7, 100, 5, 5)) >= 1 and tiles.latlon_to_tile(0, 0, 1) == (1, 1)

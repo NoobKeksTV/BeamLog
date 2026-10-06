@@ -10,6 +10,11 @@ from datetime import datetime, timedelta, timezone
 from . import geo, prefixes
 
 RST_RE = re.compile(r"^[1-5][1-9][1-9]?$")
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
+NUM_RE = re.compile(r"^\d+([.,]\d+)?$")
+# Wertungsgruppen, die die IARU-Region-1-/DARC-Auswerter kennen (REG1TEST PSect); frei eingetragene Texte geben nur einen Hinweis
+KNOWN_SECTIONS = {"SINGLE", "MULTI", "SINGLE-OP", "MULTI-OP", "SO", "MO", "6H", "LOW POWER", "LP", "QRP", "SOLP", "SOHP", "MOLP", "MOHP",
+                  "SINGLE OPERATOR", "MULTI OPERATOR", "NEWCOMER", "YL", "OPEN", "LOW", "HIGH"}
 EDI_REQUIRED = [("resp_name", "Name des Verantwortlichen"), ("resp_call", "Rufzeichen des Verantwortlichen"),
                 ("resp_address", "Straße"), ("resp_zip", "PLZ"), ("resp_city", "Ort"), ("resp_email", "E-Mail"),
                 ("section", "Wertungsgruppe"), ("antenna", "Antenne"), ("power", "Leistung"), ("tx", "Sender")]
@@ -38,6 +43,23 @@ def check_station(contest: dict, station: dict, qsos: list[dict]) -> dict:
     for key, label in EDI_REQUIRED:
         if not str(info.get(key) or "").strip():
             warn(f"EDI-Kopf: {label} fehlt (Verwaltung → Station bearbeiten)")
+    sect = str(info.get("section") or "").strip()
+    if sect and sect.upper() not in KNOWN_SECTIONS and not sect.isdigit():
+        warn(f"EDI-Kopf: Wertungsgruppe „{sect}“ ist keine übliche Bezeichnung (Single, Multi, 6H, Low Power, QRP oder die Nummer laut Ausschreibung)")
+    if "MULTI" in sect.upper() and not str(info.get("operators") or "").strip():
+        warn("EDI-Kopf: Multi-Operator ohne Operatorenliste (MOpe1)")
+    email = str(info.get("resp_email") or "").strip()
+    if email and not EMAIL_RE.match(email):
+        warn(f"EDI-Kopf: E-Mail „{email}“ sieht ungültig aus")
+    for key, label in (("power", "Leistung"), ("antenna_height", "Antennenhöhe"), ("asl", "Höhe über NN")):
+        v = str(info.get(key) or "").strip().replace(" W", "").replace("W", "").replace(" m", "").replace("m", "")
+        if v and not NUM_RE.match(v):
+            warn(f"EDI-Kopf: {label} „{info.get(key)}“ ist keine Zahl – Auswerter erwarten nur die Zahl")
+    for key, label, mx in (("resp_name", "Name", 40), ("resp_address", "Straße", 40), ("resp_city", "Ort", 40), ("club", "Club", 40), ("operators", "Operatoren", 80)):
+        if len(str(info.get(key) or "")) > mx:
+            warn(f"EDI-Kopf: {label} länger als {mx} Zeichen – wird vom Auswerter evtl. abgeschnitten")
+    if len(str(contest.get("name") or "")) > 60:
+        warn("Contest-Name länger als 60 Zeichen (TName)")
     if not qsos:
         err("Das Log enthält keine QSOs")
         return {"errors": errors, "warnings": warnings, "ok": False, "qsos": 0}
@@ -90,6 +112,12 @@ def check_station(contest: dict, station: dict, qsos: list[dict]) -> dict:
             err(pl["msg"], q)
         if q["km"] > 1500:
             warn(f"{q['km']} km – ungewöhnlich weit, Locator prüfen", q)
+    own_core = prefixes.core_call(station["call"])
+    for q in ordered:
+        if prefixes.core_call(q["call"]) == own_core:
+            err("QSO mit dem eigenen Rufzeichen", q)
+        if q["locator"] and station["locator"] and q["locator"].upper() == station["locator"].upper() and q["km"] == 0:
+            warn("Partner im eigenen Locator-Feld (0 km) – stimmt der Locator?", q)
     nums = sorted(serials)
     missing = [n for n in range(nums[0], nums[-1] + 1) if n not in serials]
     if missing:

@@ -320,6 +320,15 @@
       <div class="card">
         <h3>Karte</h3>
         <form id="tile-form" class="row"><input id="tile-url" placeholder="https://tile.openstreetmap.org/{z}/{x}/{y}.png" style="flex:1;min-width:260px"><button class="ghost">Speichern</button></form>
+        <label class="check" style="margin-top:8px"><input type="checkbox" id="tile-cache"> Kacheln über den Server laden und speichern (Offline-Cache – alles, was einmal angezeigt wurde, bleibt verfügbar)</label>
+        <form id="tc-form" class="row" style="margin-top:6px">
+          <span class="small">Region vorab laden:</span>
+          <input id="tc-loc" placeholder="Locator Mitte" style="width:110px" maxlength="6">
+          <input id="tc-radius" type="number" value="300" min="20" max="1500" style="width:80px" title="Radius km"> km
+          <select id="tc-zoom" title="höchste Zoomstufe"><option value="7">Zoom bis 7 (grob)</option><option value="8">Zoom bis 8</option><option value="9" selected>Zoom bis 9</option><option value="10">Zoom bis 10 (fein, viele Kacheln)</option></select>
+          <button class="ghost small">Laden</button><button type="button" id="btn-tc-stop" class="ghost small hidden">Stopp</button><button type="button" id="btn-tc-clear" class="ghost small danger">Cache leeren</button>
+        </form>
+        <p class="muted small" id="tc-info"></p>
         <p class="muted small">Kachel-URL für die Karte. Standard: OpenStreetMap (braucht Internet). Für reinen Offline-Betrieb einen lokalen Kachel-Server eintragen (z. B. <code>http://192.168.1.10:8080/tile/{z}/{x}/{y}.png</code>) – Linien und Marker funktionieren auch ohne Kacheln.</p>
       </div>
       <div class="card">

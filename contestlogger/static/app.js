@@ -480,7 +480,7 @@
   function renderKpis(summary) {
     const box = $("#kpis");
     const valid = S.qsos.filter((q) => !q.dupe);
-    const pts = valid.reduce((a, q) => a + q.points, 0);
+    const sc = scoreOf(valid); const pts = sc.points;
     const squares = new Set(valid.map((q) => q.square).filter(Boolean)).size;
     const odx = valid.reduce((a, q) => (q.km > (a?.km || 0) ? q : a), null);
     const hourAgo = Date.now() - 3600e3;
@@ -488,7 +488,8 @@
     box.innerHTML = "";
     if (!S.stationId) return;
     const k = (v, l, cls = "") => el("span", { class: `st ${cls}` }, el("b", {}, v), l);
-    box.append(k(valid.length, t("QSOs")), k(pts.toLocaleString("de"), t("Punkte")), k(squares, t("Großfelder")),
+    const ptsEl = k(sc.score.toLocaleString("de"), t("Punkte"), "score"); ptsEl.title = scoringLabel(contest()) + (sc.multiplier != null ? ` – ${pts.toLocaleString("de")} × ${sc.multiplier}` : "");
+    box.append(k(valid.length, t("QSOs")), ptsEl, k(squares, t("Großfelder")),
       k(valid.length ? Math.round(pts / valid.length) : 0, t("Ø km")), k(rate, t("QSOs / letzte h")), k(S.qsos.length - valid.length, t("Dupes")),
       k(odx ? `${odx.call} ${odx.km} km` : "–", "ODX", "odx"));
     if (hasDok()) box.append(k(new Set(valid.map((q) => q.exch_rcvd).filter(Boolean)).size, t("DOKs")));
@@ -499,6 +500,16 @@
   const order = [F.call, F.rs, F.rr, F.nr, F.dok, F.loc, F.cmt];
   // Austausch des Contests: "serial" (Nummer), "dok" (DOK/OV, z. B. Köln-Aachen-Contest) oder "serial_dok" (beides)
   const exchangeMode = () => contest()?.exchange || "serial";
+  // Wertung des Contests: "km" | "fixN" [ "*squares" | "*doks" | "*squares_doks" ] – wie contestlogger/scoring.py
+  function scoringOf(c) { const m = /^(km|fix(\d+))(?:\*(squares|doks|squares_doks))?$/.exec((c?.scoring || "km").toLowerCase()); return m ? { points: m[1].startsWith("fix") ? "fix" : "km", fixed: Number(m[2] || 0), mult: m[3] || "" } : { points: "km", fixed: 0, mult: "" }; }
+  function scoreOf(valid, c = contest()) {  // {points, multiplier, score} aus gültigen QSOs
+    const sc = scoringOf(c); const pts = valid.reduce((a, q) => a + (q.points || 0), 0);
+    if (!sc.mult) return { points: pts, multiplier: null, score: pts };
+    const squares = new Set(valid.map((q) => q.square).filter(Boolean)).size, doks = new Set(valid.map((q) => q.exch_rcvd).filter(Boolean)).size;
+    const n = (sc.mult.includes("squares") ? squares : 0) + (sc.mult.includes("doks") ? doks : 0); const mult = n ? Math.max(1, n) : 0;
+    return { points: pts, multiplier: mult, score: pts * mult };
+  }
+  const scoringLabel = (c) => { const sc = scoringOf(c); return (sc.points === "km" ? t("1 Punkt je km") : t("{n} Punkte je QSO", { n: sc.fixed })) + ({ "": "", squares: " × " + t("Großfelder"), doks: " × " + t("DOKs"), squares_doks: " × (" + t("Großfelder") + " + " + t("DOKs") + ")" })[sc.mult]; };
   const hasDok = () => exchangeMode().includes("dok");
   const hasSerial = () => exchangeMode() !== "dok";
   const firstRcvd = () => (hasSerial() ? F.nr : F.dok);  // erstes Feld nach dem Rufzeichen
@@ -853,7 +864,7 @@
     if (Maps[id]) return Maps[id];
     if (typeof L === "undefined") return null;
     const map = L.map(id, { zoomControl: true, attributionControl: true }).setView([51, 10], 5);
-    const url = localStorage.getItem("cl.tileurl") || S.info.tile_url || "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+    const url = S.info.tile_cache ? `${location.origin}/tiles/{z}/{x}/{y}.png` : (localStorage.getItem("cl.tileurl") || S.info.tile_url || "https://tile.openstreetmap.org/{z}/{x}/{y}.png");
     L.tileLayer(url, { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(map);
     const m = { map, layer: L.layerGroup().addTo(map), dots: L.layerGroup().addTo(map) };
     Maps[id] = m;
@@ -1000,6 +1011,21 @@
     $("#lookup-result").textContent = "…";
     try { const r = await api("POST", "/api/lookup/test"); $("#lookup-result").textContent = r.msg; $("#lookup-result").style.color = r.ok ? "var(--ok)" : "var(--bad)"; } catch (err) { $("#lookup-result").textContent = err.message; }
   });
+  async function tilesStatus() {
+    try {
+      const s = await GET("/api/tiles/status"); const j = s.job;
+      $("#tc-info").textContent = `${s.tiles} ${t("Kacheln im Cache")} (${s.size_mb} MB)` + (j.running ? ` · ${t("lädt")} ${j.done}/${j.total}${j.errors ? `, ${j.errors} ${t("Fehler")}` : ""}` : (j.total ? ` · ${t("zuletzt")}: ${j.done}/${j.total}${j.skipped ? `, ${j.skipped} ${t("schon vorhanden")}` : ""}${j.errors ? `, ${j.errors} ${t("Fehler")}` : ""}${j.message ? ` – ${j.message}` : ""}` : ""));
+      $("#btn-tc-stop").classList.toggle("hidden", !j.running);
+      if (j.running) setTimeout(tilesStatus, 1500);
+    } catch (_) { /* */ }
+  }
+  $("#tile-cache").addEventListener("change", async () => { try { await api("POST", "/api/settings", { tile_cache: $("#tile-cache").checked ? "1" : "0" }); toast(t("Gespeichert – Seite neu laden, damit die Karten den Cache nutzen"), "ok"); } catch (err) { toast(err.message, "err"); } });
+  $("#tc-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try { const r = await api("POST", "/api/tiles/prefetch", { locator: $("#tc-loc").value.trim(), radius_km: Number($("#tc-radius").value), zmin: 4, zmax: Number($("#tc-zoom").value) }); toast(t("{n} Kacheln werden geladen", { n: r.total }), "ok"); tilesStatus(); } catch (err) { toast(err.message, "err"); }
+  });
+  $("#btn-tc-stop").addEventListener("click", () => api("POST", "/api/tiles/stop").then(tilesStatus).catch(() => {}));
+  $("#btn-tc-clear").addEventListener("click", async () => { if (confirm(t("Alle gespeicherten Kacheln löschen?"))) { await api("DELETE", "/api/tiles"); tilesStatus(); } });
   $("#tile-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try { await api("POST", "/api/settings", { tile_url: $("#tile-url").value.trim() }); toast(t("Kachel-URL gespeichert – Seite neu laden"), "ok"); } catch (err) { toast(err.message, "err"); }
@@ -1016,10 +1042,10 @@
     let tq = 0, tp = 0;
     for (const r of rows) {
       if (r.rig) S.rig[r.id] = r.rig;
-      tq += r.qsos - r.dupes; tp += r.points || 0;
+      tq += r.qsos - r.dupes; tp += r.score ?? r.points ?? 0;
       const tr = el("tr", { style: "cursor:pointer", onclick: () => { $("#sel-station").value = r.id; $("#sel-station").dispatchEvent(new Event("change")); } },
         el("td", {}, r.id === S.stationId ? el("b", {}, r.call) : r.call, r.rig?.freq ? el("div", { class: "muted small" }, `${r.rig.freq} MHz`) : null), el("td", {}, r.band),
-        el("td", { class: "num" }, r.qsos - r.dupes), el("td", { class: "num" }, (r.points || 0).toLocaleString("de")), el("td", { class: "num" }, r.squares),
+        el("td", { class: "num" }, r.qsos - r.dupes), el("td", { class: "num", title: r.multiplier != null ? `${(r.points || 0).toLocaleString("de")} × ${r.multiplier}` : "" }, (r.score ?? r.points ?? 0).toLocaleString("de")), el("td", { class: "num" }, r.squares),
         el("td", { class: "num" }, r.odx_km || "–"), el("td", { class: "num" }, r.rate_last_hour));
       tb.append(tr);
     }
@@ -1400,7 +1426,7 @@
     const s = st.summary; const own = station();
     $("#stats-title").textContent = `${t("Station")} ${own?.call || ""} ${own?.band || ""}`;
     root.append(el("div", { class: "card kpis stat-card" },
-      kpi(s.qsos - s.dupes, t("gültige QSOs")), kpi((s.points || 0).toLocaleString("de"), t("Punkte")), kpi(s.squares, t("Großfelder")),
+      kpi(s.qsos - s.dupes, t("gültige QSOs")), kpi((s.score ?? s.points ?? 0).toLocaleString("de"), s.multiplier != null ? `${t("Punkte")} (${(s.points || 0).toLocaleString("de")} × ${s.multiplier})` : t("Punkte")), kpi(s.squares, t("Großfelder")),
       kpi(s.countries, t("Länder")), kpi(s.avg_km, t("Ø km / QSO")), kpi(s.dupes, t("Dupes")),
       kpi(s.odx ? `${s.odx.call} · ${s.odx.km} km` : "–", `ODX (${s.odx?.locator || ""})`, "wide")));
     const mapCard = card(t("Karte aller QSOs und Großfelder"), el("div", { id: "map-stats", class: "map tall" })); mapCard.style.gridColumn = "1 / -1"; root.append(mapCard);
@@ -1486,11 +1512,11 @@
     if (!c) return;
     let st; try { st = await GET(`/api/contests/${c.id}/stats`); } catch (_) { return; }
     root.append(el("div", { class: "card kpis big", style: "grid-column: 1 / -1" },
-      kpi(st.total_qsos, t("QSOs gesamt")), kpi(st.total_points.toLocaleString("de"), t("Punkte gesamt")), kpi(st.rate_last_hour, t("QSOs letzte Stunde")), kpi(st.unique_calls, t("verschiedene Calls")),
+      kpi(st.total_qsos, t("QSOs gesamt")), kpi((st.total_score ?? st.total_points).toLocaleString("de"), t("Punkte gesamt")), kpi(st.rate_last_hour, t("QSOs letzte Stunde")), kpi(st.unique_calls, t("verschiedene Calls")),
       kpi(st.unique_squares, t("Großfelder (alle Bänder)")), kpi(st.unique_countries, t("Länder")), kpi(st.bands.length, t("Bänder aktiv")),
       kpi(c.end_utc ? $("#countdown").textContent || "–" : "–", t("Restzeit"))));
     const cs = card(t("Stationen / Bänder"), table([t("Station"), t("Band"), t("QSOs"), t("Punkte"), t("Felder"), "ODX km", t("ODX-Call"), "/h"],
-      st.stations.map((s) => { const o = st.odx.find((x) => x.band === s.band); return [s.call, s.band, s.qsos - s.dupes, s.points || 0, s.squares, s.odx_km || 0, o ? `${o.call} ${o.locator}` : "–", s.rate_last_hour]; }))); cs.classList.add("wide2"); root.append(cs);
+      st.stations.map((s) => { const o = st.odx.find((x) => x.band === s.band); return [s.call, s.band, s.qsos - s.dupes, s.score ?? s.points ?? 0, s.squares, s.odx_km || 0, o ? `${o.call} ${o.locator}` : "–", s.rate_last_hour]; }))); cs.classList.add("wide2"); root.append(cs);
     // Stundenverlauf je Band (gestapelt)
     const hours = [...new Set(st.per_hour.map((h) => h.hour))].sort();
     const bands = [...new Set(st.per_hour.map((h) => h.band))];
@@ -1582,12 +1608,14 @@
       el("b", { style: "min-width:160px" }, `${s.call} · ${s.band}`),
       el("button", { class: "primary small", onclick: () => { S.stationId = s.id; save(); renderStationBar(); loadQsos().then(() => runCheck(true)); } }, t("EDI (mit Prüfung)")),
       el("a", { class: "button ghost small", href: `/api/stations/${s.id}/export.adi`, download: 1 }, "ADIF"),
-      el("a", { class: "button ghost small", href: `/api/stations/${s.id}/export.csv`, download: 1 }, "CSV")));
+      el("a", { class: "button ghost small", href: `/api/stations/${s.id}/export.csv`, download: 1 }, "CSV"),
+      el("a", { class: "button ghost small", href: `/api/stations/${s.id}/export.cbr?nick=${encodeURIComponent(S.nick)}`, download: 1, title: t("Cabrillo 3.0 – für Auswerter, die kein EDI nehmen") }, "Cabrillo")));
     if (c) ex.append(el("div", { class: "row" }, el("a", { class: "button primary", href: `/api/contests/${c.id}/export.zip?nick=${encodeURIComponent(S.nick)}`, download: 1 }, t("Alle Bänder als EDI-ZIP")), el("span", { class: "muted small" }, t("nur Logs, die die Prüfung bestehen; Details in NICHT_EXPORTIERT.txt im ZIP"))));
     if (!c?.stations?.length) ex.append(el("div", { class: "muted small" }, t("Keine Stationen im gewählten Contest.")));
     const is = $("#imp-station"); is.innerHTML = "";
     S.contests.forEach((cc) => cc.stations.forEach((s) => is.append(el("option", { value: s.id }, `${cc.name} · ${s.call} ${s.band}`))));
-    const inf = await GET("/api/info"); $("#cb-count").textContent = inf.callbook_count; $("#tile-url").value = inf.tile_url || "";
+    const inf = await GET("/api/info"); $("#cb-count").textContent = inf.callbook_count; $("#tile-url").value = inf.tile_url || ""; $("#tile-cache").checked = !!inf.tile_cache;
+    if (!$("#tc-loc").value) $("#tc-loc").value = station()?.locator || S.templates?.[0]?.locator || ""; tilesStatus();
     try {
       const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider; $("#lookup-user").value = cfg.lookup_user || ""; $("#lookup-pass").placeholder = cfg.lookup_pass_set ? t("Passwort (gespeichert)") : t("Passwort");
       S.kstRooms = cfg.kst_rooms || {};
@@ -1663,6 +1691,11 @@
           lab(t("Beginn (UTC)"), el("input", { id: "c-start", type: "datetime-local", value: toLocal(c?.start_utc) })),
           lab(t("Ende (UTC)"), el("input", { id: "c-end", type: "datetime-local", value: toLocal(c?.end_utc) }))),
         lab(t("Notizen"), el("input", { id: "c-notes", value: c?.notes || "" })),
+        el("div", { class: "grid2" },
+          lab(t("Punkte je QSO"), el("select", { id: "c-pts" }, [["km", t("1 Punkt je km (IARU/DARC-UKW)")], ["fix1", t("1 Punkt je QSO")], ["fix2", t("2 Punkte je QSO")], ["fix3", t("3 Punkte je QSO")], ["fix5", t("5 Punkte je QSO")], ["fix10", t("10 Punkte je QSO")]]
+            .map(([v, l]) => el("option", { value: v, selected: scoringOf(c).points + (scoringOf(c).points === "fix" ? scoringOf(c).fixed : "") === v ? 1 : null }, l)))),
+          lab(t("Multiplikator"), el("select", { id: "c-mult" }, [["", t("keiner (Summe der Punkte)")], ["squares", t("× Großfelder")], ["doks", t("× DOKs/OVs (z. B. Köln-Aachen)")], ["squares_doks", t("× (Großfelder + DOKs)")]]
+            .map(([v, l]) => el("option", { value: v, selected: scoringOf(c).mult === v ? 1 : null }, l))))),
         lab(t("Austausch (was geloggt wird)"), el("select", { id: "c-exch" }, [["serial", t("RST + laufende Nummer (Standard, IARU/DARC-UKW)")], ["dok", t("RST + DOK/OV (z. B. Köln-Aachen-Contest)")], ["serial_dok", t("RST + Nummer + DOK/OV")]]
           .map(([v, l]) => el("option", { value: v, selected: (c?.exchange || "serial") === v ? 1 : null }, l)))),
         c ? null : el("div", { class: "stack" }, el("span", { class: "muted small" }, t("Teilnehmende Stationen (aus den globalen Stationen):")),
@@ -1672,7 +1705,7 @@
     box.querySelector("#c-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const body = { name: box.querySelector("#c-name").value, start_utc: fromLocal(box.querySelector("#c-start").value), end_utc: fromLocal(box.querySelector("#c-end").value), notes: box.querySelector("#c-notes").value,
-        exchange: box.querySelector("#c-exch").value, template_ids: $$("#c-form .c-tpl:checked").map((x) => Number(x.value)) };
+        exchange: box.querySelector("#c-exch").value, scoring: box.querySelector("#c-pts").value + (box.querySelector("#c-mult").value ? "*" + box.querySelector("#c-mult").value : ""), template_ids: $$("#c-form .c-tpl:checked").map((x) => Number(x.value)) };
       try {
         const r = c ? await api("PATCH", `/api/contests/${c.id}`, body) : await api("POST", "/api/contests", body);
         if (!c) { S.contestId = r.id; save(); }

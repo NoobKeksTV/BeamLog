@@ -112,3 +112,38 @@ def test_dok_exchange_roundtrip(tmp_path):
     db.learn_call("DK0FY", "JN49KT", source="import", dok="G01")
     assert db.lookup_call("DK0FY")["dok"] == "G01"
     assert db.suggest("DK0F")[0]["dok"] == "G01"
+
+
+def test_scoring_and_cabrillo(tmp_path):
+    """Wertung mit Multiplikator (Punkte × DOKs), Neuberechnung bei Wertungswechsel, Cabrillo-Export."""
+    from contestlogger import scoring
+    assert scoring.parse("km*squares")["mult"] == "squares" and scoring.normalize("Unsinn") == "km" and scoring.parse("fix2*doks")["fixed"] == 2
+    assert scoring.qso_points("fix3", 500, "JN59LE") == 3 and scoring.qso_points("km", 0, "JN59") == 1 and scoring.qso_points("km", 406, "JN59LE", dupe=True) == 0
+    assert scoring.total("km", 1000, 5, 2) == {"score": 1000, "multiplier": None} and scoring.total("fix1*squares_doks", 10, 5, 2)["score"] == 70
+    db = Database(tmp_path / "t.db")
+    cid = db.create_contest("KAC", None, None, scoring="fix1*doks", exchange="dok")
+    sid = db.create_station(cid, "DN2LH", "JO31AA", "432MHz", "SSB", "", {"exchange": "G01", "section": "Single", "power": "100"})
+    db.add_qso(sid, {"call": "DL8NAS", "locator": "JN59LE", "exch_rcvd": "B21", "ts_utc": "2025-05-03T14:12:00Z"})
+    db.add_qso(sid, {"call": "OL3Z", "locator": "JN79FX", "exch_rcvd": "G20", "ts_utc": "2025-05-03T14:15:00Z"})
+    db.add_qso(sid, {"call": "DG1E", "locator": "JO31LE", "exch_rcvd": "G20", "ts_utc": "2025-05-03T14:20:00Z"})
+    s = db.station_summary(sid)
+    assert s["points"] == 3 and s["multiplier"] == 2 and s["score"] == 6 and "DOKs" in s["scoring_label"]
+    db.update_contest(cid, scoring="km*squares"); db.rescore_contest(cid)
+    s = db.station_summary(sid)
+    assert s["points"] == 406 + 607 + 67 and s["multiplier"] == 3 and s["score"] == s["points"] * 3
+    assert db.contest_summary(cid)["total_score"] == s["score"] and db.scoreboard(cid)[0]["score"] == s["score"]
+    contest, station, qsos = db.get_contest(cid), db.get_station(sid), db.list_qsos(sid)
+    edi = exporters.export_edi(contest, station, qsos)
+    assert f"CToSc={s['score']}" in edi and f"CQSOP={s['points']}" in edi and "Multiplikator 3" in edi
+    cbr = exporters.export_cabrillo(contest, station, qsos)
+    assert cbr.startswith("START-OF-LOG: 3.0") and f"CLAIMED-SCORE: {s['score']}" in cbr and "CATEGORY-BAND: 432" in cbr and "GRID-LOCATOR: JO31AA" in cbr
+    assert "QSO:   432 PH 2025-05-03 1412 DN2LH         59 001 JO31AA G01 DL8NAS        59 --- JN59LE B21" in cbr and cbr.rstrip().endswith("END-OF-LOG:")
+    # strengere Log-Prüfung
+    from contestlogger import logcheck
+    db.update_station(sid, info={"exchange": "G01", "section": "Supergruppe", "resp_email": "kaputt", "power": "100 Watt", "operators": ""})
+    chk = logcheck.check_station(contest, db.get_station(sid), qsos)
+    msgs = " | ".join(w["msg"] for w in chk["warnings"])
+    assert "Wertungsgruppe" in msgs and "E-Mail" in msgs and "Leistung" in msgs
+    db.add_qso(sid, {"call": "DN2LH/P", "locator": "JO31AA", "ts_utc": "2025-05-03T14:30:00Z"})
+    chk = logcheck.check_station(contest, db.get_station(sid), db.list_qsos(sid))
+    assert any("eigenen Rufzeichen" in e["msg"] for e in chk["errors"])

@@ -28,3 +28,10 @@ Ist in der Verwaltung eine Rufzeichen-Abfrage eingerichtet (HamQTH ist kostenlos
 - Abweichender **6-stelliger Locator** im selben Großfeld: „… – Portabelbetrieb?“.
 
 Dieselbe Abfrage läuft auch beim Loggen: Kennt die eigene Datenbank ein Rufzeichen nicht, wird es online nachgeschlagen und der Locator vorbelegt.
+
+## Zusätzliche Prüfungen gegen die Abgaberegeln
+
+- Wertungsgruppe (PSect): Hinweis, wenn sie keine übliche Bezeichnung ist (Single, Multi, 6H, Low Power, QRP oder die Nummer laut Ausschreibung).
+- Multi-Operator ohne Operatorenliste, ungültige E-Mail, Leistung/Antennenhöhe/Höhe über NN mit Text statt Zahl, zu lange Kopffelder (Name, Straße, Ort, Club, Operatoren), Contest-Name über 60 Zeichen.
+- QSO mit dem eigenen Rufzeichen (Fehler), Partner im eigenen Locator-Feld mit 0 km (Hinweis).
+- Bei DOK-Contests: fehlender DOK je QSO und fehlender eigener DOK (`PExch`).

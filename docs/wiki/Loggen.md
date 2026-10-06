@@ -56,6 +56,10 @@ Alle Kürzel unter [Tastenkürzel](Tastenkuerzel.md) oder mit F1 im Programm.
 
 Die Karte unter dem Formular zeigt die eigene Station (blau), das Feld des Partners (rot) und die Richtungslinie mit Pfeil. Beschriftung: Rufzeichen, km, Grad. Kacheln kommen von OpenStreetMap (oder einem eigenen Kachelserver, Verwaltung → Karte); ohne Internet funktionieren Linien und Marker trotzdem. Mit „✈ Flugzeuge“ kommt die ADS-B-Ebene dazu, siehe [Flugzeug-Scatter](Flugzeug-Scatter.md).
 
+## Wertung
+
+Die Punkte folgen der Wertung des Contests (Verwaltung → Contest): Standard ist 1 Punkt je km (IARU Region 1 / DARC-UKW). Alternativ zählt jedes QSO einen festen Wert, und ein Multiplikator (Großfelder, DOKs oder beides) wird auf die Summe angewendet – z. B. „1 Punkt je QSO × DOKs“ für den Köln-Aachen-Contest. Die Statistikzeile zeigt die Gesamtwertung; Hover auf „Punkte“ zeigt Formel und Multiplikator. EDI (`CToSc`), Cabrillo (`CLAIMED-SCORE`), Scoreboard und Statistik verwenden dieselbe Wertung.
+
 ## Statistikzeile
 
 Direkt unter dem Formular: QSOs, Punkte, Großfelder, Ø km, QSOs in der letzten Stunde, Dupes, ODX. Aktualisiert sich live.

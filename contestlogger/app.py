@@ -17,7 +17,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __version__, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, updater
+from . import __app_name__, __copyright__, __version__, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, tiles, updater
 from .db import Database, normalize_dok
 
 STATIC = Path(__file__).parent / "static"
@@ -235,6 +235,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             "server_time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "public_url": public_url or os.environ.get("CONTESTLOGGER_URL", ""),
             "tile_url": db.get_setting("tile_url", "") or "",
+            "tile_cache": db.get_setting("tile_cache", "0") == "1",  # Kacheln über den Server (Offline-Cache) statt direkt vom Kachelserver
             "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
             "mdbtools": True,  # MDB-Import rein in Python eingebaut
             "maintainer": is_maintainer(),
@@ -249,7 +250,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.post("/api/settings", dependencies=[Depends(require_admin)])
     def set_settings(body: dict):
-        for k in ("tile_url", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros", "repo_url", "adsb_source", "adsb_local_url", "adsb_corridor_km", "adsb_antenna_m", "update_check"):
+        for k in ("tile_url", "tile_cache", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros", "repo_url", "adsb_source", "adsb_local_url", "adsb_corridor_km", "adsb_antenna_m", "update_check"):
             if k in body:
                 db.set_setting(k, json.dumps(body[k]) if k == "kst_macros" else str(body[k] or ""))
         lookup_state["client"] = None
@@ -264,7 +265,53 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 "kst_rooms": kst.ROOMS, "repo_url": db.get_setting("repo_url", "") or REPO_CALLBOOK_URL,
                 "adsb_source": db.get_setting("adsb_source", "adsb.fi") or "adsb.fi", "adsb_local_url": db.get_setting("adsb_local_url", "") or "",
                 "adsb_corridor_km": float(db.get_setting("adsb_corridor_km", "12") or 12), "adsb_antenna_m": float(db.get_setting("adsb_antenna_m", "15") or 15),
-                "update_check": db.get_setting("update_check", "1") != "0"}
+                "update_check": db.get_setting("update_check", "1") != "0", "tile_cache": db.get_setting("tile_cache", "0") == "1"}
+
+    # ------------------------------------------------------------ Karten-Kacheln (Offline-Cache)
+    tile_cache = tiles.TileCache(db.path.parent / "tiles", db.get_setting("tile_url", "") or tiles.DEFAULT_URL)
+
+    @app.get("/tiles/{z}/{x}/{y}.png")
+    async def tile(z: int, x: int, y: int):
+        """Kachel aus dem Server-Cache; fehlt sie, wird sie (bei Internet) nachgeladen und gespeichert."""
+        tile_cache.url = db.get_setting("tile_url", "") or tiles.DEFAULT_URL
+        try:
+            data = await asyncio.to_thread(tile_cache.get, z, x, y)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, f"Kachel nicht verfügbar: {e}")
+        if not data:
+            raise HTTPException(404)
+        return Response(data, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+
+    @app.get("/api/tiles/status", dependencies=[Depends(require_admin)])
+    def tiles_status():
+        return tile_cache.stats()
+
+    @app.post("/api/tiles/prefetch", dependencies=[Depends(require_admin)])
+    def tiles_prefetch(body: dict):
+        """Region vorab laden: Locator (Mitte), Radius km, Zoom von/bis – läuft im Hintergrund, Status über /api/tiles/status."""
+        loc = str(body.get("locator") or "").upper()
+        if not geo.is_valid_locator(loc):
+            raise HTTPException(400, "Locator ungültig")
+        lat, lon = geo.locator_to_latlon(loc)
+        tile_cache.url = db.get_setting("tile_url", "") or tiles.DEFAULT_URL
+        try:
+            plan = tile_cache.plan(lat, lon, float(body.get("radius_km") or 300), int(body.get("zmin") or 4), int(body.get("zmax") or 9))
+            tile_cache.prefetch(plan)
+        except (ValueError, RuntimeError) as e:
+            raise HTTPException(400, str(e))
+        db.add_audit("Karten-Kacheln vorab geladen", details=f"{loc} ±{body.get('radius_km', 300)} km, Zoom {body.get('zmin', 4)}–{body.get('zmax', 9)}: {len(plan)} Kacheln", nick="Admin", admin=True)
+        return {"total": len(plan)}
+
+    @app.post("/api/tiles/stop", dependencies=[Depends(require_admin)])
+    def tiles_stop():
+        tile_cache.stop()
+        return {"ok": True}
+
+    @app.delete("/api/tiles", dependencies=[Depends(require_admin)])
+    def tiles_clear():
+        n = tile_cache.clear()
+        db.add_audit("Kachelcache geleert", details=f"{n} Kacheln", nick="Admin", admin=True)
+        return {"deleted": n}
 
     @app.post("/api/lookup/test", dependencies=[Depends(require_admin)])
     async def lookup_test():
@@ -390,11 +437,17 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.patch("/api/contests/{cid}", dependencies=[Depends(require_admin)])
     async def update_contest(cid: int, body: dict):
-        if not db.get_contest(cid):
+        old = db.get_contest(cid)
+        if not old:
             raise HTTPException(404)
         db.update_contest(cid, **body)
+        new = db.get_contest(cid)
+        if new and new.get("scoring") != old.get("scoring"):
+            await asyncio.to_thread(db.rescore_contest, cid)  # Punkte aller QSOs nach der neuen Wertung
+            for s in db.list_stations(cid):
+                await hub.broadcast({"type": "update", "scope": "qsos", "station_id": s["id"]})
         await hub.broadcast({"type": "update", "scope": "contests"})
-        return db.get_contest(cid)
+        return new
 
     @app.delete("/api/contests/{cid}", dependencies=[Depends(require_admin)])
     async def delete_contest(cid: int):
@@ -1226,6 +1279,9 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             return PlainTextResponse(exporters.export_adif(contest, station, qsos), headers={"Content-Disposition": f"attachment; filename={base}.adi"})
         if fmt == "csv":
             return PlainTextResponse(exporters.export_csv(contest, station, qsos), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={base}.csv"})
+        if fmt in ("cbr", "log", "cabrillo"):
+            db.add_audit(f"Cabrillo exportiert (Station {sid})", details=f"{base}.cbr, {len(qsos)} QSOs", admin=is_admin(x_admin_token), nick=nick_of(nick))
+            return PlainTextResponse(exporters.export_cabrillo(contest, station, qsos), headers={"Content-Disposition": f"attachment; filename={base}.cbr"})
         raise HTTPException(404, "Unbekanntes Format")
 
     # ------------------------------------------------------------ Chat / WS
