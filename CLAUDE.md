@@ -9,3 +9,7 @@
 - Immer auf `main` pushen (zusätzlich zum Feature-Branch). Release-Build über `workflow_dispatch` des Workflows „Portable Builds“.
 - Vor dem Push: `python -m pytest -q` muss grün sein; Oberflächenänderungen mit Playwright gegen einen lokalen Server prüfen
   (Fake-KST-Server: `tests/fake_kst.py`, Umgebungsvariablen `CONTESTLOGGER_KST_HOST/PORT`).
+- **Git-Commits immer unter dem Account des Auftraggebers:** Autor `NoobKeksTV <zockerboyshd@outlook.de>`
+  (`git config user.name "NoobKeksTV" && git config user.email "zockerboyshd@outlook.de"`), Signierung aus
+  (`git config commit.gpgsign false`), **keine** „Co-Authored-By“- oder „Claude-Session“-Zeilen in Commit-Nachrichten,
+  keine Signaturschlüssel vorgeben oder erfragen. Direkt auf `main` arbeiten (kein Claude-Feature-Branch mehr).

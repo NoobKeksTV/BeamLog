@@ -199,6 +199,8 @@
         <div class="card-head"><h3>Stationen im Contest <span id="admin-contest-name" class="muted"></span></h3><div class="row"><select id="tpl-add-sel" class="small"></select><button id="btn-add-template" class="primary small" title="Globale Station in diesen Contest aufnehmen">+ aufnehmen</button><button id="btn-new-station" class="ghost small" title="Station nur für diesen Contest anlegen">+ einmalig</button></div></div>
         <p class="muted small">Die Stationen dieses Contests mit eigenem Log und eigener laufender Nummer. Operatoren schalten die Station mit dem Passwort frei. Die Stations-ID (für CAT-Bridge und Operator-Fenster) steht in der Tabelle.</p>
         <div class="table-wrap"><table id="admin-stations" class="compact fixed"><tbody></tbody></table></div>
+      </div>
+      <div class="card">
         <h3>Export / Abgabe <span id="admin-export-name" class="muted"></span></h3>
         <p class="muted small">EDI (REG1TEST) je Station/Band für die Abgabe – vor dem Export läuft die Log-Prüfung. Das ZIP enthält die EDI-Dateien aller geprüften Stationen des Contests.</p>
         <div id="admin-export" class="stack"></div>
@@ -211,6 +213,8 @@
           <button class="primary">Ordner importieren</button>
           <div id="folder-result" class="result hidden"></div>
         </form>
+      </div>
+      <div class="card">
         <h3>Ergebnisliste importieren (DARC / IARU / UKW-Contest-Club)</h3>
         <p class="muted small">Die veröffentlichten Ergebnislisten enthalten Rufzeichen und Locator aller Teilnehmer – die größte frei verfügbare Quelle für die Stationsdatenbank. Datei (HTML, PDF, TXT, CSV), eingefügter Text oder Internetadresse der Ergebnisseite; vor der Übernahme gibt es eine Vorschau.</p>
         <form id="results-form" class="stack">
@@ -221,6 +225,8 @@
           <div class="table-wrap hidden" id="res-wrap" style="max-height:260px"><table id="res-table" class="compact"><tbody></tbody></table></div>
           <div class="row hidden" id="res-actions"><button type="button" id="btn-res-commit" class="primary">Ausgewählte übernehmen</button><label class="row small"><input type="checkbox" id="res-only-new" checked> nur neue / geänderte</label></div>
         </form>
+      </div>
+      <div class="card">
         <h3>DARC-Contest-Hub: Ergebnisse direkt laden</h3>
         <p class="muted small">Lädt die offiziellen Ergebnislisten (result.csv) vom DARC-Contest-Hub <code>dxhf2.darc.de</code> – alle Teilnehmer mit Locator, dazu die ODX-Gegenstationen. Pro Contest 500–900 Rufzeichen. Braucht Internet auf dem Server.</p>
         <div class="row">
@@ -231,6 +237,8 @@
         </div>
         <div class="table-wrap hidden" id="darc-wrap" style="max-height:220px"><table id="darc-table" class="compact"><tbody></tbody></table></div>
         <div class="row hidden" id="darc-actions"><button type="button" id="btn-darc-import" class="primary">Ausgewählte importieren</button></div>
+      </div>
+      <div class="card">
         <h3>Einzelne Datei importieren</h3>
         <p class="muted small">WinContest (DD3KU) <code>.txt</code>/<code>.EXP</code>/<code>.mdb</code>, EDI/REG1TEST, ADIF oder Call-Listen (<code>Call;Locator;Name</code>). Rufzeichen + Locator landen immer im Call-Buch.</p>
         <form id="import-form" class="stack">
@@ -267,10 +275,14 @@
           <button class="ghost small">Speichern</button>
         </form>
         <p class="muted small">Ablauf: Hier „Export im Repo-Format“ herunterladen und als <code>contestlogger/seed/stationsdatenbank.csv</code> ins Repo einchecken; andere Installationen holen sie mit „Nach neuen suchen“.</p>
+      </div>
+      <div class="card">
         <h3>Backups auf dem Server</h3>
         <p class="muted small" id="backup-info">Der Server sichert die Datenbank automatisch (nur wenn sich etwas geändert hat) in den Ordner <code>backup/</code> neben der Datenbank; beim Beenden zusätzlich. Die Datenbank selbst läuft im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt sie nicht.</p>
         <p><button id="btn-backup" class="ghost">Jetzt sichern</button></p>
         <div class="table-wrap" style="max-height:180px"><table id="backup-list" class="compact"><tbody></tbody></table></div>
+      </div>
+      <div class="card">
         <h3>Updates</h3>
         <p class="muted small">Der Server prüft stündlich die GitHub-Releases. Die portable Version kann sich selbst aktualisieren (Dateien werden ersetzt, <code>data/</code> bleibt, danach Neustart); eine Quellcode-Installation aktualisiert man mit <code>git pull</code>.</p>
         <div class="row">
@@ -281,10 +293,14 @@
           <label class="row small"><input type="checkbox" id="upd-auto" checked> automatisch prüfen</label>
         </div>
         <div id="upd-result" class="muted small"></div>
+      </div>
+      <div class="card">
         <h3>Aktionsprotokoll</h3>
         <p class="muted small">Jede Änderung (QSOs, Stationen, Contests, Importe, Einstellungen, KST, Backups) wird mit Zeit, Nutzer und Admin-Kennzeichen festgehalten – auch auf der Server-Konsole.</p>
         <div class="row"><input id="audit-search" placeholder="Suchen (Aktion, Nutzer, Details) …" class="small" style="flex:1;min-width:160px"><button type="button" id="btn-audit-refresh" class="ghost small">Aktualisieren</button><button type="button" id="btn-audit-dl" class="ghost small">Als Textdatei</button></div>
         <div class="table-wrap" style="max-height:300px"><table id="audit-table" class="compact"><tbody></tbody></table></div>
+      </div>
+      <div class="card">
         <h3>Externe Rufzeichen-Abfrage</h3>
         <p class="muted small">Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH oder QRZ.com nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. <b>HamQTH ist kostenlos, die Abfrage-Schnittstelle verlangt aber zwingend einen HamQTH-Account</b> (auf hamqth.com registrieren, dann hier Benutzername und Passwort eintragen und „Testen“ drücken). QRZ.com braucht ein XML-Abo. Ohne Internet oder Zugangsdaten bleibt alles lokal.</p>
         <form id="lookup-form" class="stack">
@@ -297,11 +313,17 @@
           </div>
           <div id="lookup-result" class="muted small"></div>
         </form>
+      </div>
+      <div class="card">
         <h3>ON4KST-Chat</h3>
         <p class="muted small">Der KST-Chat (Telnet, <code>www.on4kst.info:23000</code>) wird <b>je Station</b> verbunden: Zugangsdaten, Raum und Autostart stehen bei der Station (Stationen → ✎). Jede Station hat so ihren eigenen Chat; die Nutzerliste wird alle 10 Minuten geholt und Nutzer mit Locator wandern automatisch in die Stationsdatenbank. Das Passwort geht im Klartext über das Netz – ein eigenes KST-Passwort verwenden.</p>
+      </div>
+      <div class="card">
         <h3>Karte</h3>
         <form id="tile-form" class="row"><input id="tile-url" placeholder="https://tile.openstreetmap.org/{z}/{x}/{y}.png" style="flex:1;min-width:260px"><button class="ghost">Speichern</button></form>
         <p class="muted small">Kachel-URL für die Karte. Standard: OpenStreetMap (braucht Internet). Für reinen Offline-Betrieb einen lokalen Kachel-Server eintragen (z. B. <code>http://192.168.1.10:8080/tile/{z}/{x}/{y}.png</code>) – Linien und Marker funktionieren auch ohne Kacheln.</p>
+      </div>
+      <div class="card">
         <h3>Flugzeug-Scatter (ADS-B)</h3>
         <p class="muted small">Zeigt auf der Karte Flugzeuge zwischen dir und dem Partner (Knopf „✈ Flugzeuge“ an der Karte), wie AirScout: Zone gemeinsamer Sichtbarkeit auf dem Pfad und Flugzeuge im Korridor, die beide Stationen über dem Funkhorizont sehen. Quelle: <b>adsb.fi</b> (frei, nicht-kommerziell, max. 1 Abfrage/s, Daten © adsb.fi) oder ein eigener ADS-B-Empfänger (dump1090/readsb/tar1090: <code>http://&lt;host&gt;:8080/data/aircraft.json</code>). Ohne Geländemodell – Berge im Pfad werden nicht berücksichtigt.</p>
         <form id="adsb-form" class="stack">
@@ -313,9 +335,13 @@
             <button class="ghost">Speichern</button>
           </div>
         </form>
+      </div>
+      <div class="card">
         <h3>Sprachen</h3>
         <p class="muted small">Eigene Übersetzung: Vorlage herunterladen, Werte übersetzen, als <code>lang/&lt;code&gt;.json</code> neben der Datenbank ablegen (z. B. <code>data/lang/nl.json</code>) und den Server neu starten. Die Sprache erscheint dann in der Auswahl.</p>
         <p><a href="/api/lang/template.json" class="button ghost" download>Übersetzungsvorlage herunterladen</a></p>
+      </div>
+      <div class="card">
         <h3>Admin-Passwort</h3>
         <form id="admin-pw-form" class="row"><input id="admin-pw-new" type="password" placeholder="Neues Passwort" required><button class="ghost">Ändern</button></form>
         <p><button id="btn-admin-logout" class="ghost small">Admin abmelden</button></p>
