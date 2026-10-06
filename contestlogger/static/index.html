@@ -196,6 +196,24 @@
         <div class="table-wrap"><table id="admin-contests" class="compact fixed"><tbody></tbody></table></div>
       </div>
       <div class="card">
+        <h3>Stationsdatenbank (Call-Buch)</h3>
+        <p class="muted"><span id="cb-count">0</span> Rufzeichen mit Locator bekannt. Wächst automatisch mit jedem geloggten QSO und jedem Import; beim ersten Start wird die mitgelieferte Startdatenbank geladen.</p>
+        <input id="cb-search" placeholder="Suchen (Call, Locator, Name) …" class="small">
+        <div class="table-wrap" style="max-height:260px"><table id="cb-table" class="compact"><tbody></tbody></table></div>
+        <form id="cb-form" class="cb-form">
+          <input id="cb-call" placeholder="Rufzeichen" required><input id="cb-loc" placeholder="Locator" required><input id="cb-name" placeholder="Name"><input id="cb-dok" placeholder="DOK" maxlength="8"><button class="ghost">Speichern</button>
+        </form>
+        <div class="row cb-actions">
+          <a href="/api/callbook/export.csv" class="button ghost" download>Stationsdatenbank exportieren (CSV)</a>
+          <a href="/api/callbook/export_seed.csv" class="button ghost maint-only" download title="Call;Locator;Zuletzt;DOK – zum Einchecken als contestlogger/seed/stationsdatenbank.csv im Repo">Export im Repo-Format</a>
+        </div>
+        <p class="muted small maint-hide">Die Stationsdatenbank wird zentral gepflegt: „Nach neuen suchen (Repo)“ unter <b>Updates</b> holt die aktuelle Liste. Eigene Funde (neue Rufzeichen, Locator, DOKs) helfen allen – einfach „Stationsdatenbank exportieren (CSV)“ und die Datei an den Betreuer schicken, er pflegt sie in die Liste im Repo ein.</p>
+        <form id="cb-list-form" class="row maint-only">
+          <span class="tag">Betreuer</span><input type="file" id="cb-list-file" accept=".csv,.txt" required><button class="ghost small">Stationsliste einpflegen</button><span id="cb-list-result" class="muted small"></span>
+        </form>
+        <p class="muted small maint-only">Ablauf: „Export im Repo-Format“ herunterladen und als <code>contestlogger/seed/stationsdatenbank.csv</code> ins Repo einchecken; alle Installationen holen sie mit „Nach neuen suchen (Repo)“.</p>
+      </div>
+      <div class="card">
         <div class="card-head"><h3>Stationen im Contest <span id="admin-contest-name" class="muted"></span></h3><div class="row"><select id="tpl-add-sel" class="small"></select><button id="btn-add-template" class="primary small" title="Globale Station in diesen Contest aufnehmen">+ aufnehmen</button><button id="btn-new-station" class="ghost small" title="Station nur für diesen Contest anlegen">+ einmalig</button></div></div>
         <p class="muted small">Die Stationen dieses Contests mit eigenem Log und eigener laufender Nummer. Operatoren schalten die Station mit dem Passwort frei. Die Stations-ID (für CAT-Bridge und Operator-Fenster) steht in der Tabelle.</p>
         <div class="table-wrap"><table id="admin-stations" class="compact fixed"><tbody></tbody></table></div>
@@ -257,30 +275,6 @@
         </form>
       </div>
       <div class="card">
-        <h3>Stationsdatenbank (Call-Buch)</h3>
-        <p class="muted"><span id="cb-count">0</span> Rufzeichen mit Locator bekannt. Wächst automatisch mit jedem geloggten QSO und jedem Import; beim ersten Start wird die mitgelieferte Startdatenbank geladen.</p>
-        <input id="cb-search" placeholder="Suchen (Call, Locator, Name) …" class="small">
-        <div class="table-wrap" style="max-height:260px"><table id="cb-table" class="compact"><tbody></tbody></table></div>
-        <form id="cb-form" class="row">
-          <input id="cb-call" placeholder="Rufzeichen" required><input id="cb-loc" placeholder="Locator" required><input id="cb-name" placeholder="Name"><input id="cb-dok" placeholder="DOK" maxlength="8" style="max-width:90px"><button class="ghost">Speichern</button>
-        </form>
-        <div class="row">
-          <a href="/api/callbook/export.csv" class="button primary" download>Stationsdatenbank exportieren (CSV)</a>
-          <a href="/api/callbook/export_seed.csv" class="button ghost" download title="Call;Locator;Zuletzt – zum Einchecken als contestlogger/seed/stationsdatenbank.csv im Repo">Export im Repo-Format</a>
-          <button type="button" id="btn-cb-sync" class="ghost" title="Stationsdatenbank aus dem GitHub-Repo laden und neue Einträge übernehmen">Nach neuen suchen (Repo)</button>
-          <span id="cb-sync-result" class="muted small"></span>
-        </div>
-        <p class="muted small maint-hide">Die Stationsdatenbank wird zentral gepflegt: „Nach neuen suchen (Repo)“ holt die aktuelle Liste. Eigene Funde (neue Rufzeichen, Locator, DOKs) helfen allen – einfach „Stationsdatenbank exportieren (CSV)“ und die Datei an den Betreuer schicken, er pflegt sie in die Liste im Repo ein.</p>
-        <form id="cb-list-form" class="row maint-only">
-          <span class="tag">Betreuer</span><input type="file" id="cb-list-file" accept=".csv,.txt" required><button class="ghost small">Stationsliste einpflegen</button><span id="cb-list-result" class="muted small"></span>
-        </form>
-        <form id="repo-form" class="row">
-          <input id="repo-url" placeholder="Repo-Datei (GitHub-API-URL oder Raw-URL)" style="flex:1;min-width:260px">
-          <button class="ghost small">Speichern</button>
-        </form>
-        <p class="muted small">Ablauf: Hier „Export im Repo-Format“ herunterladen und als <code>contestlogger/seed/stationsdatenbank.csv</code> ins Repo einchecken; andere Installationen holen sie mit „Nach neuen suchen“.</p>
-      </div>
-      <div class="card">
         <h3>Backups auf dem Server</h3>
         <p class="muted small" id="backup-info">Der Server sichert die Datenbank automatisch (nur wenn sich etwas geändert hat) in den Ordner <code>backup/</code> neben der Datenbank; beim Beenden zusätzlich. Die Datenbank selbst läuft im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt sie nicht.</p>
         <p><button id="btn-backup" class="ghost">Jetzt sichern</button></p>
@@ -297,6 +291,11 @@
           <label class="row small"><input type="checkbox" id="upd-auto" checked> automatisch prüfen</label>
         </div>
         <div id="upd-result" class="muted small"></div>
+        <div class="row" style="margin-top:8px">
+          <b class="small">Stationsdatenbank</b>
+          <button type="button" id="btn-cb-sync" class="ghost" title="Stationsdatenbank aus dem GitHub-Repo laden und neue Einträge übernehmen">Nach neuen suchen (Repo)</button>
+          <span id="cb-sync-result" class="muted small"></span>
+        </div>
       </div>
       <div class="card">
         <h3>Aktionsprotokoll</h3>
@@ -317,10 +316,6 @@
           </div>
           <div id="lookup-result" class="muted small"></div>
         </form>
-      </div>
-      <div class="card">
-        <h3>ON4KST-Chat</h3>
-        <p class="muted small">Der KST-Chat (Telnet, <code>www.on4kst.info:23000</code>) wird <b>je Station</b> verbunden: Zugangsdaten, Raum und Autostart stehen bei der Station (Stationen → ✎). Jede Station hat so ihren eigenen Chat; die Nutzerliste wird alle 10 Minuten geholt und Nutzer mit Locator wandern automatisch in die Stationsdatenbank. Das Passwort geht im Klartext über das Netz – ein eigenes KST-Passwort verwenden.</p>
       </div>
       <div class="card">
         <h3>Karte</h3>

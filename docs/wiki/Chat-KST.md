@@ -53,3 +53,7 @@ Spricht gezielt KST-Nutzer im Umkreis an, die in diesem Log noch fehlen:
 3. Text wählen oder eingeben; eigene Texte lassen sich speichern (für alle Operatoren). Platzhalter wie bei den Textbausteinen.
 4. „An ausgewählte senden“ schickt jedem Empfänger eine eigene `/CQ`-Nachricht mit 2 s Abstand; die Sendeliste zeigt, wer schon dran war.
 5. „Nächste →“ dreht die Auswahl auf die nächsten noch nicht angeschriebenen Kandidaten.
+
+## Tagestrenner
+
+In allen drei Verläufen (Chat, KST, DM) steht vor der ersten Nachricht eines neuen Tages eine Trennzeile mit dem Datum („Heute“, „Gestern“, sonst Wochentag und Datum, UTC) – wie in Messengern.

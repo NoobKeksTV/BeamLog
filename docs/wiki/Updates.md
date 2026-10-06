@@ -8,6 +8,10 @@ Der Server prüft stündlich die GitHub-Releases (Verwaltung → Updates → „
 
 Das Repo ist öffentlich, ein Token ist nicht nötig. (Nur für ein privates Fork: `GITHUB_TOKEN` in `contestlogger.env` setzen.)
 
+## Stationsdatenbank aktualisieren
+
+„Nach neuen suchen (Repo)“ in derselben Karte holt die zentral gepflegte Stationsdatenbank aus dem Repo und übernimmt neue Rufzeichen, geänderte Locator und DOKs. Siehe [Stationsdatenbank](Stationsdatenbank.md).
+
 ## Jetzt aktualisieren (portable Version)
 
 „Jetzt aktualisieren“ lädt das ZIP für die eigene Plattform, entpackt es, ersetzt die Programmdateien (der Ordner `data/` bleibt unangetastet), schreibt vorher eine Sicherung und startet den Server neu. Alle Browser verbinden sich automatisch wieder.

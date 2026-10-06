@@ -25,7 +25,7 @@
   .dupe.hidden { display:none; }
   /* Reihenfolge wie im Logger: Rufzeichen · RST geg. · Nr geg. · RST erh. · Nr erh. · Locator · km/° */
   .tiles { display:grid; grid-template-columns: 2.2fr 1fr 1.2fr 1fr 1.2fr 1.5fr 1.6fr; gap:10px; }
-  .tile { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; min-width:0; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; min-width:0; text-align:center; }
   .tile span { display:block; color:var(--muted); font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
   .tile b { display:block; font:700 clamp(26px, 3.8vw, 58px)/1.15 var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tile.call b { color:var(--accent); }
@@ -58,8 +58,11 @@
   .pbtn.active { color:var(--warn); border-color:var(--warn); }
   .plist { display:flex; flex-wrap:wrap; gap:4px 10px; font:13px var(--mono); color:var(--muted); padding:4px 4px 0; min-height:0; }
   .plist:empty { display:none; }
+  .plist .pl { cursor:pointer; } .plist .pl:hover { text-decoration:underline; }
   .plist .hot { color:var(--warn); font-weight:700; }
-  .map-label { background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:2px 6px; font-family:var(--mono); font-size:13px; white-space:nowrap; }
+  .map-label { background:rgba(18,22,28,.88); color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:6px; padding:3px 7px; font-family:var(--mono); font-size:13px; white-space:nowrap; line-height:1.2; width:auto !important; height:auto !important; }
+  .leaflet-div-icon { background:transparent; border:none; }
+  .arrow-icon { background:transparent; border:none; filter:drop-shadow(0 0 3px rgba(0,0,0,.8)); }
   .list { min-height:0; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:auto; }
   table { width:100%; border-collapse:collapse; font:16px var(--mono); }
   th, td { padding:5px 9px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap; }
@@ -167,8 +170,9 @@
     L.polyline(pts, { color: "#ff5c6c", weight: 3, opacity: .9 }).addTo(m.layer);
     const p1 = pts[pts.length - 2], p2 = pts[pts.length - 1];
     const ang = Math.atan2((p2[1] - p1[1]) * Math.cos(p2[0] * Math.PI / 180), p2[0] - p1[0]) * 180 / Math.PI;
-    L.marker(b, { icon: L.divIcon({ className: "arrow-icon", html: `<div style="transform:rotate(${ang - 90}deg)">➤</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }), interactive: false }).addTo(m.layer);
-    if (label) L.marker(b, { icon: L.divIcon({ className: "map-label", html: label, iconAnchor: [-10, -10] }), interactive: false }).addTo(m.layer);
+    // Pfeilspitze: Spitze liegt genau auf dem Partnerpunkt, Körper zeigt entlang der Linie zurück
+    L.marker(b, { icon: L.divIcon({ className: "arrow-icon", html: `<svg viewBox="0 0 32 32" width="32" height="32" style="transform:rotate(${ang}deg)"><path d="M16 16 L25 31 L16 25 L7 31 Z" fill="#ff5c6c" stroke="#000" stroke-width="1"/></svg>`, iconSize: [32, 32], iconAnchor: [16, 16] }), interactive: false }).addTo(m.layer);
+    if (label) L.marker(b, { icon: L.divIcon({ className: "map-label", html: label, iconAnchor: [-18, 11] }), interactive: false }).addTo(m.layer);
     m.map.fitBounds(L.latLngBounds(pts), { padding: [30, 30], maxZoom: 9 });
     $("#map-info").textContent = label || loc;
   }
@@ -261,10 +265,12 @@
         `FL${p.fl} = ${km1(p.alt_m)} km · ${p.gs_kmh} km/h · Kurs ${Math.round(p.track)}°`,
         `Mindesthöhe ${km1(p.req_m)} km → <b style="color:${p.margin_m > 0 ? "#3ddc84" : "#ff6b6b"}">${p.margin_m > 0 ? "+" : ""}${km1(p.margin_m)} km</b> Reserve · ${Math.abs(p.xt_km)} km vom Pfad · Elevation ${p.elev1}° / ${p.elev2}°`,
         p.cross && p.cross.on_path ? `<b>kreuzt in ${p.eta_min != null ? Math.round(p.eta_min) : "> 60"} min</b> um ${p.cross.utc} UTC bei km ${p.cross.km}${p.cross.in_zone ? " ✓ Zone" : ""}${p.cross.margin_m != null ? ` · dort ${p.cross.margin_m > 0 ? "+" : ""}${km1(p.cross.margin_m)} km` : ""}` : ""].filter(Boolean).join("<br>");
-      for (const p of r.planes) { const st = p.status || "far"; const big = st === "hot" || p.size === "heavy"; L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${COL[st]};font-size:${big ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) }).bindTooltip(tip(p), { className: "plane-tip", direction: "top", offset: [0, -10] }).addTo(m.planes); }
+      const markers = {};
+      for (const p of r.planes) { const st = p.status || "far"; const big = st === "hot" || p.size === "heavy"; markers[p.hex] = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${COL[st]};font-size:${big ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) }).bindTooltip(tip(p), { className: "plane-tip", direction: "top", offset: [0, -10] }).addTo(m.planes); }
       const box = $("#plane-list"); box.innerHTML = "";
-      for (const p of r.planes.filter((p) => p.status === "hot").slice(0, 5)) { const s = document.createElement("span"); s.className = "hot"; s.textContent = `✈ ${p.flight || p.hex} ${p.type} FL${p.fl} · ${Math.abs(p.xt_km)} km vom Pfad · +${km1(p.margin_m)} km`; s.title = tip(p).replace(/<[^>]+>/g, ""); box.append(s); }
-      for (const p of r.planes.filter((p) => p.status === "soon").slice(0, 3)) { const s = document.createElement("span"); s.className = "soon"; s.textContent = `${p.flight || p.hex} kreuzt in ${Math.round(p.eta_min)} min bei km ${p.cross.km} (${p.cross.utc.slice(0, 5)} UTC)`; s.title = tip(p).replace(/<[^>]+>/g, ""); box.append(s); }
+      const goTo = (p) => { m.map.setView([p.lat, p.lon], Math.max(m.map.getZoom(), 8)); markers[p.hex]?.openTooltip(); };
+      for (const p of r.planes.filter((p) => p.status === "hot").slice(0, 5)) { const s = document.createElement("span"); s.className = "hot pl"; s.textContent = `✈ ${p.flight || p.hex} ${p.type} FL${p.fl} · ${Math.abs(p.xt_km)} km vom Pfad · +${km1(p.margin_m)} km`; s.title = tip(p).replace(/<[^>]+>/g, ""); s.onclick = () => goTo(p); box.append(s); }
+      for (const p of r.planes.filter((p) => p.status === "soon").slice(0, 3)) { const s = document.createElement("span"); s.className = "soon pl"; s.textContent = `${p.flight || p.hex} kreuzt in ${Math.round(p.eta_min)} min bei km ${p.cross.km} (${p.cross.utc.slice(0, 5)} UTC)`; s.title = tip(p).replace(/<[^>]+>/g, ""); s.onclick = () => goTo(p); box.append(s); }
     } catch (e) { $("#plane-list").textContent = "✈ " + e.message; }
     planeTimer = setTimeout(refreshPlanes, 5000);
   }

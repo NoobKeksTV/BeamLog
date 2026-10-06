@@ -542,5 +542,16 @@
  "{total} Einträge, {new} neu – jetzt {count} Rufzeichen": "{total} entries, {new} new – now {count} callsigns",
  "Betreuer": "Maintainer",
  "Stationsliste einpflegen": "Merge station list",
- "Die Stationsdatenbank wird zentral gepflegt: „Nach neuen suchen (Repo)“ holt die aktuelle Liste. Eigene Funde (neue Rufzeichen, Locator, DOKs) helfen allen – einfach „Stationsdatenbank exportieren (CSV)“ und die Datei an den Betreuer schicken, er pflegt sie in die Liste im Repo ein.": "The station database is maintained centrally: “Check for new (repo)” fetches the current list. Your own finds (new callsigns, locators, DOKs) help everyone – just “Export station database (CSV)” and send the file to the maintainer, who merges it into the list in the repo."
+ "Die Stationsdatenbank wird zentral gepflegt: „Nach neuen suchen (Repo)“ holt die aktuelle Liste. Eigene Funde (neue Rufzeichen, Locator, DOKs) helfen allen – einfach „Stationsdatenbank exportieren (CSV)“ und die Datei an den Betreuer schicken, er pflegt sie in die Liste im Repo ein.": "The station database is maintained centrally: “Check for new (repo)” fetches the current list. Your own finds (new callsigns, locators, DOKs) help everyone – just “Export station database (CSV)” and send the file to the maintainer, who merges it into the list in the repo.",
+ "Heute": "Today",
+ "Gestern": "Yesterday",
+ "So": "Sun",
+ "Mo": "Mon",
+ "Di": "Tue",
+ "Mi": "Wed",
+ "Do": "Thu",
+ "Fr": "Fri",
+ "Sa": "Sat",
+ "Klicken: Karte dorthin": "Click: map jumps there",
+ "Die Stationsdatenbank wird zentral gepflegt: „Nach neuen suchen (Repo)“ unter Updates holt die aktuelle Liste. Eigene Funde (neue Rufzeichen, Locator, DOKs) helfen allen – einfach „Stationsdatenbank exportieren (CSV)“ und die Datei an den Betreuer schicken, er pflegt sie in die Liste im Repo ein.": "The station database is maintained centrally: “Check for new (repo)” under Updates fetches the current list. Your own finds (new callsigns, locators, DOKs) help everyone – just “Export station database (CSV)” and send the file to the maintainer, who merges it into the list in the repo."
 }

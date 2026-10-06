@@ -123,6 +123,18 @@
   const fromTpl = (id) => { const f = document.getElementById(id).content.cloneNode(true); const d = document.createElement("div"); d.append(f); translateDom(d); const out = document.createDocumentFragment(); while (d.firstChild) out.append(d.firstChild); return out; };
   const fmtTime = (ts) => ts ? ts.slice(11, 16) : "";
   const fmtDate = (ts) => ts ? `${ts.slice(8, 10)}.${ts.slice(5, 7)}.${ts.slice(0, 4)}` : "";
+  const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  function dayLabel(ts) {  // „Heute“, „Gestern“ oder „Sa, 03.05.2025“ (UTC-Datum)
+    if (!ts) return ""; const d = ts.slice(0, 10); const now = new Date(); const today = now.toISOString().slice(0, 10);
+    const y = new Date(now.getTime() - 864e5).toISOString().slice(0, 10);
+    if (d === today) return t("Heute"); if (d === y) return t("Gestern");
+    return `${t(WEEKDAYS[new Date(d + "T00:00:00Z").getUTCDay()])}, ${fmtDate(ts)}`;
+  }
+  // Trenner einfügen, wenn der Tag der Nachricht vom zuletzt gezeigten abweicht (Zustand am Container)
+  function daySeparator(log, ts) {
+    const d = (ts || "").slice(0, 10); if (!d || log.dataset.lastDay === d) return;
+    log.dataset.lastDay = d; log.append(el("div", { class: "day" }, el("span", {}, dayLabel(ts))));
+  }
   const pad3 = (n) => String(n ?? "").padStart(3, "0");
   const station = () => S.contests.flatMap((c) => c.stations).find((s) => s.id === S.stationId);
   const contest = () => S.contests.find((c) => c.id === S.contestId);
@@ -868,8 +880,9 @@
     // Pfeilspitze in Linienrichtung
     const p1 = pts[pts.length - 2], p2 = pts[pts.length - 1];
     const ang = Math.atan2((p2[1] - p1[1]) * Math.cos(p2[0] * Math.PI / 180), p2[0] - p1[0]) * 180 / Math.PI;
-    L.marker(b, { icon: L.divIcon({ className: "arrow-icon", html: `<div style="transform:rotate(${ang - 90}deg)">➤</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }), interactive: false }).addTo(m.layer);
-    if (label) L.marker(b, { icon: L.divIcon({ className: "map-label", html: label, iconAnchor: [-10, -10] }), interactive: false }).addTo(m.layer);
+    // Pfeilspitze: Spitze liegt genau auf dem Partnerpunkt, Körper zeigt entlang der Linie zurück
+    L.marker(b, { icon: L.divIcon({ className: "arrow-icon", html: `<svg viewBox="0 0 32 32" width="32" height="32" style="transform:rotate(${ang}deg)"><path d="M16 16 L25 31 L16 25 L7 31 Z" fill="#ff5c6c" stroke="#000" stroke-width="1"/></svg>`, iconSize: [32, 32], iconAnchor: [16, 16] }), interactive: false }).addTo(m.layer);
+    if (label) L.marker(b, { icon: L.divIcon({ className: "map-label", html: label, iconAnchor: [-18, 11] }), interactive: false }).addTo(m.layer);
     m.map.fitBounds(L.latLngBounds(pts), { padding: [30, 30], maxZoom: 9 });
   }
   function updateLogMap() {
@@ -908,10 +921,10 @@
       : `${t("kreuzt die Verlängerung des Pfads")} (km ${p.cross.km}) ${t("in")} ${p.eta_min != null ? Math.round(p.eta_min) : "> 60"} min`);
     return lines.join("<br>");
   }
-  function planeChip(p) {
+  function planeChip(p, onclick) {
     const txt = p.status === "soon" && p.cross ? `${p.flight || p.hex} ${p.type} FL${p.fl} · ${t("kreuzt in")} ${Math.round(p.eta_min)} min ${t("bei km")} ${p.cross.km} (${p.cross.utc.slice(0, 5)}) · +${km1(p.cross.margin_m || 0)} km`
       : `${p.flight || p.hex} ${p.type} FL${p.fl} · ${Math.abs(p.xt_km)} km ${t("vom Pfad")} · km ${p.at_km} · ${p.margin_m > 0 ? "+" : ""}${km1(p.margin_m)} km`;
-    const s = el("span", { class: `pl ${p.status}` }, (p.size === "heavy" ? "✈✈ " : "✈ ") + txt); s.innerHTML_title = 1; s.title = planeTitle(p).replace(/<[^>]+>/g, ""); return s;
+    const s = el("span", { class: `pl ${p.status}`, onclick, title: planeTitle(p).replace(/<[^>]+>/g, "") + "\n" + t("Klicken: Karte dorthin") }, (p.size === "heavy" ? "✈✈ " : "✈ ") + txt); return s;
   }
   function planeProfile(r) {
     // Seitenansicht: x = km entlang des Pfads, y = Höhe; Kurve = Mindesthöhe (Funkhorizont beider Stationen), Punkte = Flugzeuge
@@ -931,7 +944,10 @@
     on: localStorage.getItem("cl.planes") === "1", timer: null, last: "", busy: false, profile: localStorage.getItem("cl.planes.profile") !== "0",
     layer() { const m = makeMap("map-log"); if (!m) return null; if (!m.planes) { m.planes = L.layerGroup().addTo(m.map); m.zone = L.layerGroup().addTo(m.map); } return m; },
     toggle() { this.on = !this.on; localStorage.setItem("cl.planes", this.on ? "1" : "0"); $("#btn-planes").classList.toggle("active", this.on); $("#plane-list").classList.toggle("hidden", !this.on);
-      if (this.on) this.refresh(true); else { this.stop(); const m = this.layer(); if (m) { m.planes.clearLayers(); m.zone.clearLayers(); } } },
+      this.size(); if (this.on) this.refresh(true); else { this.stop(); const m = this.layer(); if (m) { m.planes.clearLayers(); m.zone.clearLayers(); } } },
+    size() { $(".map-card").classList.toggle("planes-on", this.on); const m = Maps["map-log"]; if (m) setTimeout(() => m.map.invalidateSize(), 250); },
+    markers: {},
+    goTo(p) { const m = this.layer(); if (!m) return; m.map.setView([p.lat, p.lon], Math.max(m.map.getZoom(), 8)); this.markers[p.hex]?.openTooltip(); },
     stop() { clearTimeout(this.timer); this.timer = null; },
     async refresh(now) {
       this.stop(); if (!this.on) return;
@@ -947,11 +963,11 @@
     },
     draw(r) {
       const m = this.layer(); if (!m) return;
-      m.planes.clearLayers(); m.zone.clearLayers();
+      m.planes.clearLayers(); m.zone.clearLayers(); this.markers = {};
       if (r.zone) L.polyline([r.zone.from, r.zone.to], { color: "#3ddc84", weight: 9, opacity: .45 }).bindTooltip(t("Zone gemeinsamer Sichtbarkeit (Reiseflughöhe): km {a}–{b} des Pfads", { a: r.zone.from_km, b: r.zone.to_km })).addTo(m.zone);
       for (const p of r.planes) {
         const st = p.status || (p.visible_both ? "visible" : "far"); const big = st === "hot" || p.size === "heavy";
-        L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${PLANE_COL[st]};font-size:${big ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }), interactive: true })
+        this.markers[p.hex] = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${PLANE_COL[st]};font-size:${big ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }), interactive: true })
           .bindTooltip(planeTitle(p), { className: "plane-tip", direction: "top", offset: [0, -10] }).addTo(m.planes);
         if (p.cross && p.cross.on_path && (st === "soon" || st === "hot")) {  // vorhergesagter Kreuzungspunkt
           const frac = Math.max(0, Math.min(1, p.cross.km / r.dist_km)); const pt = pointAlong(r.path_from, r.path_to, frac);
@@ -962,14 +978,14 @@
       const hot = r.planes.filter((p) => p.status === "hot"), soon = r.planes.filter((p) => p.status === "soon");
       box.append(el("span", { class: "muted small" }, r.other ? `✈ ${r.planes.length} ${t("Flugzeuge")} · ${t("Korridor")} ±${r.corridor_km} km · ${r.zone ? t("Zone km {a}–{b}", { a: r.zone.from_km, b: r.zone.to_km }) : t("keine gemeinsame Sichtbarkeit (Pfad zu lang)")}` : `✈ ${r.planes.length} ${t("Flugzeuge im Umkreis")} – ${t("Locator eingeben für Pfad-Auswertung")}`),
         r.other ? el("button", { type: "button", class: "ghost small", title: t("Seitenansicht des Pfads (Mindesthöhe, Flugzeuge) ein-/ausblenden"), onclick: () => { this.profile = !this.profile; localStorage.setItem("cl.planes.profile", this.profile ? "1" : "0"); this.draw(r); } }, t("Profil")) : null);
-      for (const p of hot.slice(0, 5)) box.append(planeChip(p));
-      for (const p of soon.slice(0, 4)) box.append(planeChip(p));
+      for (const p of hot.slice(0, 5)) box.append(planeChip(p, () => this.goTo(p)));
+      for (const p of soon.slice(0, 4)) box.append(planeChip(p, () => this.goTo(p)));
       box.append(el("span", { class: "muted small attrib" }, r.attribution));
       if (this.profile && r.other) { const pr = planeProfile(r); if (pr) box.append(pr); }
     },
   };
   $("#btn-planes").addEventListener("click", () => Planes.toggle());
-  if (Planes.on) { $("#btn-planes").classList.add("active"); $("#plane-list").classList.remove("hidden"); setTimeout(() => Planes.refresh(true), 1500); }
+  if (Planes.on) { $("#btn-planes").classList.add("active"); $("#plane-list").classList.remove("hidden"); Planes.size(); setTimeout(() => Planes.refresh(true), 1500); }
   $("#adsb-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     try { await api("POST", "/api/settings", { adsb_source: $("#adsb-source").value, adsb_local_url: $("#adsb-local").value.trim(), adsb_corridor_km: $("#adsb-corridor").value, adsb_antenna_m: $("#adsb-antenna").value }); toast(t("Einstellungen gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
@@ -1084,12 +1100,13 @@
   };
   $$(".logwrap").forEach((w) => { const log = w.querySelector(".chat-log"); log.addEventListener("scroll", () => Scroll.update(log)); w.querySelector(".jump-down").addEventListener("click", () => Scroll.toBottom(log)); });
   async function loadChat() {
-    const log = $("#chat-log"); log.innerHTML = ""; S.chatContest = S.contestId;
+    const log = $("#chat-log"); log.innerHTML = ""; delete log.dataset.lastDay; S.chatContest = S.contestId;
     try { (await GET(`/api/chat?contest_id=${S.contestId || 0}`)).forEach(appendChat); } catch (_) { /* */ }
     Scroll.toBottom(log);
   }
   function appendChat(m) {
     const log = $("#chat-log"); const snap = Scroll.snapshot(log);
+    daySeparator(log, m.ts_utc);
     log.append(el("div", { class: "m" }, el("span", { class: "t" }, fmtTime(m.ts_utc)), el("span", { class: "n" }, m.nick + ": "), m.text));
     Scroll.restore(log, snap, m.nick === S.nick);
   }
@@ -1131,6 +1148,10 @@
       S.kst.msgs = await GET(`/api/kst/messages?${sidQ()}&limit=300`);
       S.kst.users = await GET(`/api/kst/users?${sidQ()}&my=${station()?.locator || ""}`);
     } catch (_) { /* */ }
+    // Beim Stationswechsel: der zuletzt offene DM-Partner gehört evtl. zur alten Station – dann das jüngste Gespräch dieser Station zeigen
+    const convs = dmConversations();
+    if (!S.kst.dm || !convs.find((c) => coreOf(c.call) === coreOf(S.kst.dm))) S.kst.dm = convs[0]?.call || "";
+    S.kst.dmShown = undefined;
     renderKstStatus(); renderKstUsers(); renderKst(); renderKstMacros();
   }
   function renderKstStatus() {
@@ -1196,10 +1217,11 @@
   }
   function renderKst() {
     const log = $("#kst-log"); const snap = Scroll.snapshot(log);
-    log.innerHTML = "";
+    log.innerHTML = ""; delete log.dataset.lastDay;
     const list = kstFiltered().slice(-400);
     for (const m of list) {
       const u = kstUser(m.call);
+      daySeparator(log, m.ts);
       log.append(el("div", { class: "m" + (m.to_me ? " me" : "") + (m.own ? " own" : "") },
         el("span", { class: "t" }, m.time),
         el("span", { class: "c", title: (u?.locator || m.locator || "") + " " + (m.name || ""), onclick: () => fillFromKst(m.call, u?.locator || m.locator) }, m.call),
@@ -1216,15 +1238,15 @@
       if (S.kst.dm) { const lastIn = [...list].reverse().find((m) => !m.own); const k = coreOf(S.kst.dm);
         if (lastIn && (S.kst.seen[k] || "") < lastIn.ts) { S.kst.seen[k] = lastIn.ts; api("POST", "/api/kst/seen", { station_id: S.stationId, partner: k, ts: lastIn.ts }).catch(() => {}); } }
       renderDmList();
-      const msgs = $("#kst-dm-msgs"); const dmSnap = Scroll.snapshot(msgs); const dmChanged = S.kst.dmShown !== S.kst.dm; S.kst.dmShown = S.kst.dm; msgs.innerHTML = "";
+      const msgs = $("#kst-dm-msgs"); const dmSnap = Scroll.snapshot(msgs); const dmChanged = S.kst.dmShown !== S.kst.dm; S.kst.dmShown = S.kst.dm; msgs.innerHTML = ""; delete msgs.dataset.lastDay;
       const u = S.kst.dm ? kstUser(S.kst.dm) : null;
       $("#kst-dm-head").innerHTML = "";
       if (S.kst.dm) {
         const dmLoc = u?.locator || list.find((m) => !m.own && m.locator)?.locator || "";
         $("#kst-dm-head").append(el("b", { class: "c", title: t("ins Log übernehmen"), onclick: () => fillFromKst(S.kst.dm, dmLoc) }, S.kst.dm), ` ${u?.name || ""} ${dmLoc}${u?.km != null ? ` · ${u.km} km ${u.bearing}°` : ""}`,
           el("button", { type: "button", class: "ghost small", style: "margin-left:auto", onclick: () => fillFromKst(S.kst.dm, dmLoc) }, "→ " + t("Log")));
-        for (const m of list) msgs.append(el("div", { class: "m" + (m.own ? " own" : "") }, el("span", { class: "t" }, m.time),
-          m.own ? el("span", { class: "c" }, t("ich")) : el("span", { class: "c", title: t("ins Log übernehmen"), onclick: () => fillFromKst(m.call, m.locator || dmLoc) }, m.call), el("span", { class: "txt" }, m.text)));
+        for (const m of list) { daySeparator(msgs, m.ts); msgs.append(el("div", { class: "m" + (m.own ? " own" : "") }, el("span", { class: "t" }, m.time),
+          m.own ? el("span", { class: "c" }, t("ich")) : el("span", { class: "c", title: t("ins Log übernehmen"), onclick: () => fillFromKst(m.call, m.locator || dmLoc) }, m.call), el("span", { class: "txt" }, m.text))); }
         if (!list.length) msgs.append(el("div", { class: "sys" }, t("Noch keine Nachrichten in diesem Gespräch.")));
         Scroll.restore(msgs, dmSnap, dmChanged);
       } else $("#kst-dm-head").textContent = t("Kontakt wählen");
@@ -1570,7 +1592,7 @@
       const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider; $("#lookup-user").value = cfg.lookup_user || ""; $("#lookup-pass").placeholder = cfg.lookup_pass_set ? t("Passwort (gespeichert)") : t("Passwort");
       S.kstRooms = cfg.kst_rooms || {};
       $("#adsb-source").value = cfg.adsb_source || "adsb.fi"; $("#adsb-local").value = cfg.adsb_local_url || ""; $("#adsb-corridor").value = cfg.adsb_corridor_km ?? 12; $("#adsb-antenna").value = cfg.adsb_antenna_m ?? 15;
-      $("#repo-url").value = cfg.repo_url || ""; $("#upd-auto").checked = cfg.update_check !== false; $("#upd-current").textContent = `v${S.info.version}`;
+      $("#upd-auto").checked = cfg.update_check !== false; $("#upd-current").textContent = `v${S.info.version}`;
       if (S.update?.available) { $("#upd-result").textContent = t("Neue Version {v} verfügbar", { v: S.update.latest }); $("#btn-upd-apply").classList.toggle("hidden", !S.update.can_self_update); }
     } catch (_) { /* */ }
     renderBackups(); renderCallbook(); renderAudit();
@@ -1618,11 +1640,6 @@
   $("#btn-add-template").addEventListener("click", async () => {
     const tid = Number($("#tpl-add-sel").value); if (!tid || !S.contestId) return toast(t("Erst globale Station und Contest wählen"), "err");
     try { await api("POST", `/api/contests/${S.contestId}/stations/from_template`, { template_id: tid }); toast(t("Station aufgenommen"), "ok"); } catch (err) { toast(err.message, "err"); }
-  });
-  $("#repo-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const body = { repo_url: $("#repo-url").value.trim() };
-    try { await api("POST", "/api/settings", body); toast(t("Einstellungen gespeichert"), "ok"); renderAdmin(); } catch (err) { toast(err.message, "err"); }
   });
   $("#cb-list-form").addEventListener("submit", async (e) => {
     e.preventDefault(); const f = $("#cb-list-file").files[0]; if (!f) return;

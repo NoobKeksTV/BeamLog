@@ -22,13 +22,13 @@ EDI je Station (mit Prüfung), ADIF, CSV, alle Bänder als EDI-ZIP. Siehe [Impor
 WinContest-Ordner, Ergebnislisten, DARC-Contest-Hub, einzelne Datei. Siehe [Import und Export](Import-Export.md).
 
 ## Stationsdatenbank (Callbuch)
-Suche, Bearbeiten, Löschen, Export (CSV, Repo-Format), Abgleich mit dem Repo (URL). Siehe [Stationsdatenbank](Stationsdatenbank.md).
+Suche, Bearbeiten (auch DOK), Löschen, Export (CSV; Repo-Format nur im Betreuer-Modus). Der Abgleich mit dem Repo („Nach neuen suchen“) steht unter **Updates**. Siehe [Stationsdatenbank](Stationsdatenbank.md).
 
 ## Backups auf dem Server
 Der Server sichert die Datenbank automatisch (nur bei Änderungen) in den Ordner `backup/` neben der Datenbank, zusätzlich beim Beenden und vor jedem Update. „Jetzt sichern“ erzeugt eine Sicherung sofort. Die Liste zeigt die vorhandenen Sicherungen. Es gibt bewusst keine Sicherung im Browser und keinen Offline-Modus: die Daten liegen nur auf dem Server.
 
 ## Updates
-Update-Prüfung, Selbst-Aktualisierung, „News anzeigen“. Siehe [Updates](Updates.md).
+Update-Prüfung, Selbst-Aktualisierung, „News anzeigen“ und „Nach neuen suchen (Repo)“ für die Stationsdatenbank. Siehe [Updates](Updates.md).
 
 ## Aktionsprotokoll
 
