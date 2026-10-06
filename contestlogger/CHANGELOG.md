@@ -1,6 +1,49 @@
 # Änderungsprotokoll
 
-## v0.9.28 (2026-10-05)
+## v0.9.29 (2026-10-06)
+- Wertung je Contest mit Multiplikator, Cabrillo-Export, strengere Log-Prüfung, Offline-Kachelcache
+  - Wertung im Contest wählbar: Punkte je QSO (1 je km oder fester Wert) und Multiplikator (keiner, Großfelder, DOKs,
+    Großfelder + DOKs); Statistikzeile, Scoreboard, Statistik, EDI (CToSc/CQSOP) und Cabrillo nutzen dieselbe Wertung,
+    bei Änderung werden alle QSOs des Contests neu bewertet
+  - Cabrillo-3.0-Export je Station (Kopf mit Kategorie, Locator, Wertung, Adresse; QSO-Zeilen mit RST, Nummer, Locator, DOK;
+    Dupes als X-QSO) in der Export-Karte
+  - Log-Prüfung: Wertungsgruppe, Operatorenliste bei Multi, E-Mail-Format, Zahlenfelder (Leistung, Antennenhöhe, NN),
+    Feldlängen, QSO mit eigenem Rufzeichen, Partner im eigenen Feld
+  - Offline-Kachelcache: Kacheln über den Server laden und unter data/tiles speichern (/tiles/{z}/{x}/{y}.png), Schalter
+    in der Verwaltung, „Region vorab laden“ (Locator, Radius, Zoom bis 7–10, Begrenzung für den öffentlichen OSM-Server),
+    Fortschritt, Stopp, Cache leeren; Logger, Statistik und Operator-Fenster nutzen den Cache
+  - Wiki (Loggen, Verwaltung, Import/Export, Log-Prüfung) und README ergänzt; Tests
+- Karte: Pfeil trifft den Partnerpunkt, lesbares Label, größere Karte mit Flugzeugen; Tagestrenner im Chat; Verwaltung aufgeräumt
+  - Richtungspfeil als SVG, die Spitze liegt exakt auf dem Partnerpunkt; Stations-Label mit lesbarem Hintergrund neben dem Punkt (Logger und Operator)
+  - Flugzeuge: Karte wird mit eingeschalteter Flugzeug-Ebene höher (420 px), Einträge in der Liste sind anklickbar und
+    springen mit der Karte zum Flugzeug (Logger und Operator-Fenster)
+  - Chat, KST und DM: Trennzeile mit Datum vor der ersten Nachricht eines neuen Tages („Heute“, „Gestern“, Wochentag + Datum)
+  - DM: beim Stations-/Contestwechsel wird das jüngste Gespräch der Station gezeigt statt des Partners der alten Station
+    (der dort keinen Verlauf hatte); ohne Auswahl ist das jüngste Gespräch offen
+  - Operator-Fenster: alle Kacheln zentriert wie Entfernung/Richtung
+  - Verwaltung: ON4KST-Karte entfernt (steht bei der Station), Stationsdatenbank direkt unter den Contests, Formular
+    als saubere Zeile, Repo-URL-Feld entfernt, „Nach neuen suchen (Repo)“ in die Updates-Karte, Repo-Export nur Betreuer
+  - Wiki (Chat/KST, Flugzeug-Scatter, Verwaltung, Updates, Stationsdatenbank) und Screenshots aktualisiert
+- Flugzeug-Scatter wie AirScout (Kreuzungszeit, Höhenreserve, Profil), Rufzeichen je Großfeld, Betreuer-Modus für Quellen-Importe
+  - Flugzeuge: Hover zeigt Mindesthöhe an der Position, Höhenreserve (Flughöhe minus Mindesthöhe), Elevation von beiden
+    Stationen, Größenklasse (schwer/groß/mittel/leicht), Steigen/Sinken und – bei Kurs auf den Pfad – Kreuzungszeit (UTC),
+    Pfad-Kilometer, ob in der Zone und Reserve am Kreuzungspunkt; Kreuzungspunkt wird auf dem Pfad markiert
+  - Status wie AirScout (hot / kreuzt bald / sichtbar / außer Reichweite / zu tief) mit Farben, schwere Flugzeuge größer
+  - Pfadprofil (Seitenansicht): Mindesthöhen-Kurve, Zone, Flugzeuge in ihrer Höhe – zu-/abschaltbar; Operator-Fenster
+    mit denselben Hover-Details
+  - Statistik-Karte: Großfelder zeigen beim Hovern die Rufzeichen, beim Klicken alle mit Locator und km
+  - Betreuer-Modus (MAINTAINER=1 in contestlogger.env): nur dann sind Ergebnislisten-Import und DARC-Contest-Hub sichtbar
+    und erlaubt (API 403 sonst); normale Installationen holen die Liste über „Nach neuen suchen (Repo)“ und schicken
+    ihren CSV-Export an den Betreuer, der ihn mit „Stationsliste einpflegen“ übernimmt (DOK, Name, zuletzt gesehen)
+  - Stationsdatenbank-Export (CSV) ist damit auch wieder importierbar; Wiki und README ergänzt
+- Verwaltung: Karten auf zwei gleich hohe Spalten verteilt, Arbeitsregeln für Git-Autor
+  - Die beiden sehr langen Sammelkarten (Importe; Stationsdatenbank bis Admin-Passwort) sind jetzt einzelne Karten,
+    die in zwei Spalten fließen – keine überlange rechte Spalte mehr, Aktionsprotokoll ohne Scrollen erreichbar
+  - Screenshot der Verwaltung (README und Wiki) aktualisiert
+  - CLAUDE.md: Commits unter dem Account NoobKeksTV, ohne Signierung und ohne Zusatzzeilen
+- Test: Updater-Test auf case-insensitiven Dateisystemen (macOS) reparieren
+  - Testordner hieß wie die Binärdatei (contestlogger/ContestLogger), was auf macOS kollidierte
+- Änderungsprotokoll für v0.9.28
 - Austausch je Contest wählbar: laufende Nummer, DOK/OV oder beides (z. B. Köln-Aachen-Contest)
   - Contest-Einstellung „Austausch“: RST + Nummer (Standard), RST + DOK/OV oder RST + Nummer + DOK
   - Logger blendet die Felder passend ein (DOK erh. statt/neben Nr erh.), Leertaste und Enter springen entsprechend,
