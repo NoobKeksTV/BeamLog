@@ -16,10 +16,15 @@ Kommandozeile: `ContestLogger-Import "D:\Contest" --db data\contestlogger.db`.
 
 ## Einzelne Datei importieren
 
-EDI (Spalte „Exchange received“), ADIF (`DARC_DOK`, `SRX_STRING`) und Call-Listen mit DOK-Spalte bringen den DOK/OV mit; er landet im QSO und in der Stationsdatenbank.
+Nimmt WinContest `.txt`/`.EXP`/`.mdb`, EDI/REG1TEST, ADIF oder Call-Listen (`Call;Locator;Name[;DOK]`). Rufzeichen und Locator aller Einträge landen **immer** in der Stationsdatenbank – das Ziel entscheidet nur, was mit den **QSOs** passiert:
 
+| Ziel | Was passiert |
+|---|---|
+| **Automatisch** (Standard) | Enthält die Datei QSOs, wird ein **neuer Contest** mit einer **neuen Station** angelegt (Name, Zeitraum, Rufzeichen, Locator und Band aus dem Dateikopf; bei einem eigenen Contest-Namen im Feld darunter wird der genommen). Enthält sie nur Rufzeichen/Locator (Call-Liste), geht alles nur in die Stationsdatenbank. Richtig für alte Logs, die als Archiv übernommen werden sollen. |
+| **Nur ins Call-Buch** | Die QSOs werden **nicht** als Log übernommen, nur Rufzeichen, Locator und DOK der Gegenstationen wandern in die Stationsdatenbank. Richtig für fremde Logs oder Listen, deren QSOs euch nicht gehören. |
+| **QSOs in bestehende Station übernehmen** | Die QSOs werden der **gewählten Station** des gewählten Contests hinzugefügt (Band der Station, wenn die Datei keins nennt). Schon vorhandene QSOs (gleiches Rufzeichen und gleiche Zeit) werden übersprungen, die laufende Nummer zählt weiter. Richtig, um ein Papier-/Zweitlog nachzutragen oder ein Backup-Log in eine laufende Station zu mischen. |
 
-WinContest `.txt`/`.EXP`/`.mdb`, EDI/REG1TEST, ADIF oder Call-Listen (`Call;Locator;Name`). Ziel: neuer Contest, bestehende Station oder nur die Stationsdatenbank.
+Hinweise: Beim automatischen Import braucht die Datei den eigenen Locator im Kopf (EDI `PWWLo`, ADIF-Kopf), sonst „Zielstation auswählen“. EDI (Spalte „Exchange received“), ADIF (`DARC_DOK`, `SRX_STRING`) und Call-Listen mit DOK-Spalte bringen den DOK/OV mit; er landet im QSO und in der Stationsdatenbank. Das Ergebnis zeigt Anzahl QSOs, Call-Buch-Einträge und Warnungen (übersprungene Zeilen).
 
 ## Ergebnislisten (DARC / IARU / UKW-Contest-Club)
 
