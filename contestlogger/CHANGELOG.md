@@ -1,6 +1,15 @@
 # Änderungsprotokoll
 
-## v0.9.29 (2026-10-06)
+## v0.9.30 (2026-10-07)
+- Fehler nach Update behoben: alte Seite aus dem Browser-Cache + neues Skript
+  - index.html und Operator-Seite werden mit Cache-Control: no-cache ausgeliefert, app.js und style.css mit
+    Versionsstempel (?v=…) eingebunden – nach einem Update passen Seite und Skript immer zusammen
+  - Alle Ereignis-Bindungen beim Start sind null-sicher (TypeError 'Cannot read properties of null' tritt nicht mehr auf,
+    auch wenn ein Element fehlt)
+- Betreuer-Modus auch über DEV=true in contestlogger.env
+  - DEV=true ist gleichbedeutend mit MAINTAINER=1 (DARC-Hub, Ergebnislisten, Stationslisten-Import nur dann)
+- Version 0.9.29
+  - Änderungsprotokoll für v0.9.29
 - Wertung je Contest mit Multiplikator, Cabrillo-Export, strengere Log-Prüfung, Offline-Kachelcache
   - Wertung im Contest wählbar: Punkte je QSO (1 je km oder fester Wert) und Multiplikator (keiner, Großfelder, DOKs,
     Großfelder + DOKs); Statistikzeile, Scoreboard, Statistik, EDI (CToSc/CQSOP) und Cabrillo nutzen dieselbe Wertung,
