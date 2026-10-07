@@ -29,14 +29,7 @@ jobs:
       - id: ver
         shell: bash
         run: echo "version=$(python -c 'import contestlogger;print(contestlogger.__version__)')" >> "$GITHUB_OUTPUT"
-      # Nur zur Ansicht am Lauf; die Dateien hängen am Release. Kurze Aufbewahrung und nicht blockierend
-      # (Speicherkontingent für Artefakte darf den Release nie verhindern).
-      - uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: ContestLogger-${{ matrix.os }}
-          path: dist/*.zip
-          retention-days: 2
+      # Kein Artefakt-Upload: die ZIPs hängen am Release, Artefakte würden nur das Speicherkontingent füllen.
       - name: Release-Notes (Änderungen + Commit-Historie seit dem letzten Release)
         shell: bash
         run: python build_tools/release_notes.py "v${{ steps.ver.outputs.version }}" > RELEASE_NOTES.md && cat RELEASE_NOTES.md
