@@ -1293,7 +1293,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     @app.get("/operator")
     def operator_page():
         """Operator-Fenster (zweiter Monitor): zeigt live die Eingabe des Loggers, Hinweise und die letzten QSOs."""
-        return FileResponse(STATIC / "operator.html")
+        return html_page("operator.html")
 
     @app.get("/api/chat")
     def chat_history(contest_id: int = 0):
@@ -1386,9 +1386,16 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     # ------------------------------------------------------------ Frontend
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
+    def html_page(name: str) -> Response:
+        """HTML-Seiten nie cachen und die eigenen Skripte/Stylesheets mit der Version stempeln – nach einem Update
+        passen Seite und Skript so immer zusammen (sonst alte Seite aus dem Cache + neues app.js)."""
+        html = (STATIC / name).read_text(encoding="utf-8")
+        html = html.replace('"/static/app.js"', f'"/static/app.js?v={__version__}"').replace('"/static/style.css"', f'"/static/style.css?v={__version__}"')
+        return Response(html, media_type="text/html", headers={"Cache-Control": "no-cache, must-revalidate"})
+
     @app.get("/")
     def index():
-        return FileResponse(STATIC / "index.html")
+        return html_page("index.html")
 
     return app
 

@@ -188,7 +188,7 @@
   async function checkUpdateBadge() {
     try { const u = await GET("/api/update/status"); S.update = u; const b = $("#update-badge"); b.classList.toggle("hidden", !u.available); if (u.available) b.textContent = `⬆ v${u.latest}`; } catch (_) { /* */ }
   }
-  $("#update-badge").addEventListener("click", () => { showView("admin"); setTimeout(() => $("#btn-upd-check")?.scrollIntoView({ block: "center" }), 100); });
+  $("#update-badge")?.addEventListener("click", () => { showView("admin"); setTimeout(() => $("#btn-upd-check")?.scrollIntoView({ block: "center" }), 100); });
   function changelogBox(entries, title) {
     const box = el("div", { class: "news" }, el("h3", {}, title));
     if (!entries.length) box.append(el("p", { class: "muted" }, t("Kein Änderungsprotokoll vorhanden (wird beim Release-Build erzeugt).")));
@@ -208,8 +208,8 @@
     if (!seen) return;  // allererster Besuch: nichts anzeigen
     try { const r = await GET(`/api/changelog?since=${encodeURIComponent(seen)}`); if (r.entries.length) changelogBox(r.entries, t("Was ist neu in v{v}", { v: cur })); } catch (_) { /* */ }
   }
-  $("#btn-upd-news").addEventListener("click", async () => { try { const r = await GET("/api/changelog"); changelogBox(r.entries, t("Neuigkeiten der letzten Versionen")); } catch (err) { toast(err.message, "err"); } });
-  $("#btn-upd-check").addEventListener("click", async () => {
+  $("#btn-upd-news")?.addEventListener("click", async () => { try { const r = await GET("/api/changelog"); changelogBox(r.entries, t("Neuigkeiten der letzten Versionen")); } catch (err) { toast(err.message, "err"); } });
+  $("#btn-upd-check")?.addEventListener("click", async () => {
     const out = $("#upd-result"); out.textContent = t("Prüfe …");
     try {
       const r = await api("POST", "/api/update/check", {}); S.update = r;
@@ -222,13 +222,13 @@
       checkUpdateBadge();
     } catch (err) { out.textContent = err.message; }
   });
-  $("#btn-upd-apply").addEventListener("click", async () => {
+  $("#btn-upd-apply")?.addEventListener("click", async () => {
     if (!confirm(t("Jetzt auf die neue Version aktualisieren? Der Server startet danach neu, alle Browser verbinden sich automatisch wieder."))) return;
     const out = $("#upd-result"); out.textContent = t("Update wird geladen …"); $("#btn-upd-apply").disabled = true;
     try { const r = await api("POST", "/api/update/apply", {}); out.textContent = t("Version {v} eingespielt – Server startet neu …", { v: r.version }); setTimeout(() => location.reload(), 8000); }
     catch (err) { out.textContent = err.message; $("#btn-upd-apply").disabled = false; }
   });
-  $("#upd-auto").addEventListener("change", async (e) => { try { await api("POST", "/api/settings", { update_check: e.target.checked ? "1" : "0" }); } catch (err) { toast(err.message, "err"); } });
+  $("#upd-auto")?.addEventListener("change", async (e) => { try { await api("POST", "/api/settings", { update_check: e.target.checked ? "1" : "0" }); } catch (err) { toast(err.message, "err"); } });
 
   function askSetup() {
     return new Promise((resolve) => {
@@ -256,7 +256,7 @@
       });
     });
   }
-  $("#nick-badge").addEventListener("click", askNick);
+  $("#nick-badge")?.addEventListener("click", askNick);
 
   // ------------------------------------------------------------ Töne (WebAudio, keine Dateien nötig)
   const Sound = {
@@ -290,12 +290,12 @@
   };
   const renderSoundBtn = () => $("#sound-btn").classList.toggle("off", !Sound.on);
   renderSoundBtn();
-  $("#sound-btn").addEventListener("click", () => { Sound.on = !Sound.on; localStorage.setItem("cl.sound", Sound.on ? "on" : "off"); renderSoundBtn(); if (Sound.on) Sound.play("chat"); });
+  $("#sound-btn")?.addEventListener("click", () => { Sound.on = !Sound.on; localStorage.setItem("cl.sound", Sound.on ? "on" : "off"); renderSoundBtn(); if (Sound.on) Sound.play("chat"); });
   document.addEventListener("pointerdown", () => Sound.ensure(), { once: true });
   document.addEventListener("keydown", () => Sound.ensure(), { once: true });
 
   // ------------------------------------------------------------ QR-Code
-  $("#qr-btn").addEventListener("click", () => {
+  $("#qr-btn")?.addEventListener("click", () => {
     const local = ["localhost", "127.0.0.1", "::1"].includes(location.hostname);
     const url = local && S.info.public_url ? S.info.public_url : location.origin + "/";
     const box = modal(fromTpl("tpl-qr"));
@@ -318,7 +318,7 @@
   // ------------------------------------------------------------ Theme
   const applyTheme = () => { const t = localStorage.getItem("cl.theme"); if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; };
   applyTheme();
-  $("#theme-btn").addEventListener("click", () => {
+  $("#theme-btn")?.addEventListener("click", () => {
     const dark = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() === "#0f1419";
     localStorage.setItem("cl.theme", dark ? "light" : "dark"); applyTheme();
   });
@@ -375,12 +375,12 @@
     }
     renderMacroBar();
   }
-  $("#sel-contest").addEventListener("change", async (e) => {
+  $("#sel-contest")?.addEventListener("change", async (e) => {
     S.contestId = Number(e.target.value) || null;
     S.stationId = contest()?.stations[0]?.id || null;
     save(); renderStationBar(); await loadQsos(); renderScoreboard(); sendStatus();
   });
-  $("#sel-station").addEventListener("change", async (e) => {
+  $("#sel-station")?.addEventListener("change", async (e) => {
     S.stationId = Number(e.target.value) || null;
     save(); renderStationBar(); await loadQsos(); renderScoreboard(); sendStatus();
     if (S.stationId && !canLog()) askUnlock(station());
@@ -439,7 +439,7 @@
     list.slice(0, 60).forEach((q) => tb.append(qsoRow(q, false)));
     $("#qso-count").textContent = S.qsos.length;
   }
-  $("#log-search").addEventListener("input", renderQsos);
+  $("#log-search")?.addEventListener("input", renderQsos);
   function renderFullLog() {
     const tb = $("#full-table tbody"); tb.innerHTML = "";
     const f = $("#full-search").value.trim().toUpperCase();
@@ -447,7 +447,7 @@
     list.forEach((q) => tb.append(qsoRow(q, true)));
     $("#full-count").textContent = `${list.length} / ${S.qsos.length}`;
   }
-  $("#full-search").addEventListener("input", renderFullLog);
+  $("#full-search")?.addEventListener("input", renderFullLog);
 
   // ---- Log-Prüfung (Pflicht vor dem EDI-Export)
   async function runCheck(thenExport) {
@@ -475,7 +475,7 @@
       list, buttons));
     if (res.ok && thenExport) { closeModal(); dl(false); }
   }
-  $("#btn-check").addEventListener("click", () => runCheck(false));
+  $("#btn-check")?.addEventListener("click", () => runCheck(false));
 
   function renderKpis(summary) {
     const box = $("#kpis");
@@ -525,7 +525,7 @@
     S.editingId = null; $("#qso-form button.primary").textContent = t("Loggen ⏎");
     hideSuggest(); updateHints(); F.call.focus();
   }
-  $("#btn-clear").addEventListener("click", clearForm);
+  $("#btn-clear")?.addEventListener("click", clearForm);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (!$("#modal").classList.contains("hidden")) closeModal();
@@ -669,14 +669,14 @@
     } else { $("#hint-geo").textContent = "— km · —°"; $("#hint-plaus").classList.add("hidden"); updateLogMap(); }
   }
 
-  $("#qso-form").addEventListener("submit", (e) => { e.preventDefault(); submitQso(); });
+  $("#qso-form")?.addEventListener("submit", (e) => { e.preventDefault(); submitQso(); });
 
   // ------------------------------------------------------------ Operator-Fenster (zweiter Monitor)
-  $("#btn-operator").addEventListener("click", () => { if (!S.stationId) return toast(t("Keine Station gewählt"), "err"); window.open(`/operator?station=${S.stationId}`, "cloperator", "width=1000,height=760,resizable=yes"); });
+  $("#btn-operator")?.addEventListener("click", () => { if (!S.stationId) return toast(t("Keine Station gewählt"), "err"); window.open(`/operator?station=${S.stationId}`, "cloperator", "width=1000,height=760,resizable=yes"); });
   function sendOpnote(text) { if (S.ws?.readyState === 1 && S.stationId) S.ws.send(JSON.stringify({ type: "opnote", station_id: S.stationId, text })); }
-  $("#btn-opnote").addEventListener("click", () => { sendOpnote($("#opnote").value.trim()); toast(t("Hinweis an das Operator-Fenster gesendet"), "ok"); });
-  $("#opnote").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("#btn-opnote").click(); } });
-  $("#btn-opnote-clear").addEventListener("click", () => { $("#opnote").value = ""; sendOpnote(""); });
+  $("#btn-opnote")?.addEventListener("click", () => { sendOpnote($("#opnote").value.trim()); toast(t("Hinweis an das Operator-Fenster gesendet"), "ok"); });
+  $("#opnote")?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("#btn-opnote").click(); } });
+  $("#btn-opnote-clear")?.addEventListener("click", () => { $("#opnote").value = ""; sendOpnote(""); });
   async function loadOpnote() { try { $("#opnote").value = S.stationId ? (await GET(`/api/stations/${S.stationId}/opnote`)).text : ""; } catch (_) { /* */ } }
   // Live-Eingabe an das Operator-Fenster (gedrosselt, nur bei Änderung)
   let typingTimer, typingLast = "";
@@ -743,7 +743,7 @@
     if (!confirm(t("QSO #{nr} mit {call} wirklich löschen?", { nr: q.serial_sent, call: q.call }))) return;
     try { await api("DELETE", `/api/qsos/${q.id}`, null, { stationId: q.station_id }); toast(t("QSO gelöscht")); } catch (err) { toast(err.message, "err"); }
   }
-  $("#btn-serial").addEventListener("click", async () => {
+  $("#btn-serial")?.addEventListener("click", async () => {
     const st = station(); if (!st || !canLog()) return toast(t("Station nicht freigeschaltet"), "err");
     const v = prompt(t("Nächste zu vergebende Seriennummer für {call}:", { call: st.call }), st.serial_next);
     if (v === null || !/^\d+$/.test(v)) return;
@@ -787,7 +787,7 @@
       try { await api("PATCH", `/api/stations/${st.id}`, { info: { ...(st.info || {}), macros: out } }); closeModal(); toast(t("Makros gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
     });
   }
-  $("#btn-macro-edit").addEventListener("click", macroEditor);
+  $("#btn-macro-edit")?.addEventListener("click", macroEditor);
   document.addEventListener("keydown", (e) => {
     if (!$("#view-log").classList.contains("active") || !$("#modal").classList.contains("hidden")) return;
     if (e.key === "F9") { e.preventDefault(); $("#macro-bar").classList.toggle("hidden"); localStorage.setItem("cl.macrobar", $("#macro-bar").classList.contains("hidden") ? "0" : "1"); renderMacroBar(); return; }
@@ -832,7 +832,7 @@
       el("div", { class: "row" }, el("span", { class: "muted small grow" }, `${S.info.app || "ContestLogger"} ${S.info.version || ""} · ${S.info.copyright || ""}`), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")))));
     box.classList.add("wide");
   }
-  $("#help-btn").addEventListener("click", helpDialog);
+  $("#help-btn")?.addEventListener("click", helpDialog);
   document.addEventListener("keydown", (e) => { if (e.key === "F1") { e.preventDefault(); if ($("#modal").classList.contains("hidden")) helpDialog(); } });
 
   // ------------------------------------------------------------ Karte (Leaflet, lokal gebündelt; Kacheln von OSM oder eigenem Server)
@@ -995,19 +995,19 @@
       if (this.profile && r.other) { const pr = planeProfile(r); if (pr) box.append(pr); }
     },
   };
-  $("#btn-planes").addEventListener("click", () => Planes.toggle());
+  $("#btn-planes")?.addEventListener("click", () => Planes.toggle());
   if (Planes.on) { $("#btn-planes").classList.add("active"); $("#plane-list").classList.remove("hidden"); Planes.size(); setTimeout(() => Planes.refresh(true), 1500); }
-  $("#adsb-form").addEventListener("submit", async (e) => {
+  $("#adsb-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try { await api("POST", "/api/settings", { adsb_source: $("#adsb-source").value, adsb_local_url: $("#adsb-local").value.trim(), adsb_corridor_km: $("#adsb-corridor").value, adsb_antenna_m: $("#adsb-antenna").value }); toast(t("Einstellungen gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
   });
-  $("#lookup-form").addEventListener("submit", async (e) => {
+  $("#lookup-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const body = { lookup_provider: $("#lookup-provider").value, lookup_user: $("#lookup-user").value.trim() };
     if ($("#lookup-pass").value) body.lookup_pass = $("#lookup-pass").value;
     try { await api("POST", "/api/settings", body); $("#lookup-pass").value = ""; toast(t("Einstellungen gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
   });
-  $("#btn-lookup-test").addEventListener("click", async () => {
+  $("#btn-lookup-test")?.addEventListener("click", async () => {
     $("#lookup-result").textContent = "…";
     try { const r = await api("POST", "/api/lookup/test"); $("#lookup-result").textContent = r.msg; $("#lookup-result").style.color = r.ok ? "var(--ok)" : "var(--bad)"; } catch (err) { $("#lookup-result").textContent = err.message; }
   });
@@ -1019,13 +1019,13 @@
       if (j.running) setTimeout(tilesStatus, 1500);
     } catch (_) { /* */ }
   }
-  $("#tile-cache").addEventListener("change", async () => { try { await api("POST", "/api/settings", { tile_cache: $("#tile-cache").checked ? "1" : "0" }); toast(t("Gespeichert – Seite neu laden, damit die Karten den Cache nutzen"), "ok"); } catch (err) { toast(err.message, "err"); } });
-  $("#tc-form").addEventListener("submit", async (e) => {
+  $("#tile-cache")?.addEventListener("change", async () => { try { await api("POST", "/api/settings", { tile_cache: $("#tile-cache").checked ? "1" : "0" }); toast(t("Gespeichert – Seite neu laden, damit die Karten den Cache nutzen"), "ok"); } catch (err) { toast(err.message, "err"); } });
+  $("#tc-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try { const r = await api("POST", "/api/tiles/prefetch", { locator: $("#tc-loc").value.trim(), radius_km: Number($("#tc-radius").value), zmin: 4, zmax: Number($("#tc-zoom").value) }); toast(t("{n} Kacheln werden geladen", { n: r.total }), "ok"); tilesStatus(); } catch (err) { toast(err.message, "err"); }
   });
-  $("#btn-tc-stop").addEventListener("click", () => api("POST", "/api/tiles/stop").then(tilesStatus).catch(() => {}));
-  $("#btn-tc-clear").addEventListener("click", async () => { if (confirm(t("Alle gespeicherten Kacheln löschen?"))) { await api("DELETE", "/api/tiles"); tilesStatus(); } });
+  $("#btn-tc-stop")?.addEventListener("click", () => api("POST", "/api/tiles/stop").then(tilesStatus).catch(() => {}));
+  $("#btn-tc-clear")?.addEventListener("click", async () => { if (confirm(t("Alle gespeicherten Kacheln löschen?"))) { await api("DELETE", "/api/tiles"); tilesStatus(); } });
   $("#tile-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try { await api("POST", "/api/settings", { tile_url: $("#tile-url").value.trim() }); toast(t("Kachel-URL gespeichert – Seite neu laden"), "ok"); } catch (err) { toast(err.message, "err"); }
@@ -1136,7 +1136,7 @@
     log.append(el("div", { class: "m" }, el("span", { class: "t" }, fmtTime(m.ts_utc)), el("span", { class: "n" }, m.nick + ": "), m.text));
     Scroll.restore(log, snap, m.nick === S.nick);
   }
-  $("#chat-form").addEventListener("submit", (e) => {
+  $("#chat-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
     const t = $("#chat-input").value.trim();
     if (t && S.ws?.readyState === 1) { S.ws.send(JSON.stringify({ type: "chat", text: t, contest_id: S.contestId || 0 })); $("#chat-input").value = ""; }
@@ -1162,7 +1162,7 @@
     const nDm = dmConversations().reduce((a, c) => a + c.unread, 0);
     const bd = $("#kst-dm-badge"); bd.textContent = nDm; bd.classList.toggle("hidden", !nDm);
   }
-  $("#btn-chat-pop").addEventListener("click", () => window.open(`${location.pathname}?popup=chat`, "clchat", "width=480,height=780,resizable=yes"));
+  $("#btn-chat-pop")?.addEventListener("click", () => window.open(`${location.pathname}?popup=chat`, "clchat", "width=480,height=780,resizable=yes"));
   if (POPUP) setChatTab(localStorage.getItem("cl.chattab") || "kst");
   const sidQ = () => `station_id=${S.stationId || 0}`;
   async function loadKst() {
@@ -1200,7 +1200,7 @@
     }
     if (!S.kst.users.length) box.append(el("span", { class: "muted small" }, t("Keine Nutzerliste – „Nutzer“ drücken (max. 1 Abfrage/Minute).")));
   }
-  $("#btn-kst-users").addEventListener("click", async () => {
+  $("#btn-kst-users")?.addEventListener("click", async () => {
     $("#kst-users").classList.toggle("hidden");
     if (!$("#kst-users").classList.contains("hidden")) { try { S.kst.users = await GET(`/api/kst/users?${sidQ()}&my=${station()?.locator || ""}`); renderKstUsers(); if (!S.kst.users.length) await api("POST", "/api/kst/refresh_users", { station_id: S.stationId }); } catch (_) { /* */ } }
   });
@@ -1281,8 +1281,8 @@
     renderKstBadges();
   }
   function setDm(call) { S.kst.dm = call; if (S.kst.tab !== "dm") setChatTab("dm"); renderKst(); $("#kst-input").focus(); }
-  $("#btn-dm-new").addEventListener("click", () => { const c = (prompt(t("Rufzeichen für neues Gespräch:")) || "").trim().toUpperCase(); if (c) setDm(c); });
-  $("#kst-form").addEventListener("submit", async (e) => {
+  $("#btn-dm-new")?.addEventListener("click", () => { const c = (prompt(t("Rufzeichen für neues Gespräch:")) || "").trim().toUpperCase(); if (c) setDm(c); });
+  $("#kst-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     let text = $("#kst-input").value.trim(); if (!text) return;
     if (S.kst.tab === "dm") { if (!S.kst.dm) return toast(t("Erst Kontakt wählen"), "err"); if (!text.startsWith("/")) text = `/CQ ${S.kst.dm} ${text}`; }
@@ -1318,7 +1318,7 @@
     });
   }
   // Rundruf: Nutzer im Umkreis anschreiben, die noch nicht im Log sind
-  $("#btn-kst-rundruf").addEventListener("click", rundrufDialog);
+  $("#btn-kst-rundruf")?.addEventListener("click", rundrufDialog);
   async function rundrufDialog() {
     const st = station(); if (!st) return toast(t("Keine Station gewählt"), "err");
     const box = modal(el("div", {}, el("h3", {}, t("Rundruf – noch nicht gearbeitete Stationen anschreiben")),
@@ -1396,7 +1396,7 @@
   // Verwaltung: DARC-Contest-Hub
   let darcList = [];
   (function initDarcYears() { const sel = $("#darc-year"); const y = new Date().getUTCFullYear(); for (let i = y; i >= 2017; i--) sel.append(el("option", { value: i }, i)); })();
-  $("#btn-darc-list").addEventListener("click", async () => {
+  $("#btn-darc-list")?.addEventListener("click", async () => {
     $("#darc-summary").textContent = "…";
     try {
       darcList = await GET(`/api/darc/contests?year=${$("#darc-year").value}`);
@@ -1415,8 +1415,8 @@
       toast(`${r.total} ${t("Rufzeichen übernommen")}`, "ok"); renderCallbook();
     } catch (err) { $("#darc-summary").textContent = err.message; toast(err.message, "err"); }
   }
-  $("#btn-darc-import").addEventListener("click", () => darcImport({ csv_urls: $$(".darc-sel:checked").map((c) => c.dataset.csv) }));
-  $("#btn-darc-all").addEventListener("click", () => { const y = new Date().getUTCFullYear(); const years = []; for (let i = 2017; i <= y; i++) years.push(i); if (confirm(t("Alle DARC-Ergebnislisten {a}–{b} laden? Das dauert ein bis zwei Minuten.", { a: 2017, b: y }))) darcImport({ years }); });
+  $("#btn-darc-import")?.addEventListener("click", () => darcImport({ csv_urls: $$(".darc-sel:checked").map((c) => c.dataset.csv) }));
+  $("#btn-darc-all")?.addEventListener("click", () => { const y = new Date().getUTCFullYear(); const years = []; for (let i = 2017; i <= y; i++) years.push(i); if (confirm(t("Alle DARC-Ergebnislisten {a}–{b} laden? Das dauert ein bis zwei Minuten.", { a: 2017, b: y }))) darcImport({ years }); });
 
   // ------------------------------------------------------------ Statistik
   async function renderStats() {
@@ -1549,7 +1549,7 @@
     bands.forEach((b, bi) => { add("rect", { x: P + bi * 90, y: 2, width: 10, height: 10, fill: colors[bi % colors.length] }); add("text", { x: P + bi * 90 + 14, y: 11, class: "lbl" }, b); });
     return svg;
   }
-  $("#btn-bigscreen").addEventListener("click", () => { document.body.classList.toggle("bigscreen"); if (document.body.classList.contains("bigscreen")) document.documentElement.requestFullscreen?.().catch(() => {}); else document.exitFullscreen?.().catch(() => {}); });
+  $("#btn-bigscreen")?.addEventListener("click", () => { document.body.classList.toggle("bigscreen"); if (document.body.classList.contains("bigscreen")) document.documentElement.requestFullscreen?.().catch(() => {}); else document.exitFullscreen?.().catch(() => {}); });
   document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) document.body.classList.remove("bigscreen"); });
 
   // ------------------------------------------------------------ Verwaltung
@@ -1625,11 +1625,11 @@
     } catch (_) { /* */ }
     renderBackups(); renderCallbook(); renderAudit();
   }
-  $("#admin-login-form").addEventListener("submit", async (e) => {
+  $("#admin-login-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try { S.adminToken = (await api("POST", "/api/admin/login", { password: $("#admin-pw").value })).token; save(); $("#admin-pw").value = ""; renderAdmin(); renderStationBar(); renderQsos(); toast(t("Als Admin angemeldet"), "ok"); } catch (err) { toast(err.message, "err"); }
   });
-  $("#btn-backup").addEventListener("click", async () => {
+  $("#btn-backup")?.addEventListener("click", async () => {
     try { const r = await api("POST", "/api/backups"); toast(t("Gesichert: {name}", r), "ok"); renderBackups(); } catch (err) { toast(err.message, "err"); }
   });
   async function renderAudit() {
@@ -1644,9 +1644,9 @@
       if (!rows.length) tb.append(el("tr", {}, el("td", { class: "muted" }, t("Keine Einträge."))));
     } catch (_) { /* */ }
   }
-  let auditTimer; $("#audit-search").addEventListener("input", () => { clearTimeout(auditTimer); auditTimer = setTimeout(renderAudit, 200); });
-  $("#btn-audit-refresh").addEventListener("click", renderAudit);
-  $("#btn-audit-dl").addEventListener("click", async () => {
+  let auditTimer; $("#audit-search")?.addEventListener("input", () => { clearTimeout(auditTimer); auditTimer = setTimeout(renderAudit, 200); });
+  $("#btn-audit-refresh")?.addEventListener("click", renderAudit);
+  $("#btn-audit-dl")?.addEventListener("click", async () => {
     try { const r = await fetch("/api/audit.txt", { headers: { "X-Admin-Token": S.adminToken } }); const blob = await r.blob(); const a = el("a", { href: URL.createObjectURL(blob), download: "contestlogger-protokoll.txt" }); document.body.append(a); a.click(); a.remove(); } catch (err) { toast(err.message, "err"); }
   });
   async function renderBackups() {
@@ -1658,28 +1658,28 @@
       if (!r.backups.length) tb.append(el("tr", {}, el("td", { class: "muted" }, t("Noch keine Sicherung."))));
     } catch (_) { /* */ }
   }
-  $("#btn-admin-logout").addEventListener("click", () => { S.adminToken = ""; save(); renderAdmin(); renderStationBar(); renderQsos(); });
-  $("#admin-pw-form").addEventListener("submit", async (e) => {
+  $("#btn-admin-logout")?.addEventListener("click", () => { S.adminToken = ""; save(); renderAdmin(); renderStationBar(); renderQsos(); });
+  $("#admin-pw-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try { await api("POST", "/api/admin/password", { password: $("#admin-pw-new").value }); S.adminToken = (await api("POST", "/api/admin/login", { password: $("#admin-pw-new").value })).token; save(); $("#admin-pw-new").value = ""; toast(t("Admin-Passwort geändert"), "ok"); } catch (err) { toast(err.message, "err"); }
   });
-  $("#btn-new-contest").addEventListener("click", () => contestDialog(null));
-  $("#btn-new-template").addEventListener("click", () => stationDialog(null, true));
-  $("#btn-add-template").addEventListener("click", async () => {
+  $("#btn-new-contest")?.addEventListener("click", () => contestDialog(null));
+  $("#btn-new-template")?.addEventListener("click", () => stationDialog(null, true));
+  $("#btn-add-template")?.addEventListener("click", async () => {
     const tid = Number($("#tpl-add-sel").value); if (!tid || !S.contestId) return toast(t("Erst globale Station und Contest wählen"), "err");
     try { await api("POST", `/api/contests/${S.contestId}/stations/from_template`, { template_id: tid }); toast(t("Station aufgenommen"), "ok"); } catch (err) { toast(err.message, "err"); }
   });
-  $("#cb-list-form").addEventListener("submit", async (e) => {
+  $("#cb-list-form")?.addEventListener("submit", async (e) => {
     e.preventDefault(); const f = $("#cb-list-file").files[0]; if (!f) return;
     const fd = new FormData(); fd.append("file", f); $("#cb-list-result").textContent = "…";
     try { const r = await api("POST", "/api/callbook/import_list", fd); $("#cb-list-result").textContent = t("{total} Einträge, {new} neu – jetzt {count} Rufzeichen", { total: r.total, new: r.new, count: r.callbook_count }); renderCallbook(); } catch (err) { $("#cb-list-result").textContent = err.message; }
   });
-  $("#btn-cb-sync").addEventListener("click", async () => {
+  $("#btn-cb-sync")?.addEventListener("click", async () => {
     const out = $("#cb-sync-result"); out.textContent = t("Lade aus dem Repo …");
     try { const r = await api("POST", "/api/callbook/sync_repo", {}); out.textContent = `${r.total} ${t("Einträge im Repo")}: ${r.new} ${t("neu")}, ${r.changed} ${t("Locator aktualisiert")} · ${t("Stationsdatenbank")}: ${r.callbook_count}`; toast(`${r.new} ${t("neue Rufzeichen übernommen")}`, "ok"); renderCallbook(); $("#cb-count").textContent = r.callbook_count; }
     catch (err) { out.textContent = err.message; toast(err.message, "err"); }
   });
-  $("#btn-new-station").addEventListener("click", () => { if (!contest()) return toast(t("Erst einen Contest anlegen/wählen"), "err"); stationDialog(null); });
+  $("#btn-new-station")?.addEventListener("click", () => { if (!contest()) return toast(t("Erst einen Contest anlegen/wählen"), "err"); stationDialog(null); });
 
   const toLocal = (ts) => (ts ? ts.slice(0, 16) : "");
   const fromLocal = (v) => (v ? v + ":00Z" : null);
@@ -1758,8 +1758,8 @@
     });
   }
 
-  $("#imp-target").addEventListener("change", (e) => $("#imp-station-wrap").classList.toggle("hidden", e.target.value !== "station"));
-  $("#import-form").addEventListener("submit", async (e) => {
+  $("#imp-target")?.addEventListener("change", (e) => $("#imp-station-wrap").classList.toggle("hidden", e.target.value !== "station"));
+  $("#import-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData();
     const file = $("#imp-file").files[0]; if (!file) return;
@@ -1790,8 +1790,8 @@
       if (!r.rows.length) tb.append(el("tr", {}, el("td", { class: "muted" }, t("Keine Einträge."))));
     } catch (_) { /* */ }
   }
-  let cbTimer; $("#cb-search").addEventListener("input", () => { clearTimeout(cbTimer); cbTimer = setTimeout(renderCallbook, 150); });
-  $("#folder-form").addEventListener("submit", async (e) => {
+  let cbTimer; $("#cb-search")?.addEventListener("input", () => { clearTimeout(cbTimer); cbTimer = setTimeout(renderCallbook, 150); });
+  $("#folder-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const files = Array.from($("#folder-files").files).filter((f) => /\.(mdb|txt|exp|edi|adi|adif|csv)$/i.test(f.name) && f.size < 50e6);
     if (!files.length) return toast(t("Keine passenden Dateien im Ordner"), "err");
@@ -1810,7 +1810,7 @@
     } catch (err) { out.textContent = t("Fehler: ") + err.message; toast(err.message, "err"); }
   });
   let resPairs = [];
-  $("#results-form").addEventListener("submit", async (e) => {
+  $("#results-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData();
     if ($("#res-file").files[0]) fd.append("file", $("#res-file").files[0]);
@@ -1828,8 +1828,8 @@
       $("#res-summary").textContent = `${r.count} ${t("Rufzeichen mit Locator gefunden")}, ${nNew} ${t("neu / geändert")}` + (r.warnings.length ? ` · ${r.warnings.length} ${t("Hinweise")}: ${r.warnings.slice(0, 3).join("; ")}` : "");
     } catch (err) { $("#res-summary").textContent = err.message; toast(err.message, "err"); }
   });
-  $("#res-only-new").addEventListener("change", (e) => { $$(".res-sel").forEach((cb) => { const p = resPairs.find((x) => x.call === cb.dataset.call); cb.checked = e.target.checked ? p.status !== "gleich" : true; }); });
-  $("#btn-res-commit").addEventListener("click", async () => {
+  $("#res-only-new")?.addEventListener("change", (e) => { $$(".res-sel").forEach((cb) => { const p = resPairs.find((x) => x.call === cb.dataset.call); cb.checked = e.target.checked ? p.status !== "gleich" : true; }); });
+  $("#btn-res-commit")?.addEventListener("click", async () => {
     const sel = $$(".res-sel:checked").map((cb) => cb.dataset.call);
     if (!sel.length) return toast(t("Nichts ausgewählt"), "err");
     const fd = new FormData();
@@ -1837,7 +1837,7 @@
     fd.append("url", $("#res-url").value.trim()); fd.append("text", $("#res-text").value); fd.append("commit", "1"); fd.append("selected", sel.join(","));
     try { const r = await api("POST", "/api/import/results", fd); toast(`${r.imported} ${t("Rufzeichen übernommen")}`, "ok"); $("#res-wrap").classList.add("hidden"); $("#res-actions").classList.add("hidden"); $("#res-summary").textContent = ""; renderCallbook(); } catch (err) { toast(err.message, "err"); }
   });
-  $("#cb-form").addEventListener("submit", async (e) => {
+  $("#cb-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     try { await api("POST", "/api/callbook", { call: $("#cb-call").value, locator: $("#cb-loc").value, name: $("#cb-name").value, dok: $("#cb-dok").value }); toast(t("Call gespeichert"), "ok"); $("#cb-call").value = $("#cb-loc").value = $("#cb-name").value = $("#cb-dok").value = ""; renderCallbook(); } catch (err) { toast(err.message, "err"); }
   });
