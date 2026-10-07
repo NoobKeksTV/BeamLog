@@ -177,8 +177,8 @@
     if (!S.info.admin_configured) await askSetup();
     if (!S.nick) await askNick();
     $("#nick-badge").textContent = S.nick;
-    await loadContests();
-    connectWs();
+    try { await loadContests(); } catch (err) { toast(t("Contests konnten nicht geladen werden: ") + err.message, "err"); }
+    connectWs();  // Verbindung immer aufbauen, auch wenn Contest/Station nicht geladen werden konnten
     loadChat();
     loadKst();
     $("#f-call").focus();
@@ -331,7 +331,8 @@
       S.contestId = active ? active.id : null;
     }
     const c = contest();
-    if (c && !c.stations.find((s) => s.id === S.stationId)) S.stationId = c.stations[0]?.id || null;
+    // Station nur behalten, wenn es sie im gewählten Contest noch gibt (sonst bleibt nach dem Löschen des letzten Contests eine tote ID stehen)
+    if (!c || !c.stations.find((s) => s.id === S.stationId)) S.stationId = c?.stations[0]?.id || null;
     save();
     renderStationBar();
     await loadQsos();
@@ -410,7 +411,8 @@
   // ------------------------------------------------------------ QSOs
   async function loadQsos() {
     if (!S.stationId) { S.qsos = []; renderQsos(); renderKpis(null); return; }
-    S.qsos = await GET(`/api/stations/${S.stationId}/qsos`);
+    try { S.qsos = await GET(`/api/stations/${S.stationId}/qsos`); }
+    catch (err) { if (/not found|404/i.test(err.message)) { S.stationId = null; save(); S.qsos = []; renderStationBar(); renderQsos(); renderKpis(null); return; } throw err; }
     renderQsos();
     renderKpis();
     const m = makeMap("map-log"); if (m) { drawQsoDots(m, S.qsos); updateLogMap(); }
