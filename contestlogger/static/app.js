@@ -1579,11 +1579,9 @@
     for (const c of S.contests) {
       tb.append(el("tr", {},
         el("td", { class: "name", title: c.name }, c.id === S.contestId ? el("b", {}, c.name) : c.name),
-        el("td", { class: "muted small" }, c.start_utc ? `${fmtDate(c.start_utc)} ${fmtTime(c.start_utc)} – ${fmtDate(c.end_utc)} ${fmtTime(c.end_utc)}` : ""),
-        el("td", { class: "muted small" }, `${c.stations.length} ${t("Stationen")}${c.archived ? " · " + t("Archiv") : ""}`),
+        el("td", { class: "muted small" }, (c.start_utc ? `${fmtDate(c.start_utc)} – ${fmtDate(c.end_utc)} · ` : "") + `${c.stations.length} ${t("Stationen")}${c.archived ? " · " + t("Archiv") : ""}`),
         el("td", { class: "actions" },
           el("button", { class: "ghost", onclick: () => { S.contestId = c.id; S.stationId = c.stations[0]?.id || null; save(); renderStationBar(); loadQsos(); renderScoreboard(); renderAdmin(); } }, t("wählen")), " ",
-          el("a", { class: "button ghost", href: `/api/contests/${c.id}/export.zip?nick=${encodeURIComponent(S.nick)}`, download: 1, title: t("Alle Stationen/Bänder dieses Contests als EDI-Dateien") }, "EDI-ZIP"), " ",
           el("button", { class: "ghost", onclick: () => contestDialog(c) }, "✎"), " ",
           el("button", { class: "ghost", onclick: async () => { await api("PATCH", `/api/contests/${c.id}`, { archived: c.archived ? 0 : 1 }); } }, c.archived ? t("aktivieren") : t("archivieren")), " ",
           el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("Contest „{name}“ mit allen Stationen und QSOs löschen?", c))) await api("DELETE", `/api/contests/${c.id}`); } }, "✕"))));
