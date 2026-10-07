@@ -2,7 +2,14 @@
 
 ![Verwaltung](img/verwaltung.png)
 
-Der Reiter **Verwaltung** ist nur mit Admin-Passwort zugänglich und enthält alle Einstellungen.
+Der Reiter **Verwaltung** ist nur mit Admin-Passwort zugänglich und enthält alle Einstellungen, aufgeteilt in vier Bereiche (der zuletzt geöffnete bleibt gemerkt):
+
+| Bereich | Karten |
+|---|---|
+| **Contests & Stationen** | Stationen (global), Contests (mit den Stationen je Contest im ✎-Dialog), Export / Abgabe |
+| **Stationsdatenbank & Import** | Stationsdatenbank, WinContest-Ordner, Einzelne Datei; im Betreuer-Modus zusätzlich Ergebnislisten und DARC-Contest-Hub |
+| **Server & Updates** | Updates (auch „Nach neuen suchen“ für die Stationsdatenbank), Backups, Aktionsprotokoll |
+| **Einstellungen** | Externe Rufzeichen-Abfrage, Karte (mit Offline-Cache), Flugzeug-Scatter, Sprachen, Admin-Passwort |
 
 ## Stationen (global)
 Stammdaten eurer Stationen (Rufzeichen, Locator, Band, Modus, Passwort, KST-Zugang, EDI-Angaben). Beim Anlegen eines Contests wählt ihr die teilnehmenden. Siehe [Erste Schritte](Erste-Schritte.md).

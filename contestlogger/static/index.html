@@ -185,7 +185,14 @@
         <button class="primary">Anmelden</button>
       </form>
     </div>
-    <div id="admin-root" class="hidden admin-grid">
+    <div id="admin-root" class="hidden">
+      <div class="subtabs" id="admin-tabs">
+        <button type="button" data-atab="contest" class="active">Contests &amp; Stationen</button>
+        <button type="button" data-atab="callbook">Stationsdatenbank &amp; Import</button>
+        <button type="button" data-atab="server">Server &amp; Updates</button>
+        <button type="button" data-atab="settings">Einstellungen</button>
+      </div>
+      <div class="admin-grid admin-sec" data-asec="contest">
       <div class="card">
         <div class="card-head"><h3>Stationen (global)</h3><button id="btn-new-template" class="primary small">+ Station</button></div>
         <p class="muted small">Die Stationen eures Teams mit allen Stammdaten (Rufzeichen, Locator, Band, Passwort, KST-Zugang, EDI-Angaben). Beim Anlegen eines Contests wählst du, welche davon teilnehmen – jede bekommt dort ihr eigenes Log mit eigener Nummer und eigenem KST-Chat.</p>
@@ -196,6 +203,13 @@
         <p class="muted small">„✎“ öffnet den Contest mit Zeitraum, Wertung, Austausch und der Liste seiner Stationen (aufnehmen, bearbeiten, Nummer, entfernen).</p>
         <div class="table-wrap"><table id="admin-contests" class="compact fixed"><tbody></tbody></table></div>
       </div>
+      <div class="card">
+        <h3>Export / Abgabe <span id="admin-export-name" class="muted"></span></h3>
+        <p class="muted small">EDI (REG1TEST) je Station/Band für die Abgabe – vor dem Export läuft die Log-Prüfung. Das ZIP enthält die EDI-Dateien aller geprüften Stationen des Contests.</p>
+        <div id="admin-export" class="stack"></div>
+      </div>
+      </div>
+      <div class="admin-grid admin-sec hidden" data-asec="callbook">
       <div class="card">
         <h3>Stationsdatenbank (Call-Buch)</h3>
         <p class="muted"><span id="cb-count">0</span> Rufzeichen mit Locator bekannt. Wächst automatisch mit jedem geloggten QSO und jedem Import; beim ersten Start wird die mitgelieferte Startdatenbank geladen.</p>
@@ -215,17 +229,30 @@
         <p class="muted small maint-only">Ablauf: „Export im Repo-Format“ herunterladen und als <code>contestlogger/seed/stationsdatenbank.csv</code> ins Repo einchecken; alle Installationen holen sie mit „Nach neuen suchen (Repo)“.</p>
       </div>
       <div class="card">
-        <h3>Export / Abgabe <span id="admin-export-name" class="muted"></span></h3>
-        <p class="muted small">EDI (REG1TEST) je Station/Band für die Abgabe – vor dem Export läuft die Log-Prüfung. Das ZIP enthält die EDI-Dateien aller geprüften Stationen des Contests.</p>
-        <div id="admin-export" class="stack"></div>
-      </div>
-      <div class="card">
         <h3>WinContest-Ordner (DD3KU) übernehmen</h3>
         <p class="muted small">Den kompletten Ordner von WinContest auswählen (z. B. <code>D:\Contest</code>). Alle Logs aus <code>Datenbank/</code>, <code>DD3KU/</code>, <code>Auswertung/</code> und <code>ADIF/</code> werden als archivierte Contests übernommen und jedes Rufzeichen mit Locator landet in der Stationsdatenbank. <code>Contest.dat</code> (DD3KUs verschlüsselte Datenbank) kann nicht gelesen werden.</p>
         <form id="folder-form" class="stack">
           <input type="file" id="folder-files" webkitdirectory directory multiple>
           <button class="primary">Ordner importieren</button>
           <div id="folder-result" class="result hidden"></div>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Einzelne Datei importieren</h3>
+        <p class="muted small">WinContest (DD3KU) <code>.txt</code>/<code>.EXP</code>/<code>.mdb</code>, EDI/REG1TEST, ADIF oder Call-Listen (<code>Call;Locator;Name</code>). Rufzeichen + Locator landen immer im Call-Buch.</p>
+        <form id="import-form" class="stack">
+          <input type="file" id="imp-file" required>
+          <label>Ziel
+            <select id="imp-target">
+              <option value="auto">Automatisch (QSOs als neue Station, sonst Call-Buch)</option>
+              <option value="callbook">Nur ins Call-Buch (Call + Locator)</option>
+              <option value="station">QSOs in bestehende Station übernehmen</option>
+            </select>
+          </label>
+          <label id="imp-station-wrap" class="hidden">Zielstation<select id="imp-station"></select></label>
+          <label>Contest-Name (nur bei neuer Station, optional)<input id="imp-contest-name" placeholder="z. B. DARC UKW Mai 2025"></label>
+          <button class="primary">Importieren</button>
+          <pre id="imp-result" class="result hidden"></pre>
         </form>
       </div>
       <div class="card maint-only">
@@ -252,30 +279,8 @@
         <div class="table-wrap hidden" id="darc-wrap" style="max-height:220px"><table id="darc-table" class="compact"><tbody></tbody></table></div>
         <div class="row hidden" id="darc-actions"><button type="button" id="btn-darc-import" class="primary">Ausgewählte importieren</button></div>
       </div>
-      <div class="card">
-        <h3>Einzelne Datei importieren</h3>
-        <p class="muted small">WinContest (DD3KU) <code>.txt</code>/<code>.EXP</code>/<code>.mdb</code>, EDI/REG1TEST, ADIF oder Call-Listen (<code>Call;Locator;Name</code>). Rufzeichen + Locator landen immer im Call-Buch.</p>
-        <form id="import-form" class="stack">
-          <input type="file" id="imp-file" required>
-          <label>Ziel
-            <select id="imp-target">
-              <option value="auto">Automatisch (QSOs als neue Station, sonst Call-Buch)</option>
-              <option value="callbook">Nur ins Call-Buch (Call + Locator)</option>
-              <option value="station">QSOs in bestehende Station übernehmen</option>
-            </select>
-          </label>
-          <label id="imp-station-wrap" class="hidden">Zielstation<select id="imp-station"></select></label>
-          <label>Contest-Name (nur bei neuer Station, optional)<input id="imp-contest-name" placeholder="z. B. DARC UKW Mai 2025"></label>
-          <button class="primary">Importieren</button>
-          <pre id="imp-result" class="result hidden"></pre>
-        </form>
       </div>
-      <div class="card">
-        <h3>Backups auf dem Server</h3>
-        <p class="muted small" id="backup-info">Der Server sichert die Datenbank automatisch (nur wenn sich etwas geändert hat) in den Ordner <code>backup/</code> neben der Datenbank; beim Beenden zusätzlich. Die Datenbank selbst läuft im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt sie nicht.</p>
-        <p><button id="btn-backup" class="ghost">Jetzt sichern</button></p>
-        <div class="table-wrap" style="max-height:180px"><table id="backup-list" class="compact"><tbody></tbody></table></div>
-      </div>
+      <div class="admin-grid admin-sec hidden" data-asec="server">
       <div class="card">
         <h3>Updates</h3>
         <p class="muted small">Der Server prüft stündlich die GitHub-Releases. Die portable Version kann sich selbst aktualisieren (Dateien werden ersetzt, <code>data/</code> bleibt, danach Neustart); eine Quellcode-Installation aktualisiert man mit <code>git pull</code>.</p>
@@ -294,11 +299,19 @@
         </div>
       </div>
       <div class="card">
+        <h3>Backups auf dem Server</h3>
+        <p class="muted small" id="backup-info">Der Server sichert die Datenbank automatisch (nur wenn sich etwas geändert hat) in den Ordner <code>backup/</code> neben der Datenbank; beim Beenden zusätzlich. Die Datenbank selbst läuft im WAL-Modus mit synchronem Schreiben – ein Stromausfall beschädigt sie nicht.</p>
+        <p><button id="btn-backup" class="ghost">Jetzt sichern</button></p>
+        <div class="table-wrap" style="max-height:180px"><table id="backup-list" class="compact"><tbody></tbody></table></div>
+      </div>
+      <div class="card">
         <h3>Aktionsprotokoll</h3>
         <p class="muted small">Jede Änderung (QSOs, Stationen, Contests, Importe, Einstellungen, KST, Backups) wird mit Zeit, Nutzer und Admin-Kennzeichen festgehalten – auch auf der Server-Konsole.</p>
         <div class="row"><input id="audit-search" placeholder="Suchen (Aktion, Nutzer, Details) …" class="small" style="flex:1;min-width:160px"><button type="button" id="btn-audit-refresh" class="ghost small">Aktualisieren</button><button type="button" id="btn-audit-dl" class="ghost small">Als Textdatei</button></div>
         <div class="table-wrap" style="max-height:300px"><table id="audit-table" class="compact"><tbody></tbody></table></div>
       </div>
+      </div>
+      <div class="admin-grid admin-sec hidden" data-asec="settings">
       <div class="card">
         <h3>Externe Rufzeichen-Abfrage</h3>
         <p class="muted small">Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH oder QRZ.com nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. <b>HamQTH ist kostenlos, die Abfrage-Schnittstelle verlangt aber zwingend einen HamQTH-Account</b> (auf hamqth.com registrieren, dann hier Benutzername und Passwort eintragen und „Testen“ drücken). QRZ.com braucht ein XML-Abo. Ohne Internet oder Zugangsdaten bleibt alles lokal.</p>
@@ -349,6 +362,7 @@
         <h3>Admin-Passwort</h3>
         <form id="admin-pw-form" class="row"><input id="admin-pw-new" type="password" placeholder="Neues Passwort" required><button class="ghost">Ändern</button></form>
         <p><button id="btn-admin-logout" class="ghost small">Admin abmelden</button></p>
+      </div>
       </div>
     </div>
   </section>

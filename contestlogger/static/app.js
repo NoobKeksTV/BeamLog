@@ -188,7 +188,15 @@
   async function checkUpdateBadge() {
     try { const u = await GET("/api/update/status"); S.update = u; const b = $("#update-badge"); b.classList.toggle("hidden", !u.available); if (u.available) b.textContent = `⬆ v${u.latest}`; } catch (_) { /* */ }
   }
-  $("#update-badge")?.addEventListener("click", () => { showView("admin"); setTimeout(() => $("#btn-upd-check")?.scrollIntoView({ block: "center" }), 100); });
+  // Verwaltung: Unterbereiche (Contests & Stationen · Stationsdatenbank & Import · Server & Updates · Einstellungen)
+  function showAdminTab(name) {
+    localStorage.setItem("cl.atab", name);
+    $$("#admin-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.atab === name));
+    $$(".admin-sec").forEach((sec) => sec.classList.toggle("hidden", sec.dataset.asec !== name));
+  }
+  $$("#admin-tabs button").forEach((b) => b.addEventListener("click", () => showAdminTab(b.dataset.atab)));
+  showAdminTab(localStorage.getItem("cl.atab") || "contest");
+  $("#update-badge")?.addEventListener("click", () => { showView("admin"); showAdminTab("server"); setTimeout(() => $("#btn-upd-check")?.scrollIntoView({ block: "center" }), 100); });
   function changelogBox(entries, title) {
     const box = el("div", { class: "news" }, el("h3", {}, title));
     if (!entries.length) box.append(el("p", { class: "muted" }, t("Kein Änderungsprotokoll vorhanden (wird beim Release-Build erzeugt).")));

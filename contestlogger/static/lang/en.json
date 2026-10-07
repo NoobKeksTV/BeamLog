@@ -601,5 +601,9 @@
  "Alle trotzdem exportieren (Admin)": "Export all anyway (admin)",
  "EDI-ZIP {name}: {ok} von {total} Logs bestehen die Prüfung": "EDI ZIP {name}: {ok} of {total} logs pass the check",
  "Klick auf eine Station öffnet ihre Prüfung. Logs mit Fehlern landen nicht im ZIP – dort steht dann eine Datei NICHT_EXPORTIERT.txt mit den Gründen.": "Click a station to open its check. Logs with errors are left out of the ZIP, which then contains NICHT_EXPORTIERT.txt with the reasons.",
- "Contests konnten nicht geladen werden: ": "Could not load contests: "
+ "Contests konnten nicht geladen werden: ": "Could not load contests: ",
+ "Contests & Stationen": "Contests & stations",
+ "Stationsdatenbank & Import": "Station database & import",
+ "Server & Updates": "Server & updates",
+ "Einstellungen": "Settings"
 }
