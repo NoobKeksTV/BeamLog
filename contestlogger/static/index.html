@@ -193,6 +193,7 @@
       </div>
       <div class="card">
         <div class="card-head"><h3>Contests</h3><button id="btn-new-contest" class="primary small">+ Contest</button></div>
+        <p class="muted small">„✎“ öffnet den Contest mit Zeitraum, Wertung, Austausch und der Liste seiner Stationen (aufnehmen, bearbeiten, Nummer, entfernen).</p>
         <div class="table-wrap"><table id="admin-contests" class="compact fixed"><tbody></tbody></table></div>
       </div>
       <div class="card">
@@ -212,11 +213,6 @@
           <span class="tag">Betreuer</span><input type="file" id="cb-list-file" accept=".csv,.txt" required><button class="ghost small">Stationsliste einpflegen</button><span id="cb-list-result" class="muted small"></span>
         </form>
         <p class="muted small maint-only">Ablauf: „Export im Repo-Format“ herunterladen und als <code>contestlogger/seed/stationsdatenbank.csv</code> ins Repo einchecken; alle Installationen holen sie mit „Nach neuen suchen (Repo)“.</p>
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>Stationen im Contest <span id="admin-contest-name" class="muted"></span></h3><div class="row"><select id="tpl-add-sel" class="small"></select><button id="btn-add-template" class="primary small" title="Globale Station in diesen Contest aufnehmen">+ aufnehmen</button><button id="btn-new-station" class="ghost small" title="Station nur für diesen Contest anlegen">+ einmalig</button></div></div>
-        <p class="muted small">Die Stationen dieses Contests mit eigenem Log und eigener laufender Nummer. Operatoren schalten die Station mit dem Passwort frei. Die Stations-ID (für CAT-Bridge und Operator-Fenster) steht in der Tabelle.</p>
-        <div class="table-wrap"><table id="admin-stations" class="compact fixed"><tbody></tbody></table></div>
       </div>
       <div class="card">
         <h3>Export / Abgabe <span id="admin-export-name" class="muted"></span></h3>

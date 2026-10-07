@@ -42,6 +42,10 @@ Alle Kürzel unter [Tastenkürzel](Tastenkuerzel.md) oder mit F1 im Programm.
 
 ## Was beim Loggen passiert
 
+Ein Doppel-QSO wird beim Tippen des Rufzeichens als rotes Banner über dem Formular angezeigt (wie im Operator-Fenster), mit Zeit und Locator des früheren QSOs.
+
+![Dupe-Hinweis](img/loggen-dupe.png)
+
 - Zeit in **UTC**, Entfernung nach WinContest-Methode (angefangene km = Punkte), Großfeld, Land (DXCC).
 - **Dupe-Erkennung** je Rufzeichen und Band: Dupes werden gespeichert, zählen aber 0 Punkte und erscheinen durchgestrichen.
 - Das Rufzeichen mit Locator landet in der **Stationsdatenbank** (siehe [Stationsdatenbank](Stationsdatenbank.md)).

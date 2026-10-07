@@ -583,5 +583,22 @@
  "Zoom bis 10 (fein, viele Kacheln)": "Zoom up to 10 (fine, many tiles)",
  "Laden": "Load",
  "Stopp": "Stop",
- "Cache leeren": "Clear cache"
+ "Cache leeren": "Clear cache",
+ "Stationen in diesem Contest": "Stations in this contest",
+ "alle globalen Stationen sind drin": "all global stations are in",
+ "aufnehmen": "add",
+ "einmalig": "one-off",
+ "Station bearbeiten": "Edit station",
+ "Nächste Seriennummer setzen": "Set next serial",
+ "Nächste Seriennummer:": "Next serial number:",
+ "Station aus dem Contest entfernen (mit allen QSOs)": "Remove station from contest (with all QSOs)",
+ "Noch keine Station – oben eine globale Station aufnehmen oder „+ einmalig“.": "No station yet – add a global station above or “+ one-off”.",
+ "Jede Station hat ihr eigenes Log, eigene laufende Nummer und eigenen KST-Chat. Die Stations-ID (für CAT-Bridge und Operator-Fenster) steht in der Tabelle; Export unter „Export / Abgabe“.": "Each station has its own log, serial and KST chat. The station ID (for CAT bridge and operator window) is in the table; export under “Export / Abgabe”.",
+ "„✎“ öffnet den Contest mit Zeitraum, Wertung, Austausch und der Liste seiner Stationen (aufnehmen, bearbeiten, Nummer, entfernen).": "“✎” opens the contest with period, scoring, exchange and its station list (add, edit, serial, remove).",
+ "ZIP herunterladen": "Download ZIP",
+ "ZIP mit den {n} geprüften Logs": "ZIP with the {n} passing logs",
+ "Auch Logs mit Fehlern exportieren? Der Auswerter wird diese QSOs wahrscheinlich streichen.": "Export logs with errors too? The adjudicator will probably strike those QSOs.",
+ "Alle trotzdem exportieren (Admin)": "Export all anyway (admin)",
+ "EDI-ZIP {name}: {ok} von {total} Logs bestehen die Prüfung": "EDI ZIP {name}: {ok} of {total} logs pass the check",
+ "Klick auf eine Station öffnet ihre Prüfung. Logs mit Fehlern landen nicht im ZIP – dort steht dann eine Datei NICHT_EXPORTIERT.txt mit den Gründen.": "Click a station to open its check. Logs with errors are left out of the ZIP, which then contains NICHT_EXPORTIERT.txt with the reasons."
 }

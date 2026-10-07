@@ -212,6 +212,7 @@ tr.total td { border-top: 2px solid var(--line); }
 .check-list { max-height: 50vh; overflow: auto; }
 .check-list div { padding: 5px 8px; border-left: 3px solid var(--warn); margin-bottom: 4px; background: var(--card2); border-radius: 0 6px 6px 0; cursor: pointer; font-size: 13.5px; }
 .check-list div.err { border-color: var(--bad); }
+.check-list div.ok { border-color: var(--ok); }
 .check-list .n { font-family: var(--mono); color: var(--muted); margin-right: 8px; }
 .check-ok { color: var(--ok); font-weight: 700; font-size: 16px; }
 .macro-bar { padding: 10px 14px; }
@@ -246,6 +247,8 @@ body.bigscreen .kpis.big .kpi b { font-size: 56px; }
 .statline .st.odx b { color: var(--accent); }
 .map-card .map { height: 220px; transition: height .2s; }
 .map-card.planes-on .map { height: 420px; }  /* mit Flugzeugen mehr Platz für den Pfad */
+.c-stations { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; }
+.c-stations .card-head h3 { font-size: 15px; }
 .cb-form { display: grid; grid-template-columns: 1.3fr 1fr 1.4fr .7fr auto; gap: 6px; align-items: center; margin: 8px 0; }
 .cb-form input { min-width: 0; width: 100%; }
 .cb-actions { margin-top: 4px; }
@@ -257,6 +260,8 @@ body.bigscreen .kpis.big .kpi b { font-size: 56px; }
 .serial-badge { background: var(--warn); color: #04121f; font-weight: 800; padding: 2px 8px; border-radius: 6px; font-family: var(--mono); }
 .export-card { border-color: var(--accent2); }
 .actions .button { padding: 2px 7px; font-size: 12px; }
+/* Dupe-Hinweis im Logger so deutlich wie im Operator-Fenster */
+#hint-dupe { flex-basis: 100%; order: -1; font-size: 17px; font-weight: 800; padding: 8px 12px; border-radius: 10px; background: rgba(255,92,108,.18); border: 2px solid var(--bad); color: #ffb3ba; }
 .qso-form input#f-loc.auto { border-color: var(--ok); box-shadow: inset 0 0 0 1px var(--ok); }
 /* Chat mit Reitern, KST */
 .chat-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }

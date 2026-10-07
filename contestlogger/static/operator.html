@@ -211,7 +211,7 @@
   async function loadQsos(flash) {
     qsos = await GET(`/api/stations/${sid}/qsos`);
     const tb = $("#qsos"); tb.innerHTML = "";
-    for (const q of qsos.slice(-60).reverse()) {
+    for (const q of qsos.slice(0, 60)) {  // Liste kommt neueste zuerst – so bleibt sie
       const tr = document.createElement("tr");
       if (flash && !lastIds.has(q.id)) tr.className = "new";
       if (q.dupe) tr.className += " dupe";

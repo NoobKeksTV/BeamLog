@@ -1,4 +1,6 @@
-# Operator-Fenster (zweiter Monitor)
+# Operator-Fenster
+
+Die QSO-Liste zeigt die neuesten QSOs oben. (zweiter Monitor)
 
 ![Operator-Fenster](img/operator.png)
 

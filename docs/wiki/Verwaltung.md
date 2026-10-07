@@ -12,11 +12,13 @@ Anlegen (mit Stationsauswahl), bearbeiten (Name, Zeitraum, Notizen, **Wertung**:
 
 ![Contest anlegen mit Austausch](img/contest-austausch.png)
 
-## Stationen im Contest
-Die Stationen des gewählten Contests mit ID, Nummer und Passwortstatus. „+ aufnehmen“ fügt eine globale Station hinzu, „+ einmalig“ eine nur für diesen Contest. Je Station: EDI, ADIF, ✎ bearbeiten, Nr. setzen, ✕ löschen.
+## Stationen eines Contests
+Stehen im Contest-Dialog (Contests → ✎) unter den Contest-Daten: ID, Band, Locator, Nummer, Passwortstatus, KST-Login. „+ aufnehmen“ fügt eine globale Station hinzu, „+ einmalig“ eine nur für diesen Contest; je Station ✎ bearbeiten, Nr. setzen, ✕ entfernen (mit allen QSOs).
+
+![Contest bearbeiten mit Stationen](img/contest-bearbeiten.png)
 
 ## Export / Abgabe
-EDI je Station (mit Prüfung), ADIF, CSV, alle Bänder als EDI-ZIP. Siehe [Import und Export](Import-Export.md).
+Je Station mit QSO-Zahl und Punkten: EDI (mit Prüfung – öffnet das Prüfergebnis, Download darin), ADIF, CSV, Cabrillo. „Alle Bänder als EDI-ZIP“ zeigt erst, welche Logs die Prüfung bestehen, und lädt dann das ZIP. Siehe [Import und Export](Import-Export.md).
 
 ## Importe
 WinContest-Ordner, Ergebnislisten, DARC-Contest-Hub, einzelne Datei. Siehe [Import und Export](Import-Export.md).

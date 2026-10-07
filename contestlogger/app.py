@@ -1233,6 +1233,20 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         lines = ["Call;Locator;Zuletzt;DOK"] + [f"{r['call']};{r['locator']};{(r['last_seen'] or '')[:10]};{r['dok'] or ''}" for r in rows]
         return PlainTextResponse("\n".join(lines) + "\n", media_type="text/csv", headers={"Content-Disposition": "attachment; filename=stationsdatenbank.csv"})
 
+    @app.get("/api/contests/{cid}/check")
+    async def check_contest(cid: int):
+        """Log-Prüfung aller Stationen eines Contests – Grundlage für den EDI-ZIP-Dialog."""
+        contest = db.get_contest(cid)
+        if not contest:
+            raise HTTPException(404)
+        out = []
+        for st in db.list_stations(cid):
+            station = db.get_station(st["id"])
+            res = await asyncio.to_thread(logcheck.check_station, contest, station, db.list_qsos(st["id"]))
+            out.append({"station_id": st["id"], "call": station["call"], "band": station["band"], "qsos": res["qsos"], "ok": res["ok"],
+                        "errors": res["errors"][:20], "n_errors": len(res["errors"]), "n_warnings": len(res["warnings"])})
+        return {"stations": out, "ok": sum(1 for s in out if s["ok"]), "total": len(out)}
+
     @app.get("/api/contests/{cid}/export.zip")
     def export_contest_zip(cid: int, force: int = 0, nick: str = "", x_admin_token: str | None = Header(default=None)):
         """Alle Stationen/Bänder eines Contests als EDI-Dateien in einem ZIP – nur geprüfte Logs."""
@@ -1249,12 +1263,14 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 qsos = db.list_qsos(st["id"])
                 res = logcheck.check_station(contest, station, qsos)
                 if res["errors"] and not (force and is_admin(x_admin_token)):
-                    skipped.append(f"{station['call']} {station['band']}: {len(res['errors'])} Fehler")
+                    lines = [f"  - #{e['serial']:03d} {e['call']}: {e['msg']}" if e.get("serial") else f"  - {e['msg']}" for e in res["errors"][:30]]
+                    skipped.append(f"{station['call']} {station['band']}: {len(res['errors'])} Fehler\n" + "\n".join(lines))
                     continue
                 name = f"{station['call'].replace('/', '-')}_{station['band']}.edi"
                 z.writestr(name, exporters.export_edi(contest, station, qsos).encode("latin-1", "replace"))
             if skipped:
-                z.writestr("NICHT_EXPORTIERT.txt", "Diese Logs haben die Prüfung nicht bestanden:\n" + "\n".join(skipped))
+                z.writestr("NICHT_EXPORTIERT.txt", ("Diese Logs haben die Log-Prüfung nicht bestanden und wurden nicht exportiert.\n"
+                                                    "Fehler im Logger beheben (Verwaltung → Export / Abgabe → EDI (mit Prüfung)) oder als Admin „trotzdem exportieren“.\n\n" + "\n\n".join(skipped)).encode("utf-8"))
         fname = f"{contest['name']}".replace("/", "-").replace(" ", "_") + ".zip"
         db.add_audit(f"EDI-ZIP exportiert (Contest {cid})", details=f"{fname}; nicht exportiert: {len(skipped)}" + (" [erzwungen]" if force else ""), admin=is_admin(x_admin_token), nick=nick_of(nick))
         return Response(buf.getvalue(), media_type="application/zip", headers={"Content-Disposition": f"attachment; filename={fname}"})

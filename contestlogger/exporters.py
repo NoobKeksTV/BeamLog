@@ -82,7 +82,7 @@ def export_edi(contest: dict, station: dict, qsos: list[dict]) -> str:
         f"CToSc={tot['score']}",
         f"CODXC={odx['call']};{odx['locator']};{odx['km']}" if odx else "CODXC=",
         "[Remarks]",
-        f"Erstellt mit ContestLogger {__version__} – Wertung: {scoring.label(contest.get('scoring'))}" + (f", Multiplikator {tot['multiplier']}" if tot["multiplier"] else ""),
+        f"Erstellt mit ContestLogger {__version__} - Wertung: {scoring.label(contest.get('scoring')).replace('×', 'x')}" + (f", Multiplikator {tot['multiplier']}" if tot["multiplier"] else ""),
         f"[QSORecords;{len(qsos)}]",
     ]
     for q in qsos:

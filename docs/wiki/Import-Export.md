@@ -46,11 +46,11 @@ Verwaltung → **Export / Abgabe** (je Contest):
 
 | Knopf | Ergebnis |
 |---|---|
-| EDI (mit Prüfung) | REG1TEST-Datei der Station/des Bandes für die Abgabe. Vorher läuft die [Log-Prüfung](Log-Pruefung.md); mit Fehlern exportiert nur der Admin nach Rückfrage. |
+| EDI (mit Prüfung) | Öffnet die [Log-Prüfung](Log-Pruefung.md) der Station (ohne die aktive Station im Logger zu wechseln); bei Erfolg steht darin „EDI herunterladen“, mit Fehlern exportiert nur der Admin nach Rückfrage. |
 | ADIF | Alle QSOs der Station als ADIF (mit Frequenz, wenn CAT lief; DOK als `DARC_DOK`/`SRX_STRING`). |
 | CSV | Tabelle. |
 | Cabrillo | Cabrillo 3.0 (`.cbr`) für Auswerter, die kein EDI annehmen: Kopf mit Kategorie, Locator, Wertung, Adresse; QSO-Zeilen mit RST, Nummer, Locator und ggf. DOK; Dupes als `X-QSO`. |
-| Alle Bänder als EDI-ZIP | Die EDI-Dateien aller geprüften Stationen des Contests; nicht bestandene Logs stehen in `NICHT_EXPORTIERT.txt`. |
+| Alle Bänder als EDI-ZIP | Zeigt erst die Prüfung aller Stationen des Contests (✔/✖ mit den ersten Fehlern, Klick öffnet die Prüfung der Station) und lädt dann das ZIP mit den bestandenen Logs; der Admin kann alle erzwingen. Nicht bestandene Logs stehen mit ihren Fehlern in `NICHT_EXPORTIERT.txt`. Enthält das ZIP nur diese Datei, hat kein Log die Prüfung bestanden. |
 
 Der EDI-Kopf nimmt die Angaben aus der Station (Wertungsgruppe, Club, Verantwortlicher, Technik). Jeder Export steht im Aktionsprotokoll.
 
