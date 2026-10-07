@@ -4,7 +4,8 @@
 |---|---|
 | Andere Rechner erreichen den Server nicht | Firewall auf dem Server-Rechner (Port 8000 bzw. 80 freigeben, Windows: „privates Netzwerk“). Adresse mit Port eingeben: `http://192.168.1.10:8000`. |
 | `GLIBC_2.xx not found` beim Start unter Linux | System zu alt (vor Debian 12 / Ubuntu 22.04). Quellcode-Variante nutzen. |
-| `Failed at step EXEC spawning /opt/contestlogger/.venv/bin/python` | Alte Unit-Datei vom Quellcode-Deploy. Unit aus `deploy/contestlogger.service` kopieren, `daemon-reload`, Neustart. |
+| `Failed at step EXEC spawning /opt/contestlogger/.venv/bin/python` | Alte Unit-Datei vom Quellcode-Deploy auf einem portablen Server. Unit aus `deploy/contestlogger.service` (im Linux-ZIP) kopieren, `daemon-reload`, Neustart. |
+| Dienst startet, ignoriert aber Port/Adresse | Die Unit enthält seit v0.9.28 keine Optionen mehr; die Werte stehen in `/etc/contestlogger/contestlogger.env`. Fehlt die Datei (alte Installation), `sudo bash deploy/install.sh --update` ausführen oder `deploy/contestlogger.env` dorthin kopieren. Beim Start zeigt die Konsole „Konfiguration: …“. |
 | `[Errno 13] permission denied` beim Binden an Port 80 | Nicht-root darf Port 80 nicht öffnen. Entweder nginx davor (Dienst auf 8000) oder `deploy/contestlogger-port80.service` mit `CAP_NET_BIND_SERVICE`. |
 | Station fragt nach Passwort | Station hat ein Passwort (Verwaltung). Ohne Passwort wird automatisch freigeschaltet. |
 | KST: „Anmeldung abgelehnt“ | Rufzeichen/Passwort bei der Station prüfen. Das KST-Passwort ist das vom ON4KST-Account. |

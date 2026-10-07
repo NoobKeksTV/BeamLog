@@ -14,8 +14,28 @@ sudo bash deploy/install.sh
 ```
 
 Das Skript installiert Python, nginx und mdbtools, kopiert den Code nach `/opt/contestlogger`,
-legt den Systembenutzer `contestlogger` an, richtet den systemd-Dienst und die nginx-Site ein
-und aktiviert ein tägliches Backup nach `/var/lib/contestlogger/backup/` (30 Tage Aufbewahrung).
+legt den Systembenutzer `contestlogger` an, schreibt die Konfiguration `/etc/contestlogger/contestlogger.env`,
+richtet den systemd-Dienst und die nginx-Site ein und aktiviert ein tägliches Backup nach
+`/var/lib/contestlogger/backup/` (30 Tage Aufbewahrung). `--url http://contest.local/` setzt die öffentliche Adresse.
+
+## Einstellungen: /etc/contestlogger/contestlogger.env
+
+Alle Server-Einstellungen stehen in dieser Datei (`.env`-Format), die Unit selbst enthält keine Optionen:
+
+```ini
+HOST=127.0.0.1                                  # hinter nginx nur lokal
+PORT=8000
+DB=/var/lib/contestlogger/contestlogger.db
+BACKUP_MIN=15                                   # automatische Sicherung alle N Minuten
+PUBLIC_URL=http://contest.local/                # Adresse im QR-Code und in Links
+#KST_HOST=www.on4kst.info
+#KST_PORT=23000
+#GITHUB_TOKEN=                                  # nur für ein privates Repo
+#MAINTAINER=1                                   # Betreuer-Modus (Quellen-Importe der Stationsdatenbank)
+```
+
+Nach Änderungen `sudo systemctl restart contestlogger`. Die Datei bleibt bei `--update` unverändert; Umgebungsvariablen
+`CONTESTLOGGER_<KEY>` und Kommandozeilen-Optionen überstimmen sie.
 
 Update auf eine neue Version:
 
@@ -28,7 +48,8 @@ sudo bash deploy/install.sh --update
 
 | Datei | Zweck |
 |---|---|
-| `contestlogger.service` | systemd-Dienst, läuft als Benutzer `contestlogger`, lauscht nur auf 127.0.0.1:8000 |
+| `contestlogger.service` | systemd-Dienst, läuft als Benutzer `contestlogger`, liest `/etc/contestlogger/contestlogger.env` (Standard: nur 127.0.0.1:8000) |
+| `portable/` | Dateien für die portable Version (Binary statt venv) inkl. `contestlogger.env`-Vorlage und Port-80-Unit |
 | `nginx-contestlogger.conf` | nginx-Site auf Port 80, Reverse-Proxy inkl. WebSocket, statische Dateien direkt |
 | `nginx-contestlogger-ssl.conf` | optionale HTTPS-Variante mit selbstsigniertem Zertifikat |
 | `install.sh` | Installation / Update in einem Rutsch |

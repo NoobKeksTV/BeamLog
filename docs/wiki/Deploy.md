@@ -126,4 +126,4 @@ Wiederherstellen: Dienst stoppen, Sicherung nach `contestlogger.db` kopieren, Di
 
 ## Quellcode-Variante auf dem Server
 
-Wer lieber aus dem Repo installiert (Python-venv statt Binary), nutzt `deploy/install.sh` aus dem Quellcode-Checkout; dort entsteht `/opt/contestlogger/.venv`. Updates dann mit `git pull` und `sudo bash deploy/install.sh --update`.
+Wer lieber aus dem Repo installiert (Python-venv statt Binary), nutzt `deploy/install.sh` aus dem Quellcode-Checkout; dort entsteht `/opt/contestlogger/.venv`. Auch diese Unit liest alle Einstellungen aus `/etc/contestlogger/contestlogger.env` (`run.py --config …`), das Skript legt die Datei beim ersten Lauf an und `--url` setzt die öffentliche Adresse. Updates dann mit `git pull` und `sudo bash deploy/install.sh --update`.
