@@ -1,6 +1,15 @@
 # Änderungsprotokoll
 
-## v0.9.30 (2026-10-07)
+## v0.9.31 (2026-10-07)
+- Quellcode-Deploy nutzt ebenfalls contestlogger.env statt Optionen in der Unit
+  - deploy/contestlogger.service startet run.py --config /etc/contestlogger/contestlogger.env (keine Optionen mehr)
+  - deploy/install.sh legt die Konfiguration an (Vorlage deploy/portable/contestlogger.env), --url setzt PUBLIC_URL,
+    übernimmt eine alte --public-url aus der Unit; deploy/README.md beschreibt die Datei
+  - Wiki: Deploy (Quellcode-Variante) und Fehlersuche (Dienst ignoriert Port/Adresse) ergänzt
+- Build: kein Artefakt-Upload mehr – die ZIPs hängen am Release
+- Build: Artefakt-Upload blockiert den Release nicht mehr (Speicherkontingent), Aufbewahrung 2 Tage
+- Version 0.9.30
+  - Änderungsprotokoll für v0.9.30
 - Fehler nach Update behoben: alte Seite aus dem Browser-Cache + neues Skript
   - index.html und Operator-Seite werden mit Cache-Control: no-cache ausgeliefert, app.js und style.css mit
     Versionsstempel (?v=…) eingebunden – nach einem Update passen Seite und Skript immer zusammen
