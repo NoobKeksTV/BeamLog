@@ -202,8 +202,13 @@
     if (!entries.length) box.append(el("p", { class: "muted" }, t("Kein Änderungsprotokoll vorhanden (wird beim Release-Build erzeugt).")));
     for (const e of entries) {
       box.append(el("h4", {}, `v${e.version}${e.date ? " · " + e.date : ""}`));
-      const ul = el("ul", {});
-      for (const ln of e.lines) { if (/^- /.test(ln)) ul.append(el("li", {}, ln.slice(2))); else if (ul.lastChild) ul.lastChild.append(" ", ln.trim().replace(/^- /, "")); }
+      const ul = el("ul", {}); let sub = null;
+      for (const ln of e.lines) {
+        if (/^- /.test(ln)) { ul.append(el("li", {}, el("b", {}, ln.slice(2)))); sub = null; }          // Commit-Betreff
+        else if (/^\s+- /.test(ln) && ul.lastChild) { if (!sub) { sub = el("ul", { class: "sub" }); ul.lastChild.append(sub); } sub.append(el("li", {}, ln.trim().slice(2))); }  // Unterpunkt
+        else if (sub?.lastChild) sub.lastChild.append(" ", ln.trim());                                  // Fortsetzungszeile
+        else if (ul.lastChild) ul.lastChild.append(" ", ln.trim());
+      }
       box.append(ul);
     }
     box.append(el("div", { class: "row" }, el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen"))));

@@ -13,6 +13,15 @@ def git(*args: str) -> str:
     return subprocess.run(["git", *args], capture_output=True, encoding="utf-8", errors="replace", check=False).stdout.strip()
 
 
+# Reine Versions-/Protokoll-Commits sagen dem Nutzer nichts – nicht in die Notizen
+_SKIP_SUBJECT = re.compile(r"^(Version \d|Änderungsprotokoll|Release v?\d|Bump version)", re.I)
+
+
+def _body_item(ln: str) -> str:
+    """Body-Zeile als Unterpunkt: „- Text“ bleibt Aufzählung, Fortsetzungszeilen werden angehängt."""
+    return ln.strip()
+
+
 def commits_between(a: str, b: str) -> list[tuple[str, str, list[str]]]:
     rng = f"{a}..{b}" if a else b
     raw = git("log", rng, "--no-merges", "--format=%H%x1f%h%x1f%s%x1f%b%x1e")
@@ -22,6 +31,8 @@ def commits_between(a: str, b: str) -> list[tuple[str, str, list[str]]]:
         if not rec.strip():
             continue
         full, short, subject, body = (rec.split("\x1f") + ["", "", "", ""])[:4]
+        if _SKIP_SUBJECT.match(subject.strip()):
+            continue
         body_lines = [ln.rstrip() for ln in body.splitlines() if ln.strip() and not re.match(r"^(Co-Authored-By|Claude-Session|Signed-off-by):", ln.strip())]
         out.append((short, subject.strip(), body_lines))
     return out
@@ -44,7 +55,8 @@ def changelog(current_version: str = "") -> str:
         for short, subject, body in cs:
             out.append(f"- {subject}")
             for ln in body:
-                out.append(f"  {ln}")
+                # Unterpunkte („- …“) eingerückt, Fortsetzungszeilen an den letzten Unterpunkt
+                out.append(f"  {ln.strip()}" if ln.strip().startswith("- ") else f"    {ln.strip()}")
         out.append("")
     return "\n".join(out)
 
@@ -65,6 +77,8 @@ def main() -> None:
         if not rec.strip():
             continue
         full, short, subject, body = (rec.split("\x1f") + ["", "", "", ""])[:4]
+        if _SKIP_SUBJECT.match(subject.strip()):
+            continue  # Versions-/Protokoll-Commits nicht in die Release-Notes
         # Signatur-/Session-Zeilen aus dem Body entfernen
         body_lines = [ln.rstrip() for ln in body.splitlines() if ln.strip() and not re.match(r"^(Co-Authored-By|Claude-Session|Signed-off-by):", ln.strip())]
         commits.append((short, subject.strip(), body_lines))
@@ -76,7 +90,7 @@ def main() -> None:
     for short, subject, body_lines in commits:
         out.append(f"- **{subject}**")
         for ln in body_lines:
-            out.append(f"  {ln}")
+            out.append(f"  {ln.strip()}" if ln.strip().startswith("- ") else f"    {ln.strip()}")
     out.append("")
     out.append("## Commit-Historie")
     for short, subject, _ in commits:

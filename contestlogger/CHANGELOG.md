@@ -1,6 +1,6 @@
 # Änderungsprotokoll
 
-## v0.9.32 (2026-10-07)
+## v0.9.32 (2026-10-08)
 - Verwaltung: Archiv-Knopf der Contest-Zeile als Symbol, damit alle Aktionen sichtbar sind
 - Verwaltung: Contest-Zeile ohne abgeschnittene Knöpfe (EDI-ZIP steht in Export / Abgabe)
 - Verwaltung in vier Bereiche aufgeteilt: Contests & Stationen, Stationsdatenbank & Import, Server & Updates, Einstellungen
@@ -22,26 +22,26 @@
   - Operator-Fenster: QSO-Liste neueste zuerst
   - EDI-Bemerkung ohne Sonderzeichen, die in Latin-1 zu „?“ wurden; Wiki aktualisiert
 - Wiki: Ziele des Einzeldatei-Imports erklärt (Automatisch, nur Call-Buch, bestehende Station)
-- Version 0.9.31
-  - Änderungsprotokoll für v0.9.31
+
+## v0.9.31 (2026-10-07)
 - Quellcode-Deploy nutzt ebenfalls contestlogger.env statt Optionen in der Unit
   - deploy/contestlogger.service startet run.py --config /etc/contestlogger/contestlogger.env (keine Optionen mehr)
   - deploy/install.sh legt die Konfiguration an (Vorlage deploy/portable/contestlogger.env), --url setzt PUBLIC_URL,
     übernimmt eine alte --public-url aus der Unit; deploy/README.md beschreibt die Datei
   - Wiki: Deploy (Quellcode-Variante) und Fehlersuche (Dienst ignoriert Port/Adresse) ergänzt
 - Build: kein Artefakt-Upload mehr – die ZIPs hängen am Release
+
+## v0.9.30 (2026-10-07)
 - Build: Artefakt-Upload blockiert den Release nicht mehr (Speicherkontingent), Aufbewahrung 2 Tage
-- Version 0.9.30
-  - Änderungsprotokoll für v0.9.30
 - Fehler nach Update behoben: alte Seite aus dem Browser-Cache + neues Skript
   - index.html und Operator-Seite werden mit Cache-Control: no-cache ausgeliefert, app.js und style.css mit
     Versionsstempel (?v=…) eingebunden – nach einem Update passen Seite und Skript immer zusammen
   - Alle Ereignis-Bindungen beim Start sind null-sicher (TypeError 'Cannot read properties of null' tritt nicht mehr auf,
     auch wenn ein Element fehlt)
+
+## v0.9.29 (2026-10-06)
 - Betreuer-Modus auch über DEV=true in contestlogger.env
   - DEV=true ist gleichbedeutend mit MAINTAINER=1 (DARC-Hub, Ergebnislisten, Stationslisten-Import nur dann)
-- Version 0.9.29
-  - Änderungsprotokoll für v0.9.29
 - Wertung je Contest mit Multiplikator, Cabrillo-Export, strengere Log-Prüfung, Offline-Kachelcache
   - Wertung im Contest wählbar: Punkte je QSO (1 je km oder fester Wert) und Multiplikator (keiner, Großfelder, DOKs,
     Großfelder + DOKs); Statistikzeile, Scoreboard, Statistik, EDI (CToSc/CQSOP) und Cabrillo nutzen dieselbe Wertung,
@@ -84,7 +84,6 @@
   - CLAUDE.md: Commits unter dem Account NoobKeksTV, ohne Signierung und ohne Zusatzzeilen
 - Test: Updater-Test auf case-insensitiven Dateisystemen (macOS) reparieren
   - Testordner hieß wie die Binärdatei (contestlogger/ContestLogger), was auf macOS kollidierte
-- Änderungsprotokoll für v0.9.28
 - Austausch je Contest wählbar: laufende Nummer, DOK/OV oder beides (z. B. Köln-Aachen-Contest)
   - Contest-Einstellung „Austausch“: RST + Nummer (Standard), RST + DOK/OV oder RST + Nummer + DOK
   - Logger blendet die Felder passend ein (DOK erh. statt/neben Nr erh.), Leertaste und Enter springen entsprechend,
@@ -109,6 +108,8 @@
     Hauptbild mit gerenderter OSM-Karte, Footer
   - Wiki: jede Seite mit Screenshots (Erster Start, QR-Code, Import, Export, Stationsdatenbank, Backups,
     Updates, Was ist neu, Aktionsprotokoll, Rufzeichen-Abfrage, ADS-B, Frequenz, KST-Rohdaten)
+
+## v0.9.28 (2026-10-05)
 - Updates, Was-ist-neu, README mit Badges und Bildern, komplettes Wiki
   - Update-Prüfung gegen die GitHub-Releases (stündlich, Token für privates Repo), grüner Knopf
     „⬆ vX“ im Kopf, Verwaltung → Updates: prüfen, Release-Notes, „Jetzt aktualisieren“ (portable
@@ -161,7 +162,6 @@
 
 ## v0.9.26 (2026-10-04)
 - Release-Notes: UTF-8-Ausgabe auf dem Windows-Runner (Umlaute)
-- Version 0.9.26: Linux-ZIP mit ergänzter Deploy-README (Befehle für Dienst und nginx)
 - Deploy-README: Befehle zum Kopieren, Aktivieren und Starten des Dienstes (manuelle Installation) und zur Bedienung
 
 ## v0.9.25 (2026-10-04)
@@ -258,10 +258,10 @@
 
 ## v0.9.6 (2026-10-04)
 - KST-DM: Rufzeichen im Gespräch anklickbar, Knopf '→ Log' (v0.9.6)
-  Im DM-Gespräch übernimmt ein Klick auf das Rufzeichen im Kopf, auf den
-  neuen Knopf '→ Log' oder auf das Rufzeichen einer Nachricht Call und
-  Locator in den Logger. Locator wird aus der Nutzerliste oder der
-  Nachricht genommen.
+    Im DM-Gespräch übernimmt ein Klick auf das Rufzeichen im Kopf, auf den
+    neuen Knopf '→ Log' oder auf das Rufzeichen einer Nachricht Call und
+    Locator in den Logger. Locator wird aus der Nutzerliste oder der
+    Nachricht genommen.
 
 ## v0.9.5 (2026-10-04)
 - KST je Station, Filter 'an mich' einstellbar, Textbausteine an alle, Import-Zusammenfassung (v0.9.5)
@@ -281,10 +281,10 @@
 
 ## v0.9.4 (2026-10-04)
 - KST-DM: Gespräch zeigt nur Nachrichten zwischen mir und dem Kontakt (v0.9.4)
-  Im DM-Tab erscheinen nur noch eingehende Nachrichten des Kontakts an mich
-  und eigene Nachrichten an den Kontakt. Nachrichten des Kontakts an Dritte
-  oder öffentliche Nachrichten werden nicht mehr angezeigt.
-  Fake-KST-Server um /FAKEMSGS für Tests erweitert.
+    Im DM-Tab erscheinen nur noch eingehende Nachrichten des Kontakts an mich
+    und eigene Nachrichten an den Kontakt. Nachrichten des Kontakts an Dritte
+    oder öffentliche Nachrichten werden nicht mehr angezeigt.
+    Fake-KST-Server um /FAKEMSGS für Tests erweitert.
 
 ## v0.9.3 (2026-10-04)
 - KST-DM als Messenger: Kontaktliste links (nach Aktivität sortiert, ungelesen), Gespräch rechts, Eingabe geht direkt an den Kontakt, neues Gespräch per +
