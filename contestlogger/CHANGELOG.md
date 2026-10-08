@@ -1,5 +1,26 @@
 # Änderungsprotokoll
 
+## v0.9.33 (2026-10-08)
+- Log-Prüfung als Vergleichstabelle: Feld, geloggt, erwartet – mit Filtern statt Textliste
+  - Jeder QSO-Befund ist eine Zeile Nr · UTC · Rufzeichen · Feld · geloggt · erwartet/Vergleich (✖ Fehler, ⚠ Hinweis);
+    Klick öffnet das QSO, der ausführliche Text steht im Tooltip
+  - Filterknöpfe: Alle / Fehler / Hinweise und je Feld (Locator, Nr erh., Land, Dupe …) mit Anzahl
+  - Kopfdaten und allgemeine Befunde (Nummernlücken, EDI-Kopf) kompakt und eingeklappt darunter
+  - Online-Abgleich (HamQTH/QRZ) erscheint als Locator-Vergleich geloggt ↔ Online-DB; Wiki ergänzt
+- Plausibilitätshinweis berücksichtigt alle bekannten Standorte eines Rufzeichens
+  - „Stationsdatenbank kennt … mit …“ erscheint nicht mehr, wenn der eingegebene Locator einer der weiteren bekannten
+    Standorte ist (oder dazu passt); der Hinweis nennt alle bekannten Locator und das Datum nur, wenn es eins gibt
+- Dupe-Hinweis mit den Angaben des früheren QSOs, Liste filtert auf gearbeitete Rufzeichen, HamQTH ohne „kostenlos“
+  - Doppel-QSO-Banner (Logger und Operator-Fenster) zeigt Datum, Zeit, Nummern, DOK, Locator, km und Operator
+    der früheren QSOs (neueste zuerst, bis zu drei)
+  - Wird ein bereits gearbeitetes Rufzeichen eingegeben, zeigt die QSO-Liste unten nur dessen QSOs (markiert);
+    Feld leeren zeigt wieder alle, das Suchfeld hat Vorrang
+  - Anbieter heißt in Auswahl und Log-Prüfung nur noch „HamQTH“
+- „Was ist neu“ und Release-Notes aufgeräumt: keine Versions-Commits, Details als Unterpunkte
+  - Reine Versions-/Änderungsprotokoll-Commits ("Version 0.9.x") erscheinen nicht mehr in Release-Notes und „Was ist neu“
+  - Commit-Details werden als eingerückte Unterpunkte dargestellt statt in eine Zeile zusammengeklebt;
+    der Betreff steht fett darüber
+
 ## v0.9.32 (2026-10-08)
 - Verwaltung: Archiv-Knopf der Contest-Zeile als Symbol, damit alle Aktionen sichtbar sind
 - Verwaltung: Contest-Zeile ohne abgeschnittene Knöpfe (EDI-ZIP steht in Export / Abgabe)
