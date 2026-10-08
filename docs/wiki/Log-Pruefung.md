@@ -1,5 +1,7 @@
 # Log-Prüfung
 
+Die Prüfung zeigt jeden Befund als eine Zeile zum Vergleichen: **Nr · UTC · Rufzeichen · Feld · geloggt · erwartet / Vergleich** (✖ Fehler, ⚠ Hinweis). Oben filtern Knöpfe nach Fehlern, Hinweisen oder einzelnen Feldern (z. B. nur „Locator“ oder „Nr erh.“); ein Klick auf eine Zeile öffnet das QSO zum Korrigieren, der volle Text steht im Tooltip. Befunde ohne QSO (EDI-Kopfdaten, Nummernlücken) stehen eingeklappt unter „Kopfdaten & Allgemeines“; mit Fehlern ist der Bereich offen.
+
 ![Log-Prüfung](img/logpruefung.png)
 
 Vor jedem EDI-Export läuft automatisch die Log-Prüfung; im Reiter **Log** lässt sie sich jederzeit mit „Log prüfen“ starten. Klick auf einen Eintrag öffnet das QSO zum Bearbeiten.

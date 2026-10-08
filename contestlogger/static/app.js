@@ -475,12 +475,38 @@
     const st = opts.station || station(); if (!st) return toast(t("Keine Station gewählt"), "err");
     let res; try { res = await GET(`/api/stations/${st.id}/check`); } catch (err) { return toast(err.message, "err"); }
     const qsosOf = async () => (st.id === S.stationId ? S.qsos : await GET(`/api/stations/${st.id}/qsos`));
-    const list = el("div", { class: "check-list" });
-    const item = (x, cls) => el("div", { class: cls, onclick: async () => { if (x.qso_id) { const q = (await qsosOf()).find((q) => q.id === x.qso_id); closeModal(); if (q) editQso(q); } } },
-      x.serial ? el("span", { class: "n" }, `#${pad3(x.serial)} ${x.call}`) : null, x.msg);
-    res.errors.forEach((x) => list.append(item(x, "err")));
-    res.warnings.forEach((x) => list.append(item(x, "warn")));
-    if (res.lookup) list.append(el("div", { class: "muted small" }, res.lookup.provider === "none" ? t("Online-Abgleich (HamQTH/QRZ) aus – in der Verwaltung einrichten, dann werden Rufzeichen und Locator automatisch gegengeprüft.") : t("Online-Abgleich: {n} Rufzeichen jetzt bei {p} nachgeschlagen, bereits geprüfte werden nicht erneut abgefragt.", { n: res.lookup.checked_now, p: res.lookup.provider === "hamqth" ? "HamQTH" : "QRZ" })));
+    // Vergleichsansicht: je QSO-Befund eine Zeile Feld · geloggt · erwartet; Kopfdaten und Allgemeines kompakt darunter
+    const all = [...res.errors.map((x) => ({ ...x, lvl: "err" })), ...res.warnings.map((x) => ({ ...x, lvl: "warn" }))];
+    const perQso = all.filter((x) => x.qso_id).sort((a, b) => (a.serial || 0) - (b.serial || 0) || (a.lvl === "err" ? -1 : 1));
+    const general = all.filter((x) => !x.qso_id);
+    const state = { lvl: "all", field: "" };
+    const counts = {}; perQso.forEach((x) => { const f = x.field || t("Sonstiges"); counts[f] = (counts[f] || 0) + 1; });
+    const chips = el("div", { class: "chk-chips" });
+    const tbody = el("tbody");
+    const renderRows = () => {
+      tbody.innerHTML = "";
+      const rows = perQso.filter((x) => (state.lvl === "all" || x.lvl === state.lvl) && (!state.field || (x.field || t("Sonstiges")) === state.field));
+      for (const x of rows) tbody.append(el("tr", { class: `chk-${x.lvl}`, title: x.msg, onclick: async () => { const q = (await qsosOf()).find((q) => q.id === x.qso_id); closeModal(); if (q) editQso(q); } },
+        el("td", { class: "lvl" }, x.lvl === "err" ? "✖" : "⚠"), el("td", { class: "num" }, x.serial ? pad3(x.serial) : ""), el("td", {}, x.ts ? fmtTime(x.ts) : ""),
+        el("td", {}, el("b", {}, x.call || "")), el("td", { class: "fld" }, x.field || "–"),
+        el("td", { class: "ist" }, x.logged || (x.field ? "" : x.msg)), el("td", { class: "soll" }, x.expected || "")));
+      if (!rows.length) tbody.append(el("tr", {}, el("td", { colspan: 7, class: "muted" }, perQso.length ? t("Keine Befunde in dieser Auswahl.") : t("Alle QSOs ohne Befund."))));
+      chips.querySelectorAll("button").forEach((b) => b.classList.toggle("active", (b.dataset.lvl && b.dataset.lvl === state.lvl) || (b.dataset.field !== undefined && b.dataset.field === state.field)));
+    };
+    const chip = (label, attrs, onclick) => el("button", { type: "button", class: "chip", ...attrs, onclick: () => { onclick(); renderRows(); } }, label);
+    chips.append(chip(`${t("Alle")} ${perQso.length}`, { "data-lvl": "all" }, () => { state.lvl = "all"; state.field = ""; }),
+      chip(`✖ ${t("Fehler")} ${perQso.filter((x) => x.lvl === "err").length}`, { "data-lvl": "err" }, () => { state.lvl = "err"; }),
+      chip(`⚠ ${t("Hinweise")} ${perQso.filter((x) => x.lvl === "warn").length}`, { "data-lvl": "warn" }, () => { state.lvl = "warn"; }),
+      el("span", { class: "sep" }),
+      ...Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([f, n]) => chip(`${f} ${n}`, { "data-field": f }, () => { state.field = state.field === f ? "" : f; })));
+    const table = el("div", { class: "table-wrap chk-table" }, el("table", { class: "compact" },
+      el("thead", {}, el("tr", {}, el("th", {}, ""), el("th", {}, t("Nr")), el("th", {}, "UTC"), el("th", {}, t("Rufzeichen")), el("th", {}, t("Feld")), el("th", {}, t("geloggt")), el("th", {}, t("erwartet / Vergleich")))), tbody));
+    const list = el("div", {}, perQso.length ? chips : null, perQso.length ? table : null);
+    if (general.length) list.append(el("details", { class: "chk-general", open: general.some((x) => x.lvl === "err") ? 1 : null },
+      el("summary", {}, `${t("Kopfdaten & Allgemeines")} (${general.filter((x) => x.lvl === "err").length} ${t("Fehler")}, ${general.filter((x) => x.lvl === "warn").length} ${t("Hinweise")})`),
+      el("ul", {}, general.map((x) => el("li", { class: `chk-${x.lvl}` }, `${x.lvl === "err" ? "✖" : "⚠"} ${x.msg}`)))));
+    if (res.lookup) list.append(el("div", { class: "muted small", style: "margin-top:6px" }, res.lookup.provider === "none" ? t("Online-Abgleich (HamQTH/QRZ) aus – in der Verwaltung einrichten, dann werden Rufzeichen und Locator automatisch gegengeprüft.") : t("Online-Abgleich: {p}, {n} Rufzeichen neu abgefragt.", { p: res.lookup.provider, n: res.lookup.checked_now })));
+    setTimeout(renderRows, 0);
     const dl = (force) => { window.location.href = `/api/stations/${st.id}/export.edi?nick=${encodeURIComponent(S.nick)}${force ? "&force=1" : ""}`; };
     const buttons = el("div", { class: "row", style: "margin-top:10px" });
     if (res.ok) buttons.append(el("button", { type: "button", class: "primary", onclick: () => { closeModal(); dl(false); } }, t("EDI herunterladen")));
@@ -493,8 +519,8 @@
     modal(el("div", {},
       el("h3", {}, t("Log-Prüfung {call} {band} – {n} QSOs", { call: st.call, band: st.band, n: res.qsos })),
       res.ok ? el("p", { class: "check-ok" }, t("✔ Keine Fehler{w} – das Log kann abgegeben werden.", { w: res.warnings.length ? ", " + res.warnings.length + " " + t("Hinweise") : "" }))
-             : el("p", { class: "hint warn" }, t("✖ {e} Fehler, {w} Hinweise. Fehler müssen vor dem EDI-Export behoben werden (Klick auf eine Zeile öffnet das QSO).", { e: res.errors.length, w: res.warnings.length })),
-      list, buttons));
+             : el("p", { class: "hint warn" }, t("✖ {e} Fehler, {w} Hinweise – Fehler vor dem Export beheben. Klick auf eine Zeile öffnet das QSO.", { e: res.errors.length, w: res.warnings.length })),
+      list, buttons)).classList.add("wide");
   }
   $("#btn-check")?.addEventListener("click", () => runCheck());
 

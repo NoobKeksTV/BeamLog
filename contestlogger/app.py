@@ -1094,9 +1094,9 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                     checked += 1
                 ext = (row.get("ext_locator") or "").upper()
                 if ext and q["locator"] and ext[:4] != q["locator"].upper()[:4]:
-                    res["warnings"].append({"qso_id": q["id"], "serial": q["serial_sent"], "call": q["call"], "msg": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')} kennt {core} mit {ext} (Log: {q['locator']}) – Locator prüfen"})
+                    res["warnings"].append({"qso_id": q["id"], "serial": q["serial_sent"], "call": q["call"], "field": "Locator", "logged": q["locator"].upper(), "expected": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')}: {ext}", "ts": q["ts_utc"], "msg": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')} kennt {core} mit {ext} (Log: {q['locator']}) – Locator prüfen"})
                 elif ext and q["locator"] and ext != q["locator"].upper() and len(q["locator"]) >= 6 and len(ext) >= 6:
-                    res["warnings"].append({"qso_id": q["id"], "serial": q["serial_sent"], "call": q["call"], "msg": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')}: {core} mit {ext} eingetragen (Log: {q['locator']}) – Portabelbetrieb?"})
+                    res["warnings"].append({"qso_id": q["id"], "serial": q["serial_sent"], "call": q["call"], "field": "Locator (fein)", "logged": q["locator"].upper(), "expected": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')}: {ext}", "ts": q["ts_utc"], "msg": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')}: {core} mit {ext} eingetragen (Log: {q['locator']}) – Portabelbetrieb?"})
             res["lookup"] = {"provider": client.provider, "checked_now": checked}
         else:
             res["lookup"] = {"provider": "none", "checked_now": 0}

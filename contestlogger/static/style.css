@@ -215,6 +215,19 @@ tr.total td { border-top: 2px solid var(--line); }
 .check-list div.ok { border-color: var(--ok); }
 .check-list .n { font-family: var(--mono); color: var(--muted); margin-right: 8px; }
 .check-ok { color: var(--ok); font-weight: 700; font-size: 16px; }
+/* Log-Prüfung als Vergleichstabelle */
+.chk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; align-items: center; }
+.chk-chips .chip { padding: 3px 10px; border-radius: 999px; font-size: 12.5px; background: var(--card2); border: 1px solid var(--line); color: var(--muted); cursor: pointer; }
+.chk-chips .chip.active { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+.chk-chips .sep { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }
+.chk-table { max-height: 50vh; }
+.chk-table tr { cursor: pointer; } .chk-table tbody tr:hover td { background: var(--card2); }
+.chk-table td.lvl { width: 18px; } .chk-table tr.chk-err td.lvl { color: var(--bad); } .chk-table tr.chk-warn td.lvl { color: var(--warn); }
+.chk-table td.fld { color: var(--muted); white-space: nowrap; }
+.chk-table td.ist { font-family: var(--mono); color: #ffb3ba; }
+.chk-table td.soll { font-family: var(--mono); color: var(--ok); }
+.chk-general { margin-top: 8px; font-size: 13px; } .chk-general summary { cursor: pointer; color: var(--muted); }
+.chk-general ul { margin: 4px 0 0 4px; padding: 0; list-style: none; } .chk-general li { margin: 2px 0; } .chk-general li.chk-err { color: #ffb3ba; }
 .macro-bar { padding: 10px 14px; }
 .macro-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .macro-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }

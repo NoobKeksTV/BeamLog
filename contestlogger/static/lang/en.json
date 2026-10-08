@@ -51,7 +51,7 @@
  "Entfernungsverteilung (km)": "Distance distribution (km)",
  "Erster Start – Admin-Passwort festlegen": "First start – set admin password",
  "F1–F8 senden/anzeigen · F9 blendet diese Übersicht ein/aus · Esc stoppt CW": "F1–F8 send/show · F9 toggles this overview · Esc stops CW",
- "Feld": "Square",
+ "Feld": "Field",
  "Felder": "Squares",
  "Format": "Format",
  "Freischalten": "Unlock",
@@ -609,5 +609,13 @@
  "Gefiltert: {n} QSO(s) mit {call} – Feld leeren zeigt wieder alle": "Filtered: {n} QSO(s) with {call} – clear the field to show all again",
  "HamQTH": "HamQTH",
  "⚠ {call} bereits gearbeitet: {info} – DUPE!": "⚠ {call} already worked: {info} – DUPE!",
- "Nr": "Nr"
+ "Nr": "Nr",
+ "Sonstiges": "Other",
+ "Keine Befunde in dieser Auswahl.": "No findings in this selection.",
+ "Alle QSOs ohne Befund.": "All QSOs without findings.",
+ "Alle": "All",
+ "erwartet / Vergleich": "expected / reference",
+ "Kopfdaten & Allgemeines": "Header & general",
+ "Online-Abgleich: {p}, {n} Rufzeichen neu abgefragt.": "Online check: {p}, {n} callsigns looked up.",
+ "✖ {e} Fehler, {w} Hinweise – Fehler vor dem Export beheben. Klick auf eine Zeile öffnet das QSO.": "✖ {e} errors, {w} warnings – fix errors before export. Click a row to open the QSO."
 }

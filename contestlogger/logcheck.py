@@ -28,11 +28,16 @@ def check_station(contest: dict, station: dict, qsos: list[dict]) -> dict:
     errors: list[dict] = []
     warnings: list[dict] = []
 
-    def err(msg: str, q: dict | None = None) -> None:
-        errors.append({"qso_id": q["id"] if q else None, "serial": q["serial_sent"] if q else None, "call": q["call"] if q else None, "msg": msg})
+    # Jeder Befund trägt für die Vergleichsansicht: Feld, geloggter Wert, erwarteter Wert/Grund (kurz)
+    def _item(msg: str, q: dict | None, field: str, logged: str, expected: str) -> dict:
+        return {"qso_id": q["id"] if q else None, "serial": q["serial_sent"] if q else None, "call": q["call"] if q else None,
+                "ts": q["ts_utc"] if q else None, "msg": msg, "field": field, "logged": logged, "expected": expected}
 
-    def warn(msg: str, q: dict | None = None) -> None:
-        warnings.append({"qso_id": q["id"] if q else None, "serial": q["serial_sent"] if q else None, "call": q["call"] if q else None, "msg": msg})
+    def err(msg: str, q: dict | None = None, field: str = "", logged: str = "", expected: str = "") -> None:
+        errors.append(_item(msg, q, field, logged, expected))
+
+    def warn(msg: str, q: dict | None = None, field: str = "", logged: str = "", expected: str = "") -> None:
+        warnings.append(_item(msg, q, field, logged, expected))
 
     # --- Station / Kopfdaten
     if not geo.is_valid_locator(station["locator"]) or len(station["locator"]) < 6:
@@ -75,49 +80,49 @@ def check_station(contest: dict, station: dict, qsos: list[dict]) -> dict:
     prev_ts = None
     for q in ordered:
         if not prefixes.is_plausible_call(q["call"]):
-            err("Rufzeichen unplausibel", q)
+            err("Rufzeichen unplausibel", q, "Rufzeichen", q["call"], "gültiges Rufzeichen")
         if "dok" in exchange and not (q.get("exch_rcvd") or "").strip():
-            warn("DOK/OV fehlt (Austausch dieses Contests)", q)
+            warn("DOK/OV fehlt (Austausch dieses Contests)", q, "DOK", "–", "DOK/OV")
         if not q["locator"]:
-            err("Locator fehlt (0 Punkte, wird vom Auswerter gestrichen)", q)
+            err("Locator fehlt (0 Punkte, wird vom Auswerter gestrichen)", q, "Locator", "–", "6-stelliger Locator")
         elif not geo.is_valid_locator(q["locator"]):
-            err(f"Locator „{q['locator']}“ ungültig", q)
+            err(f"Locator „{q['locator']}“ ungültig", q, "Locator", q["locator"], "z. B. JO31AA")
         elif len(q["locator"]) < 6:
-            warn(f"Locator „{q['locator']}“ nur 4-stellig – Entfernung ist ungenau", q)
+            warn(f"Locator „{q['locator']}“ nur 4-stellig – Entfernung ist ungenau", q, "Locator", q["locator"], "6 Stellen")
         if not RST_RE.match(str(q["rst_sent"])):
-            err(f"RST gegeben „{q['rst_sent']}“ ungültig", q)
+            err(f"RST gegeben „{q['rst_sent']}“ ungültig", q, "RST geg.", str(q["rst_sent"]), "z. B. 59 / 599")
         if not RST_RE.match(str(q["rst_rcvd"])):
-            err(f"RST erhalten „{q['rst_rcvd']}“ ungültig", q)
+            err(f"RST erhalten „{q['rst_rcvd']}“ ungültig", q, "RST erh.", str(q["rst_rcvd"]), "z. B. 59 / 599")
         if not str(q["serial_rcvd"]).strip():
-            warn("Empfangene Nummer fehlt", q)
+            warn("Empfangene Nummer fehlt", q, "Nr erh.", "–", "Nummer")
         elif not str(q["serial_rcvd"]).isdigit():
-            err(f"Empfangene Nummer „{q['serial_rcvd']}“ ist keine Zahl", q)
+            err(f"Empfangene Nummer „{q['serial_rcvd']}“ ist keine Zahl", q, "Nr erh.", str(q["serial_rcvd"]), "nur Ziffern")
         t = _ts(q["ts_utc"])
         if t > now:
-            err("Zeit liegt in der Zukunft", q)
+            err("Zeit liegt in der Zukunft", q, "Zeit", q["ts_utc"][11:16], "nicht in der Zukunft")
         if start and t < start:
-            err(f"QSO liegt vor Contest-Beginn ({contest['start_utc'][:16].replace('T', ' ')} UTC)", q)
+            err(f"QSO liegt vor Contest-Beginn ({contest['start_utc'][:16].replace('T', ' ')} UTC)", q, "Zeit", q["ts_utc"][5:16].replace("T", " "), f"ab {contest['start_utc'][5:16].replace('T', ' ')}")
         if end and t > end:
-            err(f"QSO liegt nach Contest-Ende ({contest['end_utc'][:16].replace('T', ' ')} UTC)", q)
+            err(f"QSO liegt nach Contest-Ende ({contest['end_utc'][:16].replace('T', ' ')} UTC)", q, "Zeit", q["ts_utc"][5:16].replace("T", " "), f"bis {contest['end_utc'][5:16].replace('T', ' ')}")
         if q["serial_sent"] in serials:
-            err(f"Gesendete Nummer {q['serial_sent']:03d} doppelt vergeben (auch bei {serials[q['serial_sent']]['call']})", q)
+            err(f"Gesendete Nummer {q['serial_sent']:03d} doppelt vergeben (auch bei {serials[q['serial_sent']]['call']})", q, "Nr geg.", f"{q['serial_sent']:03d}", f"schon bei {serials[q['serial_sent']]['call']}")
         serials[q["serial_sent"]] = q
         if prev_ts and q["serial_sent"] < prev_ts[1] and not q["dupe"]:
-            warn(f"Nummer {q['serial_sent']:03d} kommt zeitlich nach Nummer {prev_ts[1]:03d} – Reihenfolge prüfen", q)
+            warn(f"Nummer {q['serial_sent']:03d} kommt zeitlich nach Nummer {prev_ts[1]:03d} – Reihenfolge prüfen", q, "Nr geg.", f"{q['serial_sent']:03d}", f"> {prev_ts[1]:03d} (Reihenfolge)")
         prev_ts = (t, q["serial_sent"])
         if q["dupe"]:
-            warn("Doppel-QSO (wird mit 0 Punkten als Dupe exportiert)", q)
+            warn("Doppel-QSO (wird mit 0 Punkten als Dupe exportiert)", q, "Dupe", q["call"], "0 Punkte, als Dupe markiert")
         pl = prefixes.check_plausibility(q["call"], q["locator"]) if q["locator"] else {"ok": True}
         if not pl["ok"]:
-            err(pl["msg"], q)
+            err(pl["msg"], q, "Land", f"{q['call']} ({pl.get('country') or '?'})", f"{q['locator']} liegt in {', '.join((pl.get('locator_countries') or ['?'])[:2])}{' …' if len(pl.get('locator_countries') or []) > 2 else ''}")
         if q["km"] > 1500:
-            warn(f"{q['km']} km – ungewöhnlich weit, Locator prüfen", q)
+            warn(f"{q['km']} km – ungewöhnlich weit, Locator prüfen", q, "Entfernung", f"{q['km']} km", "Locator prüfen")
     own_core = prefixes.core_call(station["call"])
     for q in ordered:
         if prefixes.core_call(q["call"]) == own_core:
-            err("QSO mit dem eigenen Rufzeichen", q)
+            err("QSO mit dem eigenen Rufzeichen", q, "Rufzeichen", q["call"], "nicht das eigene")
         if q["locator"] and station["locator"] and q["locator"].upper() == station["locator"].upper() and q["km"] == 0:
-            warn("Partner im eigenen Locator-Feld (0 km) – stimmt der Locator?", q)
+            warn("Partner im eigenen Locator-Feld (0 km) – stimmt der Locator?", q, "Locator", q["locator"], "≠ eigener Locator")
     nums = sorted(serials)
     missing = [n for n in range(nums[0], nums[-1] + 1) if n not in serials]
     if missing:
