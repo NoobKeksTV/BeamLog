@@ -605,5 +605,9 @@
  "Contests & Stationen": "Contests & stations",
  "Stationsdatenbank & Import": "Station database & import",
  "Server & Updates": "Server & updates",
- "Einstellungen": "Settings"
+ "Einstellungen": "Settings",
+ "Gefiltert: {n} QSO(s) mit {call} – Feld leeren zeigt wieder alle": "Filtered: {n} QSO(s) with {call} – clear the field to show all again",
+ "HamQTH": "HamQTH",
+ "⚠ {call} bereits gearbeitet: {info} – DUPE!": "⚠ {call} already worked: {info} – DUPE!",
+ "Nr": "Nr"
 }

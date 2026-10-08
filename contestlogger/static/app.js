@@ -451,8 +451,12 @@
   function renderQsos() {
     const tb = $("#qso-table tbody"); tb.innerHTML = "";
     const f = $("#log-search").value.trim().toUpperCase();
-    const list = S.qsos.filter((q) => !f || q.call.includes(f) || q.locator.includes(f) || (q.comment || "").toUpperCase().includes(f));
-    list.slice(0, 60).forEach((q) => tb.append(qsoRow(q, false)));
+    // Bereits gearbeitetes Rufzeichen im Eingabefeld: Liste auf dessen QSOs filtern (Suchfeld hat Vorrang)
+    const dupe = !f && S.dupeFilter;
+    const list = dupe ? S.qsos.filter((q) => q.core_call === S.dupeFilter)
+      : S.qsos.filter((q) => !f || q.call.includes(f) || q.locator.includes(f) || (q.comment || "").toUpperCase().includes(f));
+    if (dupe) tb.append(el("tr", { class: "filter-note" }, el("td", { colspan: 11 }, t("Gefiltert: {n} QSO(s) mit {call} – Feld leeren zeigt wieder alle", { n: list.length, call: S.dupeFilter }))));
+    list.slice(0, 60).forEach((q) => { const tr = qsoRow(q, false); if (dupe) tr.classList.add("match"); tb.append(tr); });
     $("#qso-count").textContent = S.qsos.length;
   }
   $("#log-search")?.addEventListener("input", renderQsos);
@@ -668,8 +672,14 @@
     if (call.length < 3) $("#hint-altloc").classList.add("hidden");
     const core = call.split("/").sort((a, b) => b.length - a.length)[0] || "";
     const prev = S.qsos.filter((q) => q.core_call === core && q.id !== S.editingId);
+    const df = call.length >= 3 && prev.length ? core : null;
+    if (df !== (S.dupeFilter || null)) { S.dupeFilter = df; renderQsos(); }
     if (call.length >= 3 && prev.length) {
-      dupeBox.textContent = t("⚠ {call} bereits gearbeitet um {time} UTC ({loc}) – DUPE!", { call, time: fmtTime(prev[prev.length - 1].ts_utc), loc: prev[prev.length - 1].locator });
+      // Angaben der früheren QSOs direkt im Hinweis (neuestes zuerst, max. 3)
+      const info = (q) => [`${fmtDate(q.ts_utc).slice(0, 6)} ${fmtTime(q.ts_utc)} UTC`, q.call, hasSerial() ? `${t("Nr")} ${pad3(q.serial_sent)}/${q.serial_rcvd || "–"}` : null,
+        q.exch_rcvd ? `DOK ${q.exch_rcvd}` : null, q.locator || null, q.km ? `${q.km} km` : null, q.logged_by ? `Op ${q.logged_by}` : null].filter(Boolean).join(" · ");
+      const shown = [...prev].sort((x, y) => (x.ts_utc < y.ts_utc ? 1 : -1)).slice(0, 3);
+      dupeBox.textContent = t("⚠ {call} bereits gearbeitet: {info} – DUPE!", { call, info: shown.map(info).join("  |  ") + (prev.length > 3 ? ` (+${prev.length - 3})` : "") });
       dupeBox.classList.remove("hidden");
     } else dupeBox.classList.add("hidden");
     clearTimeout(hintTimer);

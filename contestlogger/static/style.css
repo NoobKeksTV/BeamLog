@@ -249,6 +249,8 @@ body.bigscreen .kpis.big .kpi b { font-size: 56px; }
 .map-card.planes-on .map { height: 420px; }  /* mit Flugzeugen mehr Platz für den Pfad */
 .c-stations { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; }
 .c-stations .card-head h3 { font-size: 15px; }
+#qso-table tr.filter-note td { color: #ffb3ba; font-weight: 700; background: rgba(255,92,108,.12); }
+#qso-table tr.match td { background: rgba(255,92,108,.08); }
 .cb-form { display: grid; grid-template-columns: 1.3fr 1fr 1.4fr .7fr auto; gap: 6px; align-items: center; margin: 8px 0; }
 .cb-form input { min-width: 0; width: 100%; }
 .cb-actions { margin-top: 4px; }

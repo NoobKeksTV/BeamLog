@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 from . import geo, prefixes
 
 TIMEOUT = 5.0
-PROVIDERS = {"none": "aus", "hamqth": "HamQTH (kostenlos)", "qrz": "QRZ.com (XML-Abo)"}
+PROVIDERS = {"none": "aus", "hamqth": "HamQTH", "qrz": "QRZ.com (XML-Abo)"}
 
 
 class LookupError_(Exception):
