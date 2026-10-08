@@ -1,6 +1,29 @@
 # Änderungsprotokoll
 
-## v0.9.31 (2026-10-07)
+## v0.9.32 (2026-10-07)
+- Verwaltung: Archiv-Knopf der Contest-Zeile als Symbol, damit alle Aktionen sichtbar sind
+- Verwaltung: Contest-Zeile ohne abgeschnittene Knöpfe (EDI-ZIP steht in Export / Abgabe)
+- Verwaltung in vier Bereiche aufgeteilt: Contests & Stationen, Stationsdatenbank & Import, Server & Updates, Einstellungen
+  - Reiterleiste oben in der Verwaltung, nur der gewählte Bereich ist sichtbar (wird gemerkt); der Update-Knopf
+    im Kopf springt direkt zu „Server & Updates“
+  - Keine 16 Karten mehr auf einer Seite; Wiki und README-Bild aktualisiert
+- Start nach Löschen des letzten Contests repariert („Start fehlgeschlagen: Not Found“, rote Verbindung)
+  - Gespeicherte Station wird verworfen, wenn es ihren Contest nicht mehr gibt; QSO-Laden mit 404 setzt die Station zurück
+  - Die WebSocket-Verbindung wird immer aufgebaut, auch wenn Contests/Station nicht geladen werden konnten
+- Verwaltung: Stationen im Contest-Dialog, EDI-Prüfung ohne Stationswechsel, EDI-ZIP mit Prüfübersicht, QSO-Zahlen im Export; Dupe-Banner im Logger; Operator-Liste neueste zuerst
+  - „Stationen im Contest“-Karte entfernt; die Stationen eines Contests stehen jetzt im Contest-Dialog (✎): Übersicht
+    mit ID, Band, Locator, Nummer, Passwort, KST; globale Station aufnehmen, einmalige anlegen, bearbeiten, Nummer, entfernen
+  - „EDI (mit Prüfung)“ in der Export-Karte prüft die jeweilige Station, ohne die aktive Station im Logger zu wechseln,
+    und zeigt das Ergebnis immer als Dialog mit „EDI herunterladen“ (vorher stiller Download bzw. Stationswechsel)
+  - Export-Karte folgt dem oben gewählten Contest sofort und zeigt je Station QSOs, Dupes und Punkte
+  - „Alle Bänder als EDI-ZIP“ zeigt vorher die Prüfung aller Stationen (✔/✖ mit Fehlern, Klick öffnet die Prüfung);
+    ZIP mit den bestandenen Logs oder als Admin alle; NICHT_EXPORTIERT.txt nennt jetzt die Fehler je Log
+  - Logger: Doppel-QSO als deutliches rotes Banner über dem Formular (wie im Operator-Fenster)
+  - Operator-Fenster: QSO-Liste neueste zuerst
+  - EDI-Bemerkung ohne Sonderzeichen, die in Latin-1 zu „?“ wurden; Wiki aktualisiert
+- Wiki: Ziele des Einzeldatei-Imports erklärt (Automatisch, nur Call-Buch, bestehende Station)
+- Version 0.9.31
+  - Änderungsprotokoll für v0.9.31
 - Quellcode-Deploy nutzt ebenfalls contestlogger.env statt Optionen in der Unit
   - deploy/contestlogger.service startet run.py --config /etc/contestlogger/contestlogger.env (keine Optionen mehr)
   - deploy/install.sh legt die Konfiguration an (Vorlage deploy/portable/contestlogger.env), --url setzt PUBLIC_URL,
