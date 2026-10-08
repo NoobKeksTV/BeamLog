@@ -328,3 +328,18 @@ def test_tile_cache(client, tmp_path, monkeypatch):
     assert client.get("/api/info").json()["tile_cache"] is True
     assert client.delete("/api/tiles", headers=H).json()["deleted"] >= r["total"]
     assert len(tiles.region_tiles(51, 7, 100, 5, 5)) >= 1 and tiles.latlon_to_tile(0, 0, 1) == (1, 1)
+
+
+def test_calc_accepts_alternative_locators(client):
+    admin = client.post("/api/setup", json={"password": "admin1"}).json()["token"]
+    H = {"X-Admin-Token": admin}
+    client.post("/api/callbook", json={"call": "9A1CRS", "locator": "JN95AE"}, headers=H)
+    client.post("/api/callbook", json={"call": "9A1CRS", "locator": "JN85OD"}, headers=H)  # zweiter Standort
+    cb = client.get("/api/callbook?q=9A1CRS").json()["rows"][0]
+    locs = {cb["locator"], *[x for x in cb["alt_locators"].split(",") if x]}
+    assert locs == {"JN95AE", "JN85OD"}
+    for loc in ("JN95AE", "JN85OD", "JN95"):
+        w = client.get("/api/calc", params={"my": "JO31AA", "loc": loc, "call": "9A1CRS"}).json()["warnings"]
+        assert not any("Stationsdatenbank" in x for x in w), (loc, w)
+    w = client.get("/api/calc", params={"my": "JO31AA", "loc": "JN75AA", "call": "9A1CRS"}).json()["warnings"]
+    assert any("Stationsdatenbank kennt 9A1CRS mit" in x and "JN95AE" in x and "JN85OD" in x and "–" not in x for x in w), w

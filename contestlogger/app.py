@@ -637,6 +637,11 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     def call_lookup(call: str = ""):
         return db.lookup_call(call) or {}
 
+    def fmt_day(ts: str) -> str:
+        """2025-05-03… -> 03.05.2025"""
+        d = (ts or "")[:10]
+        return f"{d[8:10]}.{d[5:7]}.{d[0:4]}" if len(d) == 10 else d
+
     @app.get("/api/calc")
     def calc(my: str, loc: str, call: str = ""):
         from . import geo  # noqa: F401
@@ -648,8 +653,13 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             if not pl["ok"]:
                 out["warnings"].append(pl["msg"])
             known = db.lookup_call(call)
-            if known and known["locator"] and known["locator"] != geo.normalize_locator(loc):
-                out["warnings"].append(f"Stationsdatenbank kennt {prefixes.core_call(call)} mit {known['locator']} (zuletzt {known['last_seen'][:10] if known['last_seen'] else '–'})")
+            if known and known["locator"]:
+                # Hauptlocator und alle bekannten weiteren Standorte zählen; ein 4-stelliger Eintrag passt zu jedem Feld darin
+                locs = [known["locator"]] + [x for x in (known.get("alt_locators") or "").split(",") if x and x != known["locator"]]
+                mine = geo.normalize_locator(loc)
+                if not any(mine == k or mine.startswith(k) or k.startswith(mine) for k in locs if k):
+                    when = f", zuletzt {fmt_day(known['last_seen'])}" if known.get("last_seen") else ""
+                    out["warnings"].append(f"Stationsdatenbank kennt {prefixes.core_call(call)} mit {', '.join(locs)}{when}")
         return out
 
     @app.get("/api/callbook")
