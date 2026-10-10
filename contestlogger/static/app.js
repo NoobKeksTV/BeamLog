@@ -962,8 +962,9 @@
   // ------------------------------------------------------------ Flugzeug-Scatter (ADS-B, wie AirScout) – zuschaltbare Ebene
   // ---- Flugzeug-Darstellung (wie AirScout): Status, Hover-Text, Seitenansicht des Pfads
   const PLANE_COL = { hot: "#ffb347", soon: "#ffe066", visible: "#9fd3ff", far: "#6b7785", low: "#8b5a5a" };
-  const SIZE_LABEL = { heavy: t("schwer"), large: t("groß"), medium: t("mittel"), light: t("leicht") };
-  const STATUS_LABEL = { hot: t("im Korridor, beidseitig sichtbar"), soon: t("kreuzt bald den Pfad"), visible: t("beidseitig sichtbar, neben dem Pfad"), far: t("außer Reichweite"), low: t("zu tief für beide Stationen") };
+  // erst bei Verwendung übersetzen (beim Laden des Skripts ist die Sprache noch nicht geladen)
+  const SIZE_LABEL = { heavy: "schwer", large: "groß", medium: "mittel", light: "leicht" };
+  const STATUS_LABEL = { hot: "im Korridor, beidseitig sichtbar", soon: "kreuzt bald den Pfad", visible: "beidseitig sichtbar, neben dem Pfad", far: "außer Reichweite", low: "zu tief für beide Stationen" };
   function pointAlong(a, b, f) {  // Großkreis-Zwischenpunkt (wie adsb.point_along)
     if (!a || !b) return null; const R = Math.PI / 180;
     const [la1, lo1, la2, lo2] = [a[0] * R, a[1] * R, b[0] * R, b[1] * R];
@@ -975,8 +976,8 @@
   }
   const km1 = (m) => (m / 1000).toLocaleString("de", { maximumFractionDigits: 1 });
   function planeTitle(p) {
-    const name = `${p.flight || p.hex}${p.type ? " · " + p.type : ""}${p.size ? " (" + SIZE_LABEL[p.size] + ")" : ""}`;
-    const lines = [`<b>${esc(name)}</b> – ${STATUS_LABEL[p.status] || ""}`,
+    const name = `${p.flight || p.hex}${p.type ? " · " + p.type : ""}${p.size ? " (" + t(SIZE_LABEL[p.size]) + ")" : ""}`;
+    const lines = [`<b>${esc(name)}</b> – ${STATUS_LABEL[p.status] ? t(STATUS_LABEL[p.status]) : ""}`,
       `${t("Höhe")} FL${p.fl} = ${km1(p.alt_m)} km · ${p.gs_kmh} km/h · ${t("Kurs")} ${Math.round(p.track)}°${p.vr_ms ? ` · ${p.vr_ms > 0 ? "↗" : "↘"} ${Math.abs(p.vr_ms)} m/s` : ""}`,
       `${t("Mindesthöhe hier")} ${km1(p.req_m)} km → <b style="color:${p.margin_m > 0 ? "#3ddc84" : "#ff6b6b"}">${p.margin_m > 0 ? "+" : ""}${km1(p.margin_m)} km</b> ${t("Höhenreserve")}`,
       `${Math.abs(p.xt_km)} km ${t("vom Pfad")} · km ${p.at_km} ${t("des Pfads")} · ${t("Elevation")} ${p.elev1}° / ${p.elev2}°`];
