@@ -328,6 +328,12 @@ def test_tile_cache(client, tmp_path, monkeypatch):
     assert client.get("/api/info").json()["tile_cache"] is True
     assert client.delete("/api/tiles", headers=H).json()["deleted"] >= r["total"]
     assert len(tiles.region_tiles(51, 7, 100, 5, 5)) >= 1 and tiles.latlon_to_tile(0, 0, 1) == (1, 1)
+    # gesperrte Kachel (OSM: HTTP 200 + x-blocked) wird nicht gespeichert
+    blocked = type("R", (), {"read": lambda self: png, "headers": {"x-blocked": "1", "Content-Type": "image/png"}, "__enter__": lambda self: self, "__exit__": lambda self, *a: None})
+    monkeypatch.setattr(tiles.urllib.request, "urlopen", lambda req, timeout=0: blocked())
+    assert client.get("/tiles/6/33/21.png").status_code == 502
+    assert client.get("/api/tiles/status", headers=H).json()["tiles"] == 0
+    assert tiles.UA.startswith("ContestLogger/")
 
 
 def test_calc_accepts_alternative_locators(client):

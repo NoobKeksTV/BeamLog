@@ -13,10 +13,17 @@ import time
 import urllib.request
 from pathlib import Path
 
+from . import __version__
+
 DEFAULT_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 MAX_PREFETCH_TILES = 4000
 MAX_PREFETCH_ZOOM = 10
-UA = "ContestLogger (Amateurfunk-Contest-Logger; offline map cache; contact via github.com/NoobKeksTV/ContestLogger)"
+# OSM verlangt eine eindeutige Kennung mit Version und Kontakt (sonst kommt nur die Kachel „Access blocked“)
+UA = f"ContestLogger/{__version__} (+https://github.com/NoobKeksTV/ContestLogger)"
+
+
+class TileBlocked(RuntimeError):
+    """Der Kachelserver verweigert den Zugriff (Nutzungsrichtlinie) – liefert nur eine Hinweis-Kachel."""
 
 
 def latlon_to_tile(lat: float, lon: float, z: int) -> tuple[int, int]:
@@ -62,6 +69,10 @@ class TileCache:
         req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "image/png,image/*"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             data = r.read()
+            headers = getattr(r, "headers", None) or {}
+        # OSM antwortet bei Sperre mit HTTP 200 und einer „Access blocked“-Kachel -> nie im Cache speichern
+        if headers.get("x-blocked") or not str(headers.get("Content-Type", "image/png")).startswith("image/"):
+            raise TileBlocked("Kachelserver blockiert den Zugriff (Nutzungsrichtlinie) – eigenen Kachelserver eintragen")
         if data:
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_bytes(data)
@@ -109,6 +120,10 @@ class TileCache:
                     else:
                         self.get(z, x, y)
                         time.sleep(delay)
+                except TileBlocked as e:
+                    self.job["errors"] += 1
+                    self.job["message"] = f"abgebrochen: {e}"
+                    break
                 except Exception as e:  # noqa: BLE001
                     self.job["errors"] += 1
                     self.job["message"] = str(e)[:120]

@@ -32,6 +32,8 @@
   .tile.serial { background:rgba(255,179,71,.14); border-color:var(--warn); }
   .tile.serial b { color:var(--warn); }
   .tile.loc b { color:var(--ok); }
+  /* 6-stelliger Locator soll immer ganz lesbar sein: Schrift richtet sich nach der Kachelbreite */
+  .tile.loc { container-type:inline-size; } .tile.loc b { font-size:min(clamp(26px, 3.8vw, 58px), 26cqi); }
   .tile.geo { text-align:center; display:flex; flex-direction:column; justify-content:center; }
   .tiles.x-dok .tile.serial, .tiles.x-dok .tile.nr { display:none; }
   .tiles.x-dok { grid-template-columns: 2.2fr 1fr 1fr 1.2fr 1.5fr 1.6fr; }
