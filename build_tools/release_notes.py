@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 
 def git(*args: str) -> str:
@@ -83,7 +84,12 @@ def main() -> None:
         body_lines = [ln.rstrip() for ln in body.splitlines() if ln.strip() and not re.match(r"^(Co-Authored-By|Claude-Session|Signed-off-by):", ln.strip())]
         commits.append((short, subject.strip(), body_lines))
 
-    out = ["Portable Versionen (kein Python nötig): ZIP entpacken, `ContestLogger.exe` bzw. `./ContestLogger` starten. Siehe START.txt im Paket.", ""]
+    out = []
+    # Optionaler Einleitungstext für besondere Releases (z. B. vollständige Funktionsliste zu 1.0): build_tools/release_intro/<tag>.md
+    intro = Path(__file__).parent / "release_intro" / f"{new_tag}.md"
+    if new_tag and intro.exists():
+        out += [intro.read_text(encoding="utf-8").strip(), ""]
+    out += ["Portable Versionen (kein Python nötig): ZIP entpacken, `ContestLogger.exe` bzw. `./ContestLogger` starten. Siehe START.txt im Paket.", ""]
     out.append(f"## Änderungen{' seit ' + prev if prev else ''}")
     if not commits:
         out.append("- (keine Änderungen seit dem letzten Release)")
