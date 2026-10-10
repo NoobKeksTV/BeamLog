@@ -1,6 +1,7 @@
 # Installation
 
-ContestLogger gibt es als **portable Version** (kein Python nötig) für Windows, Linux und macOS sowie als Quellcode.
+BeamLog gibt es als **portable Version** (kein Python nötig) für Windows, Linux und macOS sowie als Quellcode.
+Die Programmdateien heißen weiterhin `ContestLogger…` (früherer Name) – so funktioniert die eingebaute Update-Funktion auch für ältere Installationen.
 
 ## Portable Version (empfohlen)
 

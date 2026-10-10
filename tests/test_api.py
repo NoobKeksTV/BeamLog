@@ -333,7 +333,7 @@ def test_tile_cache(client, tmp_path, monkeypatch):
     monkeypatch.setattr(tiles.urllib.request, "urlopen", lambda req, timeout=0: blocked())
     assert client.get("/tiles/6/33/21.png").status_code == 502
     assert client.get("/api/tiles/status", headers=H).json()["tiles"] == 0
-    assert tiles.UA.startswith("ContestLogger/")
+    assert tiles.UA.startswith("BeamLog/")
 
 
 def test_calc_accepts_alternative_locators(client):

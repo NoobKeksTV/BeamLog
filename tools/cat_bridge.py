@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CAT-Bridge: meldet die Frequenz des Transceivers an den ContestLogger.
+"""CAT-Bridge: meldet die Frequenz des Transceivers an BeamLog.
 
 Läuft auf dem Rechner, an dem das Funkgerät hängt. Liest die Frequenz von
 Hamlib `rigctld` (TCP, Standard localhost:4532) und schickt sie an den Server;

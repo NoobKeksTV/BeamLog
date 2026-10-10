@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installiert den ContestLogger auf Debian/Ubuntu (auch Raspberry Pi OS) als systemd-Dienst hinter nginx.
+# Installiert BeamLog auf Debian/Ubuntu (auch Raspberry Pi OS) als systemd-Dienst hinter nginx.
 #   sudo bash deploy/install.sh            # aus dem Repo-Verzeichnis
 #   sudo bash deploy/install.sh --update   # Code aktualisieren und Dienst neu starten
 #   sudo bash deploy/install.sh --url http://contest.local/   # Adresse für QR-Code/Links setzen
@@ -81,6 +81,6 @@ fi
 
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 echo
-echo "Fertig. ContestLogger läuft: http://${IP:-<server-ip>}/"
+echo "Fertig. BeamLog läuft: http://${IP:-<server-ip>}/"
 echo "Datenbank: $DATA_DIR/contestlogger.db   Logs: journalctl -u contestlogger -f"
 echo "Einstellungen: $CONF   (danach: sudo systemctl restart contestlogger)"

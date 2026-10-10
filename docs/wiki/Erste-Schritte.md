@@ -2,7 +2,7 @@
 
 ## 1. Admin-Passwort
 
-Beim ersten Aufruf der Oberfläche fragt ContestLogger nach einem Admin-Passwort. Es schützt die Verwaltung (Stationen, Contests, Importe, Einstellungen). Operatoren brauchen es nicht – sie melden sich nur mit einem Nickname an.
+Beim ersten Aufruf der Oberfläche fragt BeamLog nach einem Admin-Passwort. Es schützt die Verwaltung (Stationen, Contests, Importe, Einstellungen). Operatoren brauchen es nicht – sie melden sich nur mit einem Nickname an.
 
 ## 2. Nickname
 

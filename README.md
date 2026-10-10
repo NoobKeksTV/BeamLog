@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/logo.png" width="96" alt="ContestLogger-Logo">
+<img src="docs/logo.png" width="96" alt="BeamLog-Logo">
 
-# ContestLogger
+# BeamLog
 
 **Lokaler, webbasierter Contest-Logger für UKW-Contests (DARC / IARU Region 1)**
 Inoffizieller Nachfolger von DD3KU WinContest · ein Server im LAN, loggen von jedem Browser
@@ -47,7 +47,7 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 ## Schnellstart
 
 1. [ZIP für dein System laden](https://github.com/NoobKeksTV/ContestLogger/releases/latest) und entpacken.
-2. `ContestLogger.exe` (Windows) bzw. `./ContestLogger` (Linux/macOS) starten. Der Browser öffnet `http://localhost:8000`; andere Rechner nutzen die beim Start angezeigte LAN-Adresse oder den QR-Code (📱).
+2. `ContestLogger.exe` (Windows) bzw. `./ContestLogger` (Linux/macOS) starten. *(BeamLog hieß früher „ContestLogger“ – Programmdateien und GitHub-Projekt tragen weiterhin diesen Namen, damit Updates nahtlos funktionieren.)* Der Browser öffnet `http://localhost:8000`; andere Rechner nutzen die beim Start angezeigte LAN-Adresse oder den QR-Code (📱).
 3. Admin-Passwort festlegen, unter **Verwaltung** die Stationen anlegen und den ersten Contest erstellen.
 4. Im Reiter **Loggen** Station wählen und loslegen. F1 zeigt alle Tastenkürzel.
 

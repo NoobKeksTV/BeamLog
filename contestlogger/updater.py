@@ -53,7 +53,7 @@ def base_dir() -> Path:
 
 
 def _headers(token: str = "", accept: str = "application/vnd.github+json") -> dict[str, str]:
-    h = {"User-Agent": f"ContestLogger/{__version__}", "Accept": accept, "X-GitHub-Api-Version": "2022-11-28"}
+    h = {"User-Agent": f"BeamLog/{__version__}", "Accept": accept, "X-GitHub-Api-Version": "2022-11-28"}
     if token:
         h["Authorization"] = f"Bearer {token}"
     return h

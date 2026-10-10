@@ -1,4 +1,4 @@
-/* ContestLogger Frontend – reines Vanilla-JS, keine Abhängigkeiten (offline-fähig). */
+/* BeamLog Frontend – reines Vanilla-JS, keine Abhängigkeiten (offline-fähig). */
 (() => {
   "use strict";
 
@@ -882,7 +882,7 @@
         K(["◐"], t("Hell/Dunkel umschalten.")),
         K([t("Sprache")], t("Umschalten der Oberfläche; eigene Übersetzungen über die Verwaltung."))),
       P(t("Export und Abgabe: in der Verwaltung unter „Export / Abgabe“ – EDI je Station/Band (mit Log-Prüfung), ADIF, CSV oder alle Bänder als EDI-ZIP. Jede Änderung steht im Aktionsprotokoll.")),
-      el("div", { class: "row" }, el("span", { class: "muted small grow" }, `${S.info.app || "ContestLogger"} ${S.info.version || ""} · ${S.info.copyright || ""}`), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")))));
+      el("div", { class: "row" }, el("span", { class: "muted small grow" }, `${S.info.app || "BeamLog"} ${S.info.version || ""} · ${S.info.copyright || ""}`), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")))));
     box.classList.add("wide");
   }
   $("#help-btn")?.addEventListener("click", helpDialog);

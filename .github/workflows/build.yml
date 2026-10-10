@@ -38,5 +38,5 @@ jobs:
         with:
           files: dist/*.zip
           tag_name: v${{ steps.ver.outputs.version }}
-          name: ContestLogger ${{ steps.ver.outputs.version }}
+          name: BeamLog ${{ steps.ver.outputs.version }}
           body_path: RELEASE_NOTES.md

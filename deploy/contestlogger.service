@@ -1,7 +1,7 @@
-# systemd-Unit für den ContestLogger
+# systemd-Unit für BeamLog
 # Installation: sudo cp deploy/contestlogger.service /etc/systemd/system/ && sudo systemctl enable --now contestlogger
 [Unit]
-Description=ContestLogger – Amateurfunk-Contest-Logger
+Description=BeamLog – Amateurfunk-Contest-Logger
 After=network.target
 
 [Service]

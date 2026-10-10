@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Importiert einen kompletten WinContest-Ordner (DD3KU) in den ContestLogger.
+"""Importiert einen kompletten WinContest-Ordner (DD3KU) in BeamLog.
 
     python tools/import_dd3ku.py /pfad/zu/Contest            # alles importieren
     python tools/import_dd3ku.py /pfad/zu/Contest --callbook-only

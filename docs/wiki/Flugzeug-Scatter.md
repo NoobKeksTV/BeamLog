@@ -2,7 +2,7 @@
 
 ![Karte mit Flugzeugen](img/karte-flugzeuge.png)
 
-Wie AirScout zeigt ContestLogger Flugzeuge zwischen dir und dem Partner und bewertet, ob sie für Aircraft-Scatter taugen. Einschalten mit **✈ Flugzeuge** an der Karte (Logger und Operator-Fenster); die Einstellung bleibt gespeichert, Aktualisierung alle 5 Sekunden.
+Wie AirScout zeigt BeamLog Flugzeuge zwischen dir und dem Partner und bewertet, ob sie für Aircraft-Scatter taugen. Einschalten mit **✈ Flugzeuge** an der Karte (Logger und Operator-Fenster); die Einstellung bleibt gespeichert, Aktualisierung alle 5 Sekunden.
 
 ## Darstellung
 

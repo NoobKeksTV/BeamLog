@@ -751,7 +751,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         elif url.strip():
             import urllib.request
             try:
-                req = urllib.request.Request(url.strip(), headers={"User-Agent": "Mozilla/5.0 ContestLogger"})
+                req = urllib.request.Request(url.strip(), headers={"User-Agent": "Mozilla/5.0 BeamLog"})
                 with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310
                     raw = r.read(20_000_000)
                     name = url
@@ -948,7 +948,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         url = importers.DARC_INDEX.format(year=year)
         try:
             def fetch():
-                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 ContestLogger"})
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 BeamLog"})
                 with urllib.request.urlopen(req, timeout=20) as r:  # noqa: S310
                     return r.read().decode("utf-8", "replace")
             text = await asyncio.to_thread(fetch)
@@ -965,7 +965,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         report: list[dict] = []
 
         def fetch(url: str) -> str:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 ContestLogger"})
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 BeamLog"})
             with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310
                 return r.read().decode("utf-8", "replace")
 
@@ -1195,7 +1195,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         import urllib.request
         url = (body or {}).get("url") or db.get_setting("repo_url", "") or REPO_CALLBOOK_URL
         token = github_token()
-        headers = {"User-Agent": f"ContestLogger/{__version__}", "Accept": "application/vnd.github.raw"}
+        headers = {"User-Agent": f"BeamLog/{__version__}", "Accept": "application/vnd.github.raw"}
         if token and "github" in url:
             headers["Authorization"] = f"Bearer {token}"
         try:

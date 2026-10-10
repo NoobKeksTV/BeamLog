@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Startet den ContestLogger-Server.
+"""Startet den BeamLog-Server.
 
     python run.py                 # Port 8000, erreichbar im ganzen LAN
     python run.py --port 8080

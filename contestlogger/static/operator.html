@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<title>Operator – ContestLogger</title>
+<title>Operator – BeamLog</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 <link rel="stylesheet" href="/static/vendor/leaflet.css">
@@ -193,9 +193,9 @@
     document.querySelector(".tile.dok").classList.toggle("hidden", !station.exchange.includes("dok"));
     $("#station").textContent = `${station.call} · ${station.band}`;
     $("#meta").textContent = `${station.locator} · ${station.mode} · ${station.contest}`;
-    document.title = `Operator ${station.call} ${station.band} – ContestLogger`;
+    document.title = `Operator ${station.call} ${station.band} – BeamLog`;
     $("#t-serial").textContent = pad3(station.serial_next);
-    $("#ver").textContent = "ContestLogger " + (info.version || "");
+    $("#ver").textContent = "BeamLog " + (info.version || "");
     try { showRig(await GET(`/api/stations/${sid}/rig`)); } catch (_) { /* */ }
     try { $("#note").textContent = (await GET(`/api/stations/${sid}/opnote`)).text || ""; } catch (_) { /* */ }
   }

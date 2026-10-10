@@ -110,7 +110,7 @@ def fetch(source: str, lat: float, lon: float, dist_km: float, local_url: str = 
     hit = _cache.get(key)
     if hit and now - hit[0] < CACHE_SEC:
         return hit[1]
-    req = urllib.request.Request(url, headers={"User-Agent": "ContestLogger (Amateurfunk, aircraft scatter; non-commercial)", "Accept": "application/json"})
+    req = urllib.request.Request(url, headers={"User-Agent": "BeamLog (Amateurfunk, aircraft scatter; non-commercial)", "Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         data = json.loads(r.read().decode("utf-8", "replace"))
     planes = _normalize(data)

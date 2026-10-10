@@ -92,7 +92,7 @@ def main() -> None:
     shutil.copy(ROOT / "LICENSE", pkg / "LICENSE") if (ROOT / "LICENSE").exists() else None
     exe = ".exe" if os.name == "nt" else ""
     (pkg / "START.txt").write_text(
-        f"ContestLogger {__version__} – portable Version\n\n"
+        f"BeamLog {__version__} – portable Version (Programmdateien heißen weiterhin ContestLogger…)\n\n"
         f"1. ContestLogger{exe} starten (Doppelklick). Der Server läuft, die Oberfläche öffnet sich im Browser.\n"
         f"   Andere Rechner im LAN: die beim Start angezeigte Adresse eingeben (oder QR-Code in der Oberfläche).\n"
         f"2. Alle Daten liegen im Ordner data/ neben dem Programm (Datenbank, Backups, eigene Sprachen).\n"

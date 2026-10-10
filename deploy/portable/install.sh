@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installiert die PORTABLE Linux-Version des ContestLoggers (aus dem Release-ZIP, kein Python nötig)
+# Installiert die PORTABLE Linux-Version von BeamLog (aus dem Release-ZIP, kein Python nötig)
 # auf Debian/Ubuntu/Raspberry Pi OS als systemd-Dienst hinter nginx.
 #
 #   unzip ContestLogger-<version>-linux-x86_64.zip
@@ -87,7 +87,7 @@ fi
 sleep 1
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 echo
-echo "Fertig. ContestLogger läuft: http://${IP:-<server-ip>}/   (Status: systemctl status contestlogger)"
+echo "Fertig. BeamLog läuft: http://${IP:-<server-ip>}/   (Status: systemctl status contestlogger)"
 echo "Datenbank: $DATA_DIR/contestlogger.db   Logs: journalctl -u contestlogger -f"
 echo "Einstellungen: $CONF   (danach: sudo systemctl restart contestlogger)"
 echo "Update später: neues ZIP entpacken und dort  sudo bash deploy/install.sh --update"

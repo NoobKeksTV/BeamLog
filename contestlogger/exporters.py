@@ -82,7 +82,7 @@ def export_edi(contest: dict, station: dict, qsos: list[dict]) -> str:
         f"CToSc={tot['score']}",
         f"CODXC={odx['call']};{odx['locator']};{odx['km']}" if odx else "CODXC=",
         "[Remarks]",
-        f"Erstellt mit ContestLogger {__version__} - Wertung: {scoring.label(contest.get('scoring')).replace('×', 'x')}" + (f", Multiplikator {tot['multiplier']}" if tot["multiplier"] else ""),
+        f"Erstellt mit BeamLog {__version__} - Wertung: {scoring.label(contest.get('scoring')).replace('×', 'x')}" + (f", Multiplikator {tot['multiplier']}" if tot["multiplier"] else ""),
         f"[QSORecords;{len(qsos)}]",
     ]
     for q in qsos:
@@ -123,7 +123,7 @@ def export_cabrillo(contest: dict, station: dict, qsos: list[dict]) -> str:
         f"ADDRESS-POSTALCODE: {g('resp_zip')}",
         f"ADDRESS-COUNTRY: {g('resp_country', 'Germany')}",
         f"EMAIL: {g('resp_email')}",
-        f"CREATED-BY: ContestLogger {__version__}",
+        f"CREATED-BY: BeamLog {__version__}",
         f"SOAPBOX: {g('tx')} {g('power')} W, {g('antenna')} ({g('antenna_height')} m agl, {g('asl')} m asl)".rstrip(),
     ]
     own_exch = g("exchange")
@@ -144,10 +144,10 @@ def _adif_field(name: str, value) -> str:
 
 def export_adif(contest: dict, station: dict, qsos: list[dict]) -> str:
     out = [
-        f"ContestLogger {__version__} ADIF Export",
+        f"BeamLog {__version__} ADIF Export",
         f"Call={station['call']}", f"Locator={station['locator']}", f"Band={station['band']}",
         f"Contest={contest['name']}",
-        _adif_field("ADIF_VER", "3.1.4"), _adif_field("PROGRAMID", "ContestLogger"), _adif_field("PROGRAMVERSION", __version__),
+        _adif_field("ADIF_VER", "3.1.4"), _adif_field("PROGRAMID", "BeamLog"), _adif_field("PROGRAMVERSION", __version__),
         "<eoh>",
     ]
     for q in sorted(qsos, key=lambda q: (q["ts_utc"], q["id"])):

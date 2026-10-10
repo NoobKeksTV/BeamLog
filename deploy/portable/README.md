@@ -1,6 +1,6 @@
-# ContestLogger auf einem Debian-Server (portable Version)
+# BeamLog auf einem Debian-Server (portable Version)
 
-Diese Dateien liegen im Linux-Release-ZIP unter `deploy/` und richten den ContestLogger als Dienst hinter nginx ein –
+Diese Dateien liegen im Linux-Release-ZIP unter `deploy/` und richten BeamLog als Dienst hinter nginx ein –
 ohne Python auf dem Server. Das Linux-Binary wird auf Ubuntu 22.04 gebaut und läuft auf Debian 12 (Bookworm), Ubuntu 22.04 und neuer (glibc ≥ 2.35).
 
 ```bash

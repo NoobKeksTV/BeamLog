@@ -22,7 +22,7 @@ class LookupError_(Exception):
 
 
 def _get(url: str) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": "ContestLogger"})
+    req = urllib.request.Request(url, headers={"User-Agent": "BeamLog"})
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         return r.read()
 
@@ -59,7 +59,7 @@ class Lookup:
 
     def _hamqth(self, call: str) -> dict:
         sid = self._hamqth_session()
-        root = ET.fromstring(_get(f"https://www.hamqth.com/xml.php?id={sid}&callsign={urllib.parse.quote(call)}&prg=ContestLogger"))
+        root = ET.fromstring(_get(f"https://www.hamqth.com/xml.php?id={sid}&callsign={urllib.parse.quote(call)}&prg=BeamLog"))
         err = _text(root, "error")
         if err:
             if "session" in err.lower():
@@ -72,7 +72,7 @@ class Lookup:
     def _qrz_session(self) -> str:
         if self._session and time.time() - self._session_ts < 50 * 60:
             return self._session
-        url = f"https://xmldata.qrz.com/xml/current/?username={urllib.parse.quote(self.user)}&password={urllib.parse.quote(self.password)}&agent=ContestLogger"
+        url = f"https://xmldata.qrz.com/xml/current/?username={urllib.parse.quote(self.user)}&password={urllib.parse.quote(self.password)}&agent=BeamLog"
         root = ET.fromstring(_get(url))
         key = _text(root, "Key")
         if not key:
