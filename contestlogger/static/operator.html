@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>Operator – ContestLogger</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
 <link rel="stylesheet" href="/static/vendor/leaflet.css">
 <style>
   :root { --bg:#0f1419; --bg2:#161c24; --card:#1b232d; --line:#2b3643; --text:#e6edf3; --muted:#8b98a8; --accent:#3fb3ff; --ok:#3ddc84; --warn:#ffb347; --bad:#ff5c6c; --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace; --sans:system-ui,Segoe UI,Roboto,sans-serif; }
@@ -72,12 +73,14 @@
   td.num { text-align:right; }
   tr.new td { background:rgba(61,220,132,.16); }
   tr.dupe td { color:var(--muted); text-decoration:line-through; }
+  .op-logo { width:28px; height:28px; border-radius:7px; flex:none; }
   footer { color:var(--muted); font-size:12px; display:flex; gap:12px; }
   @media (max-width: 1100px) { .tiles { grid-template-columns: repeat(4, 1fr); } .tile.call { grid-column: span 4; } .tile.loc, .tile.geo { grid-column: span 2; } .main { grid-template-columns: 1fr; grid-template-rows: minmax(200px, 3fr) minmax(140px, 2fr); } #map { min-height:160px; } }
 </style>
 </head>
 <body>
 <header>
+  <img src="/static/logo.svg" alt="" class="op-logo">
   <span class="dot" id="conn" title="Verbindung"></span>
   <span class="st" id="station">–</span>
   <span class="meta" id="meta"></span>

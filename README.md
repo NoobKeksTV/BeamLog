@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/logo.png" width="96" alt="ContestLogger-Logo">
+
 # ContestLogger
 
 **Lokaler, webbasierter Contest-Logger für UKW-Contests (DARC / IARU Region 1)**
