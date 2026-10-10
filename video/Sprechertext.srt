@@ -1,6 +1,6 @@
 1
-00:00:00,900 --> 00:00:06,084
-Das ist der ContestLogger. Loggen im Team – direkt im Browser.
+00:00:00,900 --> 00:00:05,509
+Das ist BeamLog. Loggen im Team – direkt im Browser.
 
 2
 00:00:06,500 --> 00:00:12,056
@@ -59,6 +59,6 @@ In der Verwaltung pflegst du Contests, Stationen und die Stationsdatenbank.
 Und zum Schluss: Log prüfen lassen, EDI-Datei exportieren, fertig.
 
 16
-00:01:38,400 --> 00:01:42,467
-Der ContestLogger ist kostenlos – zum Download auf GitHub.
+00:01:38,400 --> 00:01:41,962
+BeamLog ist kostenlos – zum Download auf GitHub.
 
