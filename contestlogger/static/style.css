@@ -182,7 +182,7 @@ table.compact td, table.compact th { padding: 5px 6px; font-size: 13.5px; }
 .stat-card svg.chart { width: 100%; height: auto; display: block; }   /* nur Diagramme – nicht die Leaflet-Ebenen */
 .stat-card.wide2 { grid-column: span 2; }
 @media (max-width: 900px) { .stat-card.wide2 { grid-column: auto; } }
-.map-sq-label { background: rgba(0,0,0,.55); color: #fff; font: 600 11px/1 var(--mono); padding: 2px 4px; border-radius: 4px; white-space: nowrap; }
+.map-sq-label { background: rgba(10,14,20,.78); color: #fff; font: 600 11px/1.2 var(--mono); padding: 2px 5px; border-radius: 4px; white-space: nowrap; width: auto !important; height: auto !important; }  /* Leaflet setzt sonst 12×12 px -> Text ragt aus dem Hintergrund */
 .bar { fill: var(--accent); }
 .bar.pts { fill: var(--ok); }
 .axis { stroke: var(--line); }
@@ -196,7 +196,8 @@ svg.rose { max-width: 360px; margin: 0 auto; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 5000; padding: 16px; }
 .modal-box { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; width: min(560px, 100%); max-height: 90vh; overflow: auto; }
 .modal-box h3 { margin-top: 0; }
-.modal-box .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.modal-box .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.modal-box select { max-width: 100%; }  /* lange Auswahltexte dürfen den Dialog nicht sprengen */
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--card2); border: 1px solid var(--line); padding: 10px 16px; border-radius: 10px; z-index: 6000; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
 .toast.err { border-color: var(--bad); color: var(--bad); }
 .toast.ok { border-color: var(--ok); }
