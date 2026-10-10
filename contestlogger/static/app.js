@@ -986,6 +986,8 @@
       : `${t("kreuzt die Verlängerung des Pfads")} (km ${p.cross.km}) ${t("in")} ${p.eta_min != null ? Math.round(p.eta_min) : "> 60"} min`);
     return lines.join("<br>");
   }
+  // Flugzeug-Symbol als SVG (zeigt nach Norden) und um den Kurs gedreht – unabhängig von Schriftart/Emoji-Darstellung des ✈
+  const planeIcon = (track, col, size) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="display:block;margin:auto;transform:rotate(${Math.round(track || 0)}deg)"><path d="M12 1.6c-.9 0-1.5.8-1.5 1.8V9L2.2 13.9v2.1l8.3-2.6v5.2l-2.2 1.6V22l3.7-1.1 3.7 1.1v-1.8l-2.2-1.6v-5.2l8.3 2.6v-2.1L13.5 9V3.4c0-1-.6-1.8-1.5-1.8z" fill="${col}" stroke="#0b0f14" stroke-width=".9" stroke-linejoin="round"/></svg>`;
   function planeChip(p, onclick) {
     const txt = p.status === "soon" && p.cross ? `${p.flight || p.hex} ${p.type} FL${p.fl} · ${t("kreuzt in")} ${Math.round(p.eta_min)} min ${t("bei km")} ${p.cross.km} (${p.cross.utc.slice(0, 5)}) · +${km1(p.cross.margin_m || 0)} km`
       : `${p.flight || p.hex} ${p.type} FL${p.fl} · ${Math.abs(p.xt_km)} km ${t("vom Pfad")} · km ${p.at_km} · ${p.margin_m > 0 ? "+" : ""}${km1(p.margin_m)} km`;
@@ -1033,7 +1035,7 @@
       if (r.zone) L.polyline([r.zone.from, r.zone.to], { color: "#3ddc84", weight: 9, opacity: .45 }).bindTooltip(t("Zone gemeinsamer Sichtbarkeit (Reiseflughöhe): km {a}–{b} des Pfads", { a: r.zone.from_km, b: r.zone.to_km })).addTo(m.zone);
       for (const p of r.planes) {
         const st = p.status || (p.visible_both ? "visible" : "far"); const big = st === "hot" || p.size === "heavy";
-        this.markers[p.hex] = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${PLANE_COL[st]};font-size:${big ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }), interactive: true })
+        this.markers[p.hex] = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: planeIcon(p.track, PLANE_COL[st], big ? 24 : 18), iconSize: [26, 26], iconAnchor: [13, 13] }), interactive: true })
           .bindTooltip(planeTitle(p), { className: "plane-tip", direction: "top", offset: [0, -10] }).addTo(m.planes);
         if (p.cross && p.cross.on_path && (st === "soon" || st === "hot")) {  // vorhergesagter Kreuzungspunkt
           const frac = Math.max(0, Math.min(1, p.cross.km / r.dist_km)); const pt = pointAlong(r.path_from, r.path_to, frac);

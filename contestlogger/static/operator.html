@@ -54,7 +54,7 @@
   .mapcard .mh { display:flex; justify-content:space-between; color:var(--muted); font-size:13px; padding:0 4px 6px; }
   #map { flex:1; min-height:200px; border-radius:8px; background:var(--bg2); position:relative; z-index:0; isolation:isolate; overflow:hidden; }
   .arrow-icon { font-size:26px; color:#ff5c6c; text-shadow:0 0 4px #000; line-height:1; }
-  .plane-icon { line-height:1; text-shadow:0 0 3px #000; }
+  .plane-icon { line-height:1; filter: drop-shadow(0 0 2px rgba(0,0,0,.55)); }
   .plane-tip { font-size:12px; line-height:1.4; max-width:360px; white-space:normal; }
   .plist .soon { color:#ffe066; }
   .pbtn { background:var(--bg2); color:var(--muted); border:1px solid var(--line); border-radius:6px; padding:2px 8px; font-size:12px; cursor:pointer; margin-left:8px; }
@@ -273,7 +273,9 @@
         `Mindesthöhe ${km1(p.req_m)} km → <b style="color:${p.margin_m > 0 ? "#3ddc84" : "#ff6b6b"}">${p.margin_m > 0 ? "+" : ""}${km1(p.margin_m)} km</b> Reserve · ${Math.abs(p.xt_km)} km vom Pfad · Elevation ${p.elev1}° / ${p.elev2}°`,
         p.cross && p.cross.on_path ? `<b>kreuzt in ${p.eta_min != null ? Math.round(p.eta_min) : "> 60"} min</b> um ${p.cross.utc} UTC bei km ${p.cross.km}${p.cross.in_zone ? " ✓ Zone" : ""}${p.cross.margin_m != null ? ` · dort ${p.cross.margin_m > 0 ? "+" : ""}${km1(p.cross.margin_m)} km` : ""}` : ""].filter(Boolean).join("<br>");
       const markers = {};
-      for (const p of r.planes) { const st = p.status || "far"; const big = st === "hot" || p.size === "heavy"; markers[p.hex] = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: `<div style="transform:rotate(${(p.track || 0) - 45}deg);color:${COL[st]};font-size:${big ? 22 : 16}px">✈</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) }).bindTooltip(tip(p), { className: "plane-tip", direction: "top", offset: [0, -10] }).addTo(m.planes); }
+      // Flugzeug-Symbol als SVG (zeigt nach Norden) und um den Kurs gedreht – unabhängig von Schriftart/Emoji-Darstellung des ✈
+      const planeIcon = (track, col, size) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="display:block;margin:auto;transform:rotate(${Math.round(track || 0)}deg)"><path d="M12 1.6c-.9 0-1.5.8-1.5 1.8V9L2.2 13.9v2.1l8.3-2.6v5.2l-2.2 1.6V22l3.7-1.1 3.7 1.1v-1.8l-2.2-1.6v-5.2l8.3 2.6v-2.1L13.5 9V3.4c0-1-.6-1.8-1.5-1.8z" fill="${col}" stroke="#0b0f14" stroke-width=".9" stroke-linejoin="round"/></svg>`;
+      for (const p of r.planes) { const st = p.status || "far"; const big = st === "hot" || p.size === "heavy"; markers[p.hex] = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: "plane-icon", html: planeIcon(p.track, COL[st], big ? 24 : 18), iconSize: [26, 26], iconAnchor: [13, 13] }) }).bindTooltip(tip(p), { className: "plane-tip", direction: "top", offset: [0, -10] }).addTo(m.planes); }
       const box = $("#plane-list"); box.innerHTML = "";
       const goTo = (p) => { m.map.setView([p.lat, p.lon], Math.max(m.map.getZoom(), 8)); markers[p.hex]?.openTooltip(); };
       for (const p of r.planes.filter((p) => p.status === "hot").slice(0, 5)) { const s = document.createElement("span"); s.className = "hot pl"; s.textContent = `✈ ${p.flight || p.hex} ${p.type} FL${p.fl} · ${Math.abs(p.xt_km)} km vom Pfad · +${km1(p.margin_m)} km`; s.title = tip(p).replace(/<[^>]+>/g, ""); s.onclick = () => goTo(p); box.append(s); }
