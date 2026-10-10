@@ -12,6 +12,8 @@ Chat für alle, die am Server angemeldet sind, getrennt je Contest. Der Verlauf 
 
 ![KST](img/chat-kst.png)
 
+![KST mit Nutzerliste und Nachricht an mich](img/kst-nutzer.png)
+
 Der Server verbindet sich per Telnet mit dem ON4KST-Chat (`www.on4kst.info:23000`) – **je Station eine eigene Verbindung** mit eigenem Login und Raum. Einrichten: Verwaltung → Station bearbeiten → „ON4KST-Chat dieser Station“:
 
 | Feld | Bedeutung |

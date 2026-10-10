@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/logo.png" width="96" alt="BeamLog-Logo">
+<img src="docs/logo.png" width="128" alt="BeamLog-Logo">
 
 # BeamLog
 
@@ -18,6 +18,12 @@ Integrierter **ON4KST-Chat** (je Station, DMs, Rundruf) · **Aircraft-Scatter** 
 
 [**Download**](https://github.com/NoobKeksTV/ContestLogger/releases/latest) · [**Wiki**](docs/wiki/Home.md) · [Installation](docs/wiki/Installation.md) · [Server-Deploy](docs/wiki/Deploy.md) · [Tastenkürzel](docs/wiki/Tastenkuerzel.md) · [Fehlersuche](docs/wiki/Fehlersuche.md) · [🎬 Video](video/)
 
+<br>
+
+<a href="video/BeamLog_Promo_VoiceOver.mp4"><img src="docs/video-vorschau.jpg" width="760" alt="BeamLog im Video – Klick startet das Video (1:42)"></a>
+
+<sub>🎬 <a href="video/BeamLog_Promo_VoiceOver.mp4"><b>Video ansehen</b></a> (1:42, mit Sprecherin) · <a href="video/BeamLog_Promo_Musik.mp4">nur Musik</a> · YouTube: <i>folgt</i><!-- YOUTUBE: hier den Link eintragen, z. B. <a href="https://youtu.be/XXXX">auf YouTube</a> --></sub>
+
 </div>
 
 ---
@@ -34,9 +40,9 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 |---|---|
 | **Loggen** | Rufzeichen, RST, Nummern und/oder DOK (Austausch je Contest wählbar, z. B. Köln-Aachen-Contest), Locator, Kommentar; Vorschläge aus der Stationsdatenbank und allen eigenen Logs; Locator, km und Grad automatisch; Dupe-Warnung; Plausibilitätsprüfung Rufzeichen ↔ Locator; Bearbeiten und Löschen; Zeit in UTC |
 | **Stationen und Contests** | Globale Stationen mit Stammdaten (Passwort, KST-Zugang, EDI-Angaben), Contest anlegen mit Stationsauswahl, Operatoren schalten per Passwort frei |
-| **Chat, ON4KST, DM** | Lokaler Chat je Contest, KST-Chat je Station (Nutzerliste, Textbausteine, „an mich“-Markierung), Direktnachrichten wie ein Messenger, Rundruf an noch nicht gearbeitete Stationen im Umkreis |
+| **Chat, ON4KST, DM** | Team-Chat je Contest (wer ist online), KST-Chat je Station (Nutzerliste mit km und Richtung, Textbausteine, „an mich“-Markierung); ein Klick auf eine Station übernimmt Rufzeichen und Locator in den Logger; Direktnachrichten wie ein Messenger, Rundruf an noch nicht gearbeitete Stationen im Umkreis |
 | **Operator-Fenster** | Zweiter Monitor: live Rufzeichen, Nummern, RST, Locator, Entfernung/Richtung, Dupe-Warnung, Hinweis vom Logger, Statistik, Karte, letzte QSOs |
-| **Karte** | Richtungspfeil zum Partner, alle QSOs, Großfelder mit Rufzeichen, Offline-Kachelcache mit Vorab-Laden; **Flugzeug-Scatter** (ADS-B, wie AirScout): Zone gemeinsamer Sichtbarkeit, Flugzeuge im Korridor, Mindesthöhe und Höhenreserve, vorhergesagte Kreuzungszeit und -punkt, Größenklasse, Pfadprofil |
+| **Karte** | Richtungspfeil zum Partner, alle QSOs, Großfelder mit Rufzeichen, Offline-Kachelcache mit Vorab-Laden; **Flugzeug-Scatter** (ADS-B, wie AirScout): Zone gemeinsamer Sichtbarkeit, Flugzeuge im Korridor, Mindesthöhe und Höhenreserve, vorhergesagte Kreuzungszeit und -punkt, Größenklasse, Höhenprofil des Pfads; Klick in der Liste springt zum Flugzeug |
 | **Statistik** | Contest gesamt und je Station: Stundenverlauf, Entfernungs- und Richtungsverteilung, Großfelder, Länder, ODX, Großanzeige |
 | **Import** | WinContest-Ordner (`.mdb` ohne Zusatzsoftware, `.txt`, `.EXP`), EDI, ADIF, Ergebnislisten (DARC/IARU), DARC-Contest-Hub direkt |
 | **Export / Abgabe** | EDI (REG1TEST) mit Pflicht-Log-Prüfung und Online-Abgleich (HamQTH/QRZ), Cabrillo, ADIF, CSV, alle Bänder als ZIP; Wertung je Contest (km oder Punkte je QSO, Multiplikator Großfelder/DOKs) |
@@ -64,6 +70,12 @@ Aus dem Quellcode: `pip install -r requirements.txt && python run.py` (Python 3.
 | <img src="docs/wiki/img/chat-kst.png" width="300" alt="KST-Chat"> | <img src="docs/wiki/img/dm.png" width="300" alt="Direktnachrichten"> |
 | **Log-Prüfung vor der EDI-Abgabe** | **Rundruf an Stationen im Umkreis** |
 | <img src="docs/wiki/img/logpruefung.png" width="440" alt="Log-Prüfung"> | <img src="docs/wiki/img/rundruf.png" width="440" alt="Rundruf"> |
+| **ON4KST: Nutzerliste mit km/Richtung, Nachricht an mich** | **Team-Chat zwischen den Plätzen** |
+| <img src="docs/wiki/img/kst-nutzer.png" width="300" alt="KST-Nutzerliste"> | <img src="docs/wiki/img/team-chat.png" width="300" alt="Team-Chat"> |
+| **Dupe-Warnung mit Daten des ersten QSOs** | **Flugzeugliste und Höhenprofil** |
+| <img src="docs/wiki/img/loggen-dupe.png" width="440" alt="Dupe-Warnung"> | <img src="docs/wiki/img/hoehenprofil.png" width="440" alt="Höhenprofil"> |
+| **Stationsdatenbank** | **Großfeld auf der Statistik-Karte** |
+| <img src="docs/wiki/img/stationsdatenbank.png" width="440" alt="Stationsdatenbank"> | <img src="docs/wiki/img/statistik-grossfeld.png" width="440" alt="Großfeld-Popup"> |
 
 <p align="center"><img src="docs/wiki/img/statistik.png" width="880" alt="Statistik"><br><sub>Statistik mit Karte, Großfeldern und Diagrammen</sub></p>
 <p align="center"><img src="docs/wiki/img/verwaltung.png" width="880" alt="Verwaltung"><br><sub>Verwaltung: Contests &amp; Stationen (weitere Bereiche: Stationsdatenbank &amp; Import, Server &amp; Updates, Einstellungen)</sub></p>

@@ -13,6 +13,8 @@ Wie AirScout zeigt BeamLog Flugzeuge zwischen dir und dem Partner und bewertet, 
 - **Hovern** über ein Flugzeug zeigt wie in AirScout: Typ und Größenklasse, Flughöhe, Geschwindigkeit, Kurs, Steigen/Sinken, die **Mindesthöhe** an seiner Position (ab der beide Stationen es über dem Funkhorizont sehen) und die **Höhenreserve** (Flughöhe minus Mindesthöhe, grün = sichtbar, rot = zu tief), Abstand vom Pfad, Elevationswinkel von beiden Stationen und – wenn es auf den Pfad zufliegt – **wann (UTC) und bei welchem Pfad-Kilometer es die Linie voraussichtlich kreuzt**, ob dieser Punkt in der Zone liegt und wie viel Reserve es dort hat. Der vorhergesagte Kreuzungspunkt wird auf dem Pfad markiert.
 - Mit eingeschalteten Flugzeugen wird die Karte höher. Ein Klick auf einen Eintrag in der Liste springt mit der Karte zum Flugzeug und öffnet seine Details.
 - Liste unter der Karte: zuerst die Flugzeuge im Korridor (Abstand, Pfad-km, Reserve), dann die, die bald kreuzen (Minuten, km, UTC-Zeit, Reserve am Kreuzungspunkt). Hover auf einen Eintrag zeigt dieselben Details.
+![Flugzeugliste und Höhenprofil](img/hoehenprofil.png)
+
 - **Profil**: Seitenansicht des Pfads wie in AirScout – rote Kurve = Mindesthöhe entlang des Pfads (Funkhorizont beider Stationen), grüner Balken = Zone bei Reiseflughöhe, Punkte = Flugzeuge in ihrer Höhe. Über die Punkte hovern zeigt die Details; der Knopf „Profil“ blendet die Ansicht aus.
 - Ohne Partner-Locator: Flugzeuge im Umkreis von 150 km um die eigene Station.
 
