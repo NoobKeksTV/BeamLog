@@ -994,10 +994,11 @@
   function planeProfile(r) {
     // Seitenansicht: x = km entlang des Pfads, y = Höhe; Kurve = Mindesthöhe (Funkhorizont beider Stationen), Punkte = Flugzeuge
     if (!r.profile || !r.profile.length || !r.dist_km) return null;
-    const W = 520, H = 110, L = 34, Bt = 16, maxAlt = 13000;
+    // in tatsächlicher Breite zeichnen (früher feste 520 px + preserveAspectRatio="none" -> Schrift und Punkte waren verzerrt)
+    const W = Math.max(320, Math.round($("#plane-list")?.clientWidth || 520)), H = 110, L = 34, Bt = 16, maxAlt = 13000;
     const x = (km) => L + (W - L - 6) * km / r.dist_km, y = (m) => H - Bt - (H - Bt - 6) * Math.min(m, maxAlt) / maxAlt;
     const pts = r.profile.map((q) => `${x(q.km).toFixed(1)},${y(q.req_m).toFixed(1)}`).join(" ");
-    let svg = `<svg class="plane-profile" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${t("Pfadprofil")}">`;
+    let svg = `<svg class="plane-profile" viewBox="0 0 ${W} ${H}" role="img" aria-label="${t("Pfadprofil")}">`;
     svg += `<polygon points="${x(0)},${y(0)} ${pts} ${x(r.dist_km)},${y(0)}" fill="rgba(255,107,107,.18)"/><polyline points="${pts}" fill="none" stroke="#ff6b6b" stroke-width="1.2"/>`;
     for (const fl of [100, 200, 300, 400]) { const m = fl * 30.48; svg += `<line x1="${L}" y1="${y(m)}" x2="${W - 6}" y2="${y(m)}" stroke="currentColor" stroke-opacity=".12"/><text x="2" y="${y(m) + 4}" font-size="9" fill="currentColor" opacity=".6">FL${fl}</text>`; }
     if (r.zone) svg += `<rect x="${x(r.zone.from_km)}" y="${H - Bt + 2}" width="${Math.max(2, x(r.zone.to_km) - x(r.zone.from_km))}" height="4" fill="#3ddc84" opacity=".7"/>`;
