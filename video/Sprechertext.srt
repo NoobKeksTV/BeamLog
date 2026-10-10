@@ -51,14 +51,14 @@ Die Statistik läuft in Echtzeit mit.
 Großfelder auf der Karte, Stundenverlauf und Richtungen.
 
 14
-00:01:20,1000 --> 00:01:26,239
+00:01:20,900 --> 00:01:26,139
 In der Verwaltung pflegst du Contests, Stationen und die Stationsdatenbank.
 
 15
-00:01:29,400 --> 00:01:34,529
+00:01:27,600 --> 00:01:32,729
 Und zum Schluss: Log prüfen lassen, EDI-Datei exportieren, fertig.
 
 16
-00:01:38,400 --> 00:01:41,962
+00:01:36,000 --> 00:01:39,562
 BeamLog ist kostenlos – zum Download auf GitHub.
 

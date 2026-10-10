@@ -18,8 +18,8 @@ Zeiten = Einsatz ab Videobeginn; die Länge ist die der KI-Stimme als Richtwert.
 | 1:01.6 | 3.6 s | Aircraft-Scatter | Mit Kreuzungszeit und Höhenreserve, wie bei AirScout. |
 | 1:07.8 | 2.3 s | Statistik | Die Statistik läuft in Echtzeit mit. |
 | 1:11.8 | 3.5 s | Statistik | Großfelder auf der Karte, Stundenverlauf und Richtungen. |
-| 1:21.0 | 4.9 s | Verwaltung | In der Verwaltung pflegst du Contests, Stationen und die Stationsdatenbank. |
-| 1:29.4 | 4.8 s | Export | Und zum Schluss: Log prüfen lassen, EDI-Datei exportieren, fertig. |
-| 1:38.4 | 3.3 s | Outro | BeamLog ist kostenlos – zum Download auf GitHub. |
+| 1:20.9 | 4.9 s | Verwaltung | In der Verwaltung pflegst du Contests, Stationen und die Stationsdatenbank. |
+| 1:27.6 | 4.8 s | Export | Und zum Schluss: Log prüfen lassen, EDI-Datei exportieren, fertig. |
+| 1:36.0 | 3.3 s | Outro | BeamLog ist kostenlos – zum Download auf GitHub. |
 
 Die gleichen Zeiten liegen als Untertiteldatei bei: `Sprechertext.srt`.
