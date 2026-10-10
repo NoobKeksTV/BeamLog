@@ -1,0 +1,30 @@
+name: Artefakte aufräumen
+
+# Löscht alle gespeicherten Build-Artefakte der Actions-Läufe (geben Speicherplatz frei).
+# Release-Downloads sind davon nicht betroffen – die hängen am Release, nicht an den Läufen.
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Alle Artefakte löschen
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            let deleted = 0, bytes = 0;
+            for (;;) {
+              const { data } = await github.rest.actions.listArtifactsForRepo({ owner, repo, per_page: 100 });
+              if (!data.artifacts.length) break;
+              for (const a of data.artifacts) {
+                await github.rest.actions.deleteArtifact({ owner, repo, artifact_id: a.id });
+                deleted++; bytes += a.size_in_bytes;
+              }
+            }
+            core.summary.addRaw(`Gelöscht: ${deleted} Artefakte, ${(bytes / 1048576).toFixed(0)} MB`).write();
+            console.log(`Gelöscht: ${deleted} Artefakte, ${(bytes / 1048576).toFixed(0)} MB`);
