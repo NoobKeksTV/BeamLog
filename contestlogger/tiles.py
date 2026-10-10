@@ -19,7 +19,7 @@ DEFAULT_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 MAX_PREFETCH_TILES = 4000
 MAX_PREFETCH_ZOOM = 10
 # OSM verlangt eine eindeutige Kennung mit Version und Kontakt (sonst kommt nur die Kachel „Access blocked“)
-UA = f"BeamLog/{__version__} (+https://github.com/NoobKeksTV/ContestLogger)"
+UA = f"BeamLog/{__version__} (+https://github.com/NoobKeksTV/BeamLog)"
 
 
 class TileBlocked(RuntimeError):

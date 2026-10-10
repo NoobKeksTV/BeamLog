@@ -5,7 +5,7 @@ Die Programmdateien heißen weiterhin `ContestLogger…` (früherer Name) – so
 
 ## Portable Version (empfohlen)
 
-1. Das passende ZIP vom [Release](https://github.com/NoobKeksTV/ContestLogger/releases/latest) laden:
+1. Das passende ZIP vom [Release](https://github.com/NoobKeksTV/BeamLog/releases/latest) laden:
    `ContestLogger-<version>-windows-x86_64.zip`, `…-linux-x86_64.zip` oder `…-macos-arm64.zip`.
 2. ZIP entpacken. Im Ordner liegen:
 
@@ -70,8 +70,8 @@ Beim ersten Start blockiert Gatekeeper eventuell das Programm: Rechtsklick → �
 ## Aus dem Quellcode
 
 ```bash
-git clone https://github.com/NoobKeksTV/ContestLogger.git
-cd ContestLogger
+git clone https://github.com/NoobKeksTV/BeamLog.git
+cd BeamLog
 python3 -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python run.py                                      # http://localhost:8000

@@ -171,7 +171,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if c:
             await c.stop()
 
-    REPO_CALLBOOK_URL = "https://api.github.com/repos/NoobKeksTV/ContestLogger/contents/contestlogger/seed/stationsdatenbank.csv?ref=main"
+    REPO_CALLBOOK_URL = "https://api.github.com/repos/NoobKeksTV/BeamLog/contents/contestlogger/seed/stationsdatenbank.csv?ref=main"
 
     def github_token() -> str:
         """Optionales GitHub-Token nur aus Umgebung/Config (CONTESTLOGGER_GITHUB_TOKEN) – das Repo ist öffentlich, normalerweise leer."""

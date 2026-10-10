@@ -8,15 +8,15 @@
 Inoffizieller Nachfolger von DD3KU WinContest · ein Server im LAN, loggen von jedem Browser
 Integrierter **ON4KST-Chat** (je Station, DMs, Rundruf) · **Aircraft-Scatter** wie AirScout direkt auf der Karte · Operator-Fenster für den zweiten Monitor
 
-[![Release](https://img.shields.io/github/v/release/NoobKeksTV/ContestLogger?label=Release&color=3fb3ff)](https://github.com/NoobKeksTV/ContestLogger/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/NoobKeksTV/ContestLogger/build.yml?label=Build)](https://github.com/NoobKeksTV/ContestLogger/actions/workflows/build.yml)
-[![Downloads](https://img.shields.io/github/downloads/NoobKeksTV/ContestLogger/total?label=Downloads&color=3ddc84)](https://github.com/NoobKeksTV/ContestLogger/releases)
-[![Letzter Commit](https://img.shields.io/github/last-commit/NoobKeksTV/ContestLogger?label=Letzter%20Commit)](https://github.com/NoobKeksTV/ContestLogger/commits/main)
+[![Release](https://img.shields.io/github/v/release/NoobKeksTV/BeamLog?label=Release&color=3fb3ff)](https://github.com/NoobKeksTV/BeamLog/releases/latest)
+[![Build](https://img.shields.io/github/actions/workflow/status/NoobKeksTV/BeamLog/build.yml?label=Build)](https://github.com/NoobKeksTV/BeamLog/actions/workflows/build.yml)
+[![Downloads](https://img.shields.io/github/downloads/NoobKeksTV/BeamLog/total?label=Downloads&color=3ddc84)](https://github.com/NoobKeksTV/BeamLog/releases)
+[![Letzter Commit](https://img.shields.io/github/last-commit/NoobKeksTV/BeamLog?label=Letzter%20Commit)](https://github.com/NoobKeksTV/BeamLog/commits/main)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![Plattformen](https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-portable-8b98a8)](https://github.com/NoobKeksTV/ContestLogger/releases/latest)
-[![Stars](https://img.shields.io/github/stars/NoobKeksTV/ContestLogger?style=social)](https://github.com/NoobKeksTV/ContestLogger/stargazers)
+[![Plattformen](https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-portable-8b98a8)](https://github.com/NoobKeksTV/BeamLog/releases/latest)
+[![Stars](https://img.shields.io/github/stars/NoobKeksTV/BeamLog?style=social)](https://github.com/NoobKeksTV/BeamLog/stargazers)
 
-[**Download**](https://github.com/NoobKeksTV/ContestLogger/releases/latest) · [**Wiki**](docs/wiki/Home.md) · [Installation](docs/wiki/Installation.md) · [Server-Deploy](docs/wiki/Deploy.md) · [Tastenkürzel](docs/wiki/Tastenkuerzel.md) · [Fehlersuche](docs/wiki/Fehlersuche.md) · [🎬 Video](video/)
+[**Download**](https://github.com/NoobKeksTV/BeamLog/releases/latest) · [**Wiki**](docs/wiki/Home.md) · [Installation](docs/wiki/Installation.md) · [Server-Deploy](docs/wiki/Deploy.md) · [Tastenkürzel](docs/wiki/Tastenkuerzel.md) · [Fehlersuche](docs/wiki/Fehlersuche.md) · [🎬 Video](video/)
 
 <br>
 
@@ -52,8 +52,8 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 
 ## Schnellstart
 
-1. [ZIP für dein System laden](https://github.com/NoobKeksTV/ContestLogger/releases/latest) und entpacken.
-2. `ContestLogger.exe` (Windows) bzw. `./ContestLogger` (Linux/macOS) starten. *(BeamLog hieß früher „ContestLogger“ – Programmdateien und GitHub-Projekt tragen weiterhin diesen Namen, damit Updates nahtlos funktionieren.)* Der Browser öffnet `http://localhost:8000`; andere Rechner nutzen die beim Start angezeigte LAN-Adresse oder den QR-Code (📱).
+1. [ZIP für dein System laden](https://github.com/NoobKeksTV/BeamLog/releases/latest) und entpacken.
+2. `ContestLogger.exe` (Windows) bzw. `./ContestLogger` (Linux/macOS) starten. *(BeamLog hieß früher „ContestLogger“ – die Programmdateien tragen weiterhin diesen Namen, damit Updates nahtlos funktionieren; alte Links auf das GitHub-Projekt leiten automatisch weiter.)* Der Browser öffnet `http://localhost:8000`; andere Rechner nutzen die beim Start angezeigte LAN-Adresse oder den QR-Code (📱).
 3. Admin-Passwort festlegen, unter **Verwaltung** die Stationen anlegen und den ersten Contest erstellen.
 4. Im Reiter **Loggen** Station wählen und loslegen. F1 zeigt alle Tastenkürzel.
 

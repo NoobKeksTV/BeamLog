@@ -25,7 +25,7 @@ from typing import Any
 
 from . import __version__
 
-REPO = "NoobKeksTV/ContestLogger"
+REPO = "NoobKeksTV/BeamLog"
 API = f"https://api.github.com/repos/{REPO}"
 CHANGELOG_FILE = Path(__file__).parent / "CHANGELOG.md"
 

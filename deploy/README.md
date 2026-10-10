@@ -8,8 +8,8 @@ Netz erreichen den Logger per Browser über `http://<server-ip>/`.
 
 ```bash
 sudo apt install -y git
-git clone https://github.com/NoobKeksTV/ContestLogger.git
-cd ContestLogger
+git clone https://github.com/NoobKeksTV/BeamLog.git
+cd BeamLog
 sudo bash deploy/install.sh
 ```
 
@@ -40,7 +40,7 @@ Nach Änderungen `sudo systemctl restart contestlogger`. Die Datei bleibt bei `-
 Update auf eine neue Version:
 
 ```bash
-cd ContestLogger && git pull
+cd BeamLog && git pull            # ältere Installationen: Ordner ContestLogger
 sudo bash deploy/install.sh --update
 ```
 
