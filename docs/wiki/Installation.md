@@ -47,7 +47,7 @@ Statt jedes Mal Optionen anzugeben, `.env.example` nach `.env` kopieren (neben d
 Unter Windows im Explorer als `.env.` eingeben (der Punkt am Ende verschwindet) oder in der Eingabeaufforderung
 `copy .env.example .env`; unter macOS/Linux sind Dateien mit Punkt vorne versteckt (`ls -a`, im Finder `⌘⇧.`).
 
-> Bis Version 1.0.3 hieß die Datei `beamlog.env`. Eine vorhandene `beamlog.env` benennt BeamLog beim Start
+> Bis Version 1.0.0 hieß die Datei `beamlog.env`. Eine vorhandene `beamlog.env` benennt BeamLog beim Start
 > automatisch in `.env` um. Auf dem Server holt `install.sh --update` außerdem alles in einen Ordner: `/etc/beamlog/beamlog.env`
 > → `/opt/beamlog/.env`, Daten aus `/var/lib/beamlog` → `/opt/beamlog/data`.
 
