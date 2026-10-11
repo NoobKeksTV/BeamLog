@@ -30,7 +30,7 @@
 set -euo pipefail
 
 APP_DIR=/opt/beamlog
-DATA_DIR=/opt/beamlog/data          # alles in einem Ordner (bis 1.0.3: /var/lib/beamlog und /etc/beamlog)
+DATA_DIR=/opt/beamlog/data          # alles in einem Ordner (bis 1.0.0: /var/lib/beamlog und /etc/beamlog)
 CONF=/opt/beamlog/.env
 SRC_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MODE=install
@@ -197,7 +197,7 @@ if [ "$MODE" = install ]; then
   # shellcheck disable=SC2086
   apt-get install -y -qq $PKGS
 fi
-# Bis 1.0.3 lagen Daten in /var/lib/beamlog und Einstellungen in /etc/beamlog – jetzt alles in $APP_DIR.
+# Bis 1.0.0 lagen Daten in /var/lib/beamlog und Einstellungen in /etc/beamlog – jetzt alles in $APP_DIR.
 # Einstellungen und gemerkte Wahl werden verschoben, die Daten kopiert (das Original bleibt als Sicherung liegen).
 LEGACY_DATA=/var/lib/beamlog
 LEGACY_ETC=/etc/beamlog

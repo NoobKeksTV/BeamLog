@@ -93,7 +93,7 @@ def migrate_from_contestlogger(base: Path) -> None:
 
 
 def adopt_legacy_names(base: Path) -> None:
-    """Alte Dateinamen umstellen: Einstellungen beamlog.env (bis 1.0.3) bzw. contestlogger.env (bis 0.9) -> .env,
+    """Alte Dateinamen umstellen: Einstellungen beamlog.env (bis 1.0.0) bzw. contestlogger.env (bis 0.9) -> .env,
     data/contestlogger.db -> data/beamlog.db (samt -wal/-shm). Nur wenn es die neue Datei noch nicht gibt; schlägt das
     Umbenennen fehl, bleibt alles wie es war."""
     for name in LEGACY_CONFIG_NAMES:
@@ -110,7 +110,7 @@ def adopt_legacy_names(base: Path) -> None:
         print(f"  Datenbank umbenannt: {old.name} -> {new.name}")
 
 
-LEGACY_DATA_DIRS = ("/var/lib/beamlog", "/var/lib/contestlogger")  # Server-Datenordner bis 1.0.3 bzw. 0.9
+LEGACY_DATA_DIRS = ("/var/lib/beamlog", "/var/lib/contestlogger")  # Server-Datenordner bis 1.0.0 bzw. 0.9
 
 
 def prepare_data(db: str) -> str:
@@ -179,7 +179,7 @@ def load_env_file(path: Path) -> dict[str, str]:
 
 def find_config(explicit: str | None) -> Path | None:
     """Reihenfolge: --config, BEAMLOG_CONFIG, .env neben dem Programm, /etc/beamlog/.env – dazu die alten Namen
-    beamlog.env (bis 1.0.3) und contestlogger.env (bis 0.9). Zeigt --config auf eine alte, inzwischen umbenannte Datei
+    beamlog.env (bis 1.0.0) und contestlogger.env (bis 0.9). Zeigt --config auf eine alte, inzwischen umbenannte Datei
     (z. B. eine eigene Dienst-Unit mit …/beamlog.env), wird die .env daneben genommen."""
     base = portable_base()
     given = [c for c in (explicit, env("CONFIG")) if c]

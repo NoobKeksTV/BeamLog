@@ -129,7 +129,7 @@ Update: neues ZIP entpacken, im entpackten Ordner `sudo bash deploy/install.sh -
 ## Alles in einem Ordner (Umzug älterer Installationen)
 
 Auf dem Server liegt jetzt alles unter `/opt/beamlog`: Programm, `data/` (Datenbank, Backups, Sprachen) und `.env`
-(Einstellungen) – ein Ordner, ein Besitzer (`beamlog`), keine verstreuten Rechte. Bis 1.0.3 lagen die Daten in
+(Einstellungen) – ein Ordner, ein Besitzer (`beamlog`), keine verstreuten Rechte. Bis 1.0.0 lagen die Daten in
 `/var/lib/beamlog` und die Einstellungen in `/etc/beamlog/beamlog.env`. `sudo bash deploy/install.sh --update` holt
 alles automatisch in den neuen Ordner:
 
