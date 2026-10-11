@@ -15,6 +15,7 @@ Integrierter **ON4KST-Chat** (je Station, DMs, Rundruf) · **Aircraft-Scatter** 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Plattformen](https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-portable-8b98a8)](https://github.com/NoobKeksTV/BeamLog/releases/latest)
 [![Live-Demo](https://img.shields.io/badge/Live--Demo-ausprobieren-ff8c1a)](https://beamlogdemo.lhprinting.de/)
+[![Video](https://img.shields.io/badge/Video-YouTube-ff0000?logo=youtube&logoColor=white)](https://youtu.be/yvYb6FNvjzA)
 [![Lizenz: GNU AGPLv3](https://img.shields.io/badge/Lizenz-GNU%20AGPLv3-a32d2a)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/NoobKeksTV/BeamLog?style=social)](https://github.com/NoobKeksTV/BeamLog/stargazers)
 
@@ -22,10 +23,9 @@ Integrierter **ON4KST-Chat** (je Station, DMs, Rundruf) · **Aircraft-Scatter** 
 
 <br>
 
-<!-- YOUTUBE: sobald das Video online ist, das Bild verlinken: <a href="https://youtu.be/XXXX"><img …></a> -->
-<img src="docs/video-vorschau.jpg" width="760" alt="BeamLog im Video (1:42)">
+<a href="https://youtu.be/yvYb6FNvjzA"><img src="docs/video-vorschau.jpg" width="760" alt="BeamLog im Video (1:42) – auf YouTube ansehen"></a>
 
-<sub>🎬 Das Video „BeamLog in 1:42 Minuten“ erscheint in Kürze auf YouTube.</sub>
+<sub>🎬 <a href="https://youtu.be/yvYb6FNvjzA">Video „BeamLog in 1:42 Minuten“ auf YouTube ansehen</a></sub>
 
 </div>
 
