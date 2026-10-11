@@ -73,9 +73,10 @@ def check_port(host: str, port: int) -> None:
     """Port vorab prüfen und bei Problemen verständlich erklären, statt mit einer knappen uvicorn-Meldung zu enden."""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if os.name != "nt":  # unter Windows würde SO_REUSEADDR einen belegten Port „teilen“
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((host if host not in ("", "localhost") else "127.0.0.1", port))
-    except PermissionError:
+    except PermissionError if os.name != "nt" and port < 1024 else ():  # Windows meldet belegte Ports ebenfalls als „Zugriff verweigert“
         sys.exit(f"  Port {port} darf von diesem Benutzer nicht geöffnet werden (Ports unter 1024 brauchen Sonderrechte).\n"
                  f"  Server-Dienst: sudo bash deploy/install.sh --update (die Unit erlaubt Port 80), sonst einen Port ab 1024 wählen.")
     except OSError as e:
