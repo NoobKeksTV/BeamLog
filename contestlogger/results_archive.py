@@ -7,8 +7,11 @@ Quellen (jeweils so weit zurück, wie die Veranstalter sie online haben):
                 vom Contest-Hub (ab 2014): Rufzeichen und DOK – Kurzwelle tauscht keinen Locator aus
   ok2kkw        Ergebnisse der IARU-Region-1-UKW-Conteste (September, Oktober UHF, Marconi, Subregionals, Mikrowelle) und der
                 tschechischen UKW-Conteste, gesammelt von OK2KKW seit 1985: Rufzeichen und Locator
-  (Der IARU-Contest-Robot iaru.oevsv.at sperrt automatische Abrufe per robots.txt – dessen CSV-Dateien lassen sich von Hand
-   herunterladen und über „Ergebnisliste importieren“ einlesen.)
+  iaru-robot    Offizielle Ergebnisse der IARU-Region-1-UKW-Conteste vom Contest-Robot iaru.oevsv.at (ab 2019, CSV-Export je Contest:
+                Rufzeichen und Locator) sowie dessen Gesamtliste vhf.csv (Rufzeichen;Locator aller bisherigen Teilnehmer).
+  iaru-robot-logs  dazu die Einzel-Logs aller Teilnehmer eines Contests (je Teilnehmer eine Seite mit allen QSOs: Partner-Rufzeichen
+                und -Locator) – erfasst auch Stationen, die selbst kein Log eingereicht haben. Vom Robot als „unique“ (vermutlich
+                verhört) oder ungültig markierte QSOs werden nicht übernommen. Abruf mit Erlaubnis des Betreibers.
 
 Jeder Eintrag einer Quelle ist eine „Liste“ (ein Contest eines Jahres) mit eindeutiger id; geladen wird über fetch(url) -> bytes,
 damit sich Netzwerk und Auswertung getrennt testen lassen. Ergebnis je Liste: [(Rufzeichen, Locator, DOK)], Datum der Liste.
@@ -42,7 +45,15 @@ SOURCES = {
     "darc-ukw-alt": {"name": "DARC UKW-Conteste 2008–2016 (Archiv darc.de)", "group": "DARC", "locator": True},
     "darc-kw": {"name": "DARC-KW-Conteste (Contest-Hub, ab 2014) – nur Rufzeichen + DOK", "group": "DARC", "locator": False},
     "ok2kkw": {"name": "IARU-Region-1-UKW-Conteste und OK-Conteste (Archiv OK2KKW, ab 1985)", "group": "IARU", "locator": True},
+    "iaru-robot": {"name": "IARU-Region-1-UKW-Conteste (Contest-Robot iaru.oevsv.at, ab 2019)", "group": "IARU", "locator": True},
+    "iaru-robot-logs": {"name": "IARU-Region-1-UKW-Conteste: Einzel-Logs aller Teilnehmer (QSO-Partner mit Locator, auch Stationen ohne eigenes Log) – "
+                                "dauert 10–30 Minuten je Contest", "group": "IARU", "locator": True},
 }
+
+
+class Cancelled(Exception):
+    """Import einer Liste abgebrochen (über den Fortschritts-Rückruf)."""
+IARU_ROBOT = "https://iaru.oevsv.at"
 OK2KKW = "https://www.ok2kkw.com/"
 OK2KKW_INDEX = OK2KKW + "contesting_en.htm"
 _OK2_SKIP = re.compile(r"contesting|winn\.htm|eme_contesting|log_cz|contests2_cz|statistika|main\.css", re.I)
@@ -158,6 +169,114 @@ def list_ok2kkw(fetch: Fetch) -> list[Entry]:
     return sorted(out, key=lambda e: (-e.year, e.label))
 
 
+def list_iaru_robot(fetch: Fetch) -> list[Entry]:
+    """Contest-Liste des Robots (seitenweise, start=1, 31, …): nur Conteste mit Ergebnis-CSV; dazu die Gesamtliste vhf.csv."""
+    out: list[Entry] = []
+    todo, seen_pages = [1], set()
+    while todo:
+        start = todo.pop(0)
+        if start in seen_pages:
+            continue
+        seen_pages.add(start)
+        page = _text(fetch(f"{IARU_ROBOT}/v_upld/prg_list.php?start={start}"))
+        todo += [int(n) for n in re.findall(r"prg_list\.php\?start=(\d+)", page) if int(n) not in seen_pages]
+        for row in re.findall(r"<tr[^>]*>(.*?)</tr>", page, re.S):
+            m = re.search(r"prg_xcsv\.php\?cont_id=(\d+)", row)
+            if not m:
+                continue  # Contest noch in der Auswertung
+            cells = [re.sub(r"\s+", " ", _clean(c)) for c in re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)]
+            name = cells[0] if cells else f"Contest {m.group(1)}"
+            date = next((c[:10] for c in cells[1:3] if re.match(r"\d{4}-\d{2}-\d{2}", c)), "")
+            year = int(date[:4]) if date else int((re.search(r"(20\d\d)", name) or re.search(r"(\d{4})", "0000")).group(1))
+            cid = m.group(1)
+            if any(e.id == f"iaru-robot:{cid}" for e in out):
+                continue
+            out.append(Entry(f"iaru-robot:{cid}", "iaru-robot", f"{date} {name}".strip(), year, f"{IARU_ROBOT}/v_upld/prg_xcsv.php?cont_id={cid}",
+                             date, f"IARU R1 {year}"))
+    out.sort(key=lambda e: (-e.year, e.when, e.label))
+    out.insert(0, Entry("iaru-robot:vhf.csv", "iaru-robot", "Gesamtliste vhf.csv (alle Teilnehmer, Rufzeichen;Locator)", 0,
+                        f"{IARU_ROBOT}/cron/vhf.csv", "", "IARU R1 Gesamtliste"))
+    return out
+
+
+def list_iaru_robot_logs(fetch: Fetch) -> list[Entry]:
+    return [Entry(e.id.replace("iaru-robot:", "iaru-robot-logs:"), "iaru-robot-logs", f"{e.label} – Einzel-Logs", e.year, e.url, e.when,
+                  f"IARU R1 {e.year} – Einzel-Logs") for e in list_iaru_robot(fetch) if e.year]
+
+
+def _table_rows(page: str) -> tuple[list[str], list[list[str]]]:
+    heads = [re.sub(r"\s+", " ", _clean(h)) for h in re.findall(r"<th[^>]*>(.*?)</th>", page, re.S | re.I)]
+    rows = [[re.sub(r"\s+", " ", _clean(c)) for c in re.findall(r"<td[^>]*>(.*?)</td>", r, re.S | re.I)]
+            for r in re.findall(r"<tr[^>]*>(.*?)</tr>", page, re.S | re.I)]
+    return heads, rows
+
+
+def parse_iaru_qsos(page: str) -> list[tuple[str, str, str]]:
+    """QSO-Seite eines Teilnehmers: Partner-Rufzeichen und -Locator; ohne „unique“ (Rufzeichen nur in diesem Log – meist verhört)
+    und ohne QSOs, die beim Gegencheck 0 Punkte bekamen."""
+    heads, rows = _table_rows(page)
+    idx = {h: i for i, h in enumerate(heads)}
+    ci, li = idx.get("RX Call"), idx.get("RX WWL")
+    if ci is None or li is None:
+        return []
+    ui = next((i for h, i in idx.items() if h.startswith("Unique")), None)
+    xi = idx.get("Cross checked score")
+    mi = idx.get("Mode")
+    out = []
+    for r in rows:
+        if len(r) <= max(ci, li):
+            continue
+        if ui is not None and ui < len(r) and r[ui].lower().startswith("yes"):
+            continue
+        if xi is not None and xi < len(r) and r[xi].strip() == "0":
+            continue
+        call, loc = r[ci].upper().replace(" ", ""), r[li].upper()
+        if mi is not None and mi < len(r) and re.search(r"FT\d|MGM|JT|MSK|Q65", r[mi].upper()) and loc.endswith("MM"):
+            continue  # Digimodes tauschen nur das Großfeld aus – „MM“ ist aufgefüllt (Feldmitte), kein echter Locator
+        if importers._CALL_TOKEN.fullmatch(call) and prefixes.is_plausible_call(call) and geo.is_valid_locator(loc) and len(loc) >= 6:  # noqa: SLF001
+            out.append((call, loc, ""))
+    return out
+
+
+def parse_iaru_logs(fetch: Fetch, cid: str, progress=None) -> Parsed:
+    """Alle Teilnehmer eines Contests (eigene Station + Locator) und deren QSO-Partner."""
+    part = _text(fetch(f"{IARU_ROBOT}/v_part/prg_list.php?reset=1&start=1&master_v_part_cont_id={cid}&master_v_part_vw=v_upld"))
+    rows: list[tuple[str, str, str]] = []
+    pids: list[str] = []
+    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", part, re.S):
+        m = re.search(r"master_v_qsos_part_id=(\d+)", tr)
+        if not m or m.group(1) in pids:
+            continue
+        pids.append(m.group(1))
+        cells = [re.sub(r"\s+", " ", _clean(c)) for c in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S)]
+        call = next((c.upper() for c in cells if importers._CALL_TOKEN.fullmatch(c.upper() or "-")), "")  # noqa: SLF001
+        loc = next((c.upper() for c in cells if importers._LOC_TOKEN.fullmatch(c.upper() or "-")), "")  # noqa: SLF001
+        if call and loc:
+            rows.append((call, loc, ""))
+    for n, pid in enumerate(pids, 1):
+        if progress and progress(n, len(pids)) is False:
+            raise Cancelled
+        rows += parse_iaru_qsos(_text(fetch(f"{IARU_ROBOT}/v_qsos/prg_list.php?reset=1&start=1&master_v_qsos_part_id={pid}&master_v_qsos_vw=v_part")))
+    return Parsed(rows, 1 + len(pids))
+
+
+def parse_iaru_csv(text: str) -> list[tuple[str, str, str]]:
+    """Ergebnis-CSV des Robots (Spalten „Call“ und „WWL“) oder die Gesamtliste vhf.csv („CALL“;„LOCATOR“)."""
+    import csv
+    import io
+    rows: list[tuple[str, str, str]] = []
+    first = text.lstrip()[:400]
+    if ";" in first.splitlines()[0] if first else False:
+        for r in csv.reader(io.StringIO(text), delimiter=";"):
+            if len(r) >= 2:
+                rows.append((r[0].strip().upper(), r[1].strip().upper(), ""))
+    else:
+        for r in csv.DictReader(io.StringIO(text)):
+            rows.append(((r.get("Call") or "").strip().upper(), (r.get("WWL") or "").strip().upper(), ""))
+    return [(c, loc, d) for c, loc, d in rows if c and importers._CALL_TOKEN.fullmatch(c) and prefixes.is_plausible_call(c)  # noqa: SLF001
+            and not c[0] == "0" and prefixes.country(c) != "?" and geo.is_valid_locator(loc) and len(loc) >= 6]
+
+
 def list_entries(fetch: Fetch, source: str, this_year: int) -> list[Entry]:
     if source == "darc-ukw":
         return list_darc_ukw(fetch, list(range(this_year, 2016, -1)))
@@ -167,6 +286,10 @@ def list_entries(fetch: Fetch, source: str, this_year: int) -> list[Entry]:
         return list_darc_kw(fetch)
     if source == "ok2kkw":
         return list_ok2kkw(fetch)
+    if source == "iaru-robot":
+        return list_iaru_robot(fetch)
+    if source == "iaru-robot-logs":
+        return list_iaru_robot_logs(fetch)
     raise ValueError(f"Unbekannte Quelle: {source}")
 
 
@@ -222,7 +345,8 @@ def parse_text_pairs(text: str) -> list[tuple[str, str, str]]:
     return rows
 
 
-def parse_entry(fetch: Fetch, e: Entry) -> Parsed:
+def parse_entry(fetch: Fetch, e: Entry, progress=None) -> Parsed:
+    """progress(n, gesamt) bei Listen aus vielen Einzelseiten; gibt er False zurück, wird mit Cancelled abgebrochen."""
     if e.source == "darc-ukw":
         res = importers.parse_darc_csv(_text(fetch(e.url)))
         return Parsed([(c, loc, res.doks.get(prefixes.core_call(c), "")) for c, loc, _ in res.callbook])
@@ -251,4 +375,8 @@ def parse_entry(fetch: Fetch, e: Entry) -> Parsed:
             text = data.decode("cp1250", "replace") if b"charset=windows-1250" in data[:3000].lower() or b"charset=iso-8859-2" in data[:3000].lower() else _text(data)
             text = importers.html_to_text(text.encode("utf-8")) if "<" in text else text
         return Parsed(parse_text_pairs(text))
+    if e.source == "iaru-robot":
+        return Parsed(parse_iaru_csv(fetch(e.url).decode("iso-8859-1")))
+    if e.source == "iaru-robot-logs":
+        return parse_iaru_logs(fetch, e.id.split(":", 1)[1], progress)
     raise ValueError(f"Unbekannte Quelle: {e.source}")

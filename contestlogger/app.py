@@ -1058,16 +1058,23 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                         break
                     e = archive["entries"][i]
                     job["current"] = e.label
+                    def progress(n: int, total: int, label: str = e.label) -> bool:
+                        job["current"] = f"{label} · {n}/{total}"
+                        time.sleep(0.2)  # viele Einzelseiten: kurze Pause je Seite
+                        return not job["cancel"]
                     try:
-                        parsed = await asyncio.to_thread(results_archive.parse_entry, archive_fetch, e)
+                        parsed = await asyncio.to_thread(results_archive.parse_entry, archive_fetch, e, progress)
+                    except results_archive.Cancelled:
+                        break
                     except Exception as ex:  # noqa: BLE001
                         job["errors"].append({"id": i, "label": e.label, "error": str(ex)[:200]})
                         job["done"] += 1
                         continue
                     when = f"{e.when}T00:00:00Z" if e.when else ""
                     n = 0
+                    uniq = list(dict.fromkeys(parsed.rows))  # Einzel-Logs: dieselbe Station steht in Hunderten Logs
                     with db.bulk():
-                        for call, loc, dok in parsed.rows:
+                        for call, loc, dok in uniq:
                             if not loc and not add_bare and not db.lookup_call(call):
                                 job["skipped"] += 1
                                 continue

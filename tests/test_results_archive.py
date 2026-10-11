@@ -91,3 +91,46 @@ def test_archive_import_job(tmp_path, monkeypatch):
                 break
             time.sleep(0.1)
         assert j["new"] == 2
+
+
+IARU_LIST = """<tr><td>2025 IARU Reg. 1 145 MHz Contest</td><td>2025-09-06 14:00</td><td>2025-09-07 14:00</td>
+<td><a href="prg_xcsv.php?cont_id=75">CSV</a></td></tr>
+<tr><td>2026 IARU Reg. 1 145 MHz Contest</td><td>2026-09-05 14:00</td><td>in Auswertung</td></tr>
+<a href="/v_upld/prg_list.php?start=31">2</a>"""
+IARU_CSV = '''"Section","Band","Rank","Rank for prize","Call","WWL","Claimed score",
+"SO-LP","145 MHz","1","1","IO4R","JN63DT","137599",
+"SO","145 MHz","2","2","OK1NPF","JO70UK","120178",
+'''
+IARU_PART = """<tr><td>SO 145 MHz</td><td>1</td><td>IO4R</td><td>JN63DT</td>
+<td><a href="../v_qsos/prg_list.php?reset=1&start=1&master_v_qsos_part_id=111&master_v_qsos_vw=v_part">QSOs</a></td></tr>"""
+IARU_QSOS = """<table><tr><th>Timestamp</th><th>RX Call</th><th>RX WWL</th><th>Cross checked score</th><th>Unique<br>Single Log</th></tr>
+<tr><td>2025-09-06 14:01</td><td>OK5W</td><td>JO60OK</td><td>178</td><td>no/no</td></tr>
+<tr><td>2025-09-06 14:02</td><td>DL9XYZ</td><td>JN58AA</td><td>90</td><td>no/yes</td></tr>
+<tr><td>2025-09-06 14:03</td><td>OK1WQX</td><td>JN79HU</td><td>101</td><td>yes/yes</td></tr>
+<tr><td>2025-09-06 14:04</td><td>OL2J</td><td>JN79TI</td><td>0</td><td>no/no</td></tr></table>"""
+IARU_QSOS_MGM = """<table><tr><th>RX Call</th><th>RX WWL</th><th>Mode</th></tr><tr><td>OE4WHG</td><td>JN87MM</td><td>FT8</td></tr>
+<tr><td>S52OR</td><td>JN76MM</td><td>CW</td></tr></table>"""
+
+
+def test_iaru_robot_list_csv_and_logs():
+    pages = {f"{ra.IARU_ROBOT}/v_upld/prg_list.php?start=1": IARU_LIST, f"{ra.IARU_ROBOT}/v_upld/prg_list.php?start=31": IARU_LIST,
+             f"{ra.IARU_ROBOT}/v_upld/prg_xcsv.php?cont_id=75": IARU_CSV,
+             f"{ra.IARU_ROBOT}/v_part/prg_list.php?reset=1&start=1&master_v_part_cont_id=75&master_v_part_vw=v_upld": IARU_PART,
+             f"{ra.IARU_ROBOT}/v_qsos/prg_list.php?reset=1&start=1&master_v_qsos_part_id=111&master_v_qsos_vw=v_part": IARU_QSOS}
+    fetch = lambda u: pages[u].encode("iso-8859-1")  # noqa: E731
+    es = ra.list_iaru_robot(fetch)
+    assert [e.id for e in es] == ["iaru-robot:vhf.csv", "iaru-robot:75"]  # Contest in Auswertung (ohne CSV) fehlt
+    assert ra.parse_entry(fetch, es[1]).rows == [("IO4R", "JN63DT", ""), ("OK1NPF", "JO70UK", "")]
+    logs = ra.list_iaru_robot_logs(fetch)
+    assert [e.id for e in logs] == ["iaru-robot-logs:75"]
+    seen = []
+    parsed = ra.parse_entry(fetch, logs[0], lambda n, t: seen.append((n, t)) or True)
+    # eigene Station + QSO-Partner; „unique“ (verhört) und beim Gegencheck gestrichene QSOs fehlen, Stationen ohne Log sind dabei
+    assert parsed.rows == [("IO4R", "JN63DT", ""), ("OK5W", "JO60OK", ""), ("DL9XYZ", "JN58AA", "")] and seen == [(1, 1)]
+    try:
+        ra.parse_entry(fetch, logs[0], lambda n, t: False)
+        assert False, "Abbruch erwartet"
+    except ra.Cancelled:
+        pass
+    assert ra.parse_iaru_qsos(IARU_QSOS_MGM) == [("S52OR", "JN76MM", "")]  # FT8: nur Großfeld, mit „MM“ aufgefüllt -> weglassen
+    assert ra.parse_iaru_csv('"DF0MU";"JO31PC"\n"";"JN19BQ"\n"0DF5TV";"JN48OL"\n') == [("DF0MU", "JO31PC", "")]
