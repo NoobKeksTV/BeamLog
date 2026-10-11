@@ -9,6 +9,8 @@ Quellen (jeweils so weit zurück, wie die Veranstalter sie online haben):
                 tschechischen UKW-Conteste, gesammelt von OK2KKW seit 1985: Rufzeichen und Locator
   iaru-robot    Offizielle Ergebnisse der IARU-Region-1-UKW-Conteste vom Contest-Robot iaru.oevsv.at (ab 2019, CSV-Export je Contest:
                 Rufzeichen und Locator) sowie dessen Gesamtliste vhf.csv (Rufzeichen;Locator aller bisherigen Teilnehmer).
+  darc-kw-logs  Einzel-Logs der DARC-KW-Conteste („Open Log“, ab 2017): je Teilnehmer das Cabrillo-Log – eigene Station mit
+                Locator (GRID-LOCATOR) und DOK, dazu alle deutschen QSO-Partner mit empfangenem DOK
   iaru-robot-logs  dazu die Einzel-Logs aller Teilnehmer eines Contests (je Teilnehmer eine Seite mit allen QSOs: Partner-Rufzeichen
                 und -Locator) – erfasst auch Stationen, die selbst kein Log eingereicht haben. Vom Robot als „unique“ (vermutlich
                 verhört) oder ungültig markierte QSOs werden nicht übernommen. Abruf mit Erlaubnis des Betreibers.
@@ -44,6 +46,8 @@ SOURCES = {
     "darc-ukw": {"name": "DARC UKW-Conteste (Contest-Hub, ab 2017)", "group": "DARC", "locator": True},
     "darc-ukw-alt": {"name": "DARC UKW-Conteste 2008–2016 (Archiv darc.de)", "group": "DARC", "locator": True},
     "darc-kw": {"name": "DARC-KW-Conteste (Contest-Hub, ab 2014) – nur Rufzeichen + DOK", "group": "DARC", "locator": False},
+    "darc-kw-logs": {"name": "DARC-KW-Conteste: Einzel-Logs aller Teilnehmer (eigener Locator + DOK, DOKs aller deutschen QSO-Partner, ab 2017) – "
+                             "dauert 5–20 Minuten je Contest und Jahr", "group": "DARC", "locator": False},
     "ok2kkw": {"name": "IARU-Region-1-UKW-Conteste und OK-Conteste (Archiv OK2KKW, ab 1985)", "group": "IARU", "locator": True},
     "iaru-robot": {"name": "IARU-Region-1-UKW-Conteste (Contest-Robot iaru.oevsv.at, ab 2019)", "group": "IARU", "locator": True},
     "iaru-robot-logs": {"name": "IARU-Region-1-UKW-Conteste: Einzel-Logs aller Teilnehmer (QSO-Partner mit Locator, auch Stationen ohne eigenes Log) – "
@@ -53,8 +57,10 @@ SOURCES = {
 
 class Cancelled(Exception):
     """Import einer Liste abgebrochen (über den Fortschritts-Rückruf)."""
+
+
+PAGE_WORKERS = 3  # gleichzeitige Abrufe von Einzelseiten innerhalb einer Liste
 IARU_ROBOT = "https://iaru.oevsv.at"
-IARU_PARALLEL = 3  # gleichzeitige Abrufe der Einzel-Logs
 OK2KKW = "https://www.ok2kkw.com/"
 OK2KKW_INDEX = OK2KKW + "contesting_en.htm"
 _OK2_SKIP = re.compile(r"contesting|winn\.htm|eme_contesting|log_cz|contests2_cz|statistika|main\.css", re.I)
@@ -239,6 +245,34 @@ def parse_iaru_qsos(page: str) -> list[tuple[str, str, str]]:
     return out
 
 
+def fetch_many(fetch: Fetch, urls: list[str], progress=None, workers: int = 0) -> list[str]:
+    """Viele Einzelseiten gleichzeitig laden (jede braucht auf den Servern rund eine Sekunde); Ergebnisse in der Reihenfolge der URLs.
+    progress(n, gesamt) nach jeder Seite – gibt er False zurück, wird abgebrochen (Cancelled)."""
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    lock, state = threading.Lock(), {"n": 0, "stop": False}
+
+    def one(url: str) -> str:
+        if state["stop"]:
+            return ""
+        try:
+            page = _text(fetch(url))
+        except Exception:  # noqa: BLE001 – eine fehlende Einzelseite soll nicht die ganze Liste kippen
+            page = ""
+        with lock:
+            state["n"] += 1
+            n = state["n"]
+        if progress and progress(n, len(urls)) is False:
+            state["stop"] = True
+        return page
+
+    with ThreadPoolExecutor(max_workers=workers or PAGE_WORKERS) as pool:
+        pages = list(pool.map(one, urls))
+    if state["stop"]:
+        raise Cancelled
+    return pages
+
+
 def parse_iaru_logs(fetch: Fetch, cid: str, progress=None) -> Parsed:
     """Alle Teilnehmer eines Contests (eigene Station + Locator) und deren QSO-Partner."""
     part = _text(fetch(f"{IARU_ROBOT}/v_part/prg_list.php?reset=1&start=1&master_v_part_cont_id={cid}&master_v_part_vw=v_upld"))
@@ -254,27 +288,9 @@ def parse_iaru_logs(fetch: Fetch, cid: str, progress=None) -> Parsed:
         loc = next((c.upper() for c in cells if importers._LOC_TOKEN.fullmatch(c.upper() or "-")), "")  # noqa: SLF001
         if call and loc:
             rows.append((call, loc, ""))
-    # Jede QSO-Seite braucht auf dem Robot gut eine Sekunde – drei gleichzeitige Abrufe, Reihenfolge der Ergebnisse bleibt erhalten
-    from concurrent.futures import ThreadPoolExecutor
-    import threading
-    lock, state = threading.Lock(), {"n": 0, "stop": False}
-
-    def one(pid: str) -> list[tuple[str, str, str]]:
-        if state["stop"]:
-            return []
-        page = _text(fetch(f"{IARU_ROBOT}/v_qsos/prg_list.php?reset=1&start=1&master_v_qsos_part_id={pid}&master_v_qsos_vw=v_part"))
-        with lock:
-            state["n"] += 1
-            n = state["n"]
-        if progress and progress(n, len(pids)) is False:
-            state["stop"] = True
-        return parse_iaru_qsos(page)
-
-    with ThreadPoolExecutor(max_workers=IARU_PARALLEL) as pool:
-        for part_rows in pool.map(one, pids):
-            rows += part_rows
-    if state["stop"]:
-        raise Cancelled
+    urls = [f"{IARU_ROBOT}/v_qsos/prg_list.php?reset=1&start=1&master_v_qsos_part_id={pid}&master_v_qsos_vw=v_part" for pid in pids]
+    for page in fetch_many(fetch, urls, progress):
+        rows += parse_iaru_qsos(page)
     return Parsed(rows, 1 + len(pids))
 
 
@@ -295,6 +311,86 @@ def parse_iaru_csv(text: str) -> list[tuple[str, str, str]]:
             and not c[0] == "0" and prefixes.country(c) != "?" and geo.is_valid_locator(loc) and len(loc) >= 6]
 
 
+def _olog_form(fetch: Fetch, key: str) -> tuple[str, list[int], list[str]]:
+    """Open-Log-Formular eines KW-Contests: interner Contest-Name, Jahre mit Logs, Durchgänge (FT4, AC-CW, RTTY-Kurz)."""
+    page = _text(fetch(f"{HUB}/~{key}/user.cgi?fc=req_olog&form=referat&lang=de"))
+    contest = (re.search(r'name="contest" value="([^"]+)"', page) or re.search(r"(x)", "x")).group(1)
+    sel = re.search(r'<select name="jahr".*?</select>', page, re.S)
+    years = sorted({int(y) for y in re.findall(r'value="(\d{4})"', sel.group(0) if sel else "")}, reverse=True)
+    ed = re.search(r'<select name="edition".*?</select>', page, re.S)
+    editions = re.findall(r'value="([^"]+)"', ed.group(0)) if ed else []
+    return contest, years, editions
+
+
+def list_darc_kw_logs(fetch: Fetch, keys: list[str] | None = None) -> list[Entry]:
+    out: list[Entry] = []
+    for key in keys or list(DARC_KW):
+        contest, years, editions = _olog_form(fetch, key)
+        if not contest or contest == "x":
+            continue
+        name = DARC_KW.get(key, key)
+        for y in years:
+            url = f"{HUB}/~{key}/user.cgi?fc=req_olog&contest={contest}&form=referat&lang=de&status=show&jahr={y}"
+            out.append(Entry(f"darc-kw-logs:{key}:{y}", "darc-kw-logs", f"{name} {y} – Einzel-Logs", y, url, f"{y}-01-01",
+                             f"{name} – Einzel-Logs"))
+            if editions:
+                out[-1].url += "&editions=" + ",".join(editions)
+    return out
+
+
+def parse_cabrillo(text: str) -> list[tuple[str, str, str]]:
+    """Cabrillo-Log (Open Log): eigene Station (CALLSIGN, GRID-LOCATOR, DOK aus SPECIFIC/LOCATION) und die QSO-Partner mit
+    empfangenem DOK – nur bei deutschen Partnern, ausländische Stationen senden eine Nummer."""
+    rows: list[tuple[str, str, str]] = []
+    head = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        m = re.match(r"^([A-Z-]+):\s*(.*)$", line)
+        if not m:
+            continue
+        tag, val = m.group(1), m.group(2).strip()
+        if tag != "QSO":
+            head.setdefault(tag, val.upper())
+            continue
+        toks = val.upper().split()
+        if len(toks) < 6:
+            continue
+        mycall = toks[4]
+        # Partner = erstes Rufzeichen nach dem eigenen; danach RST und Austausch
+        for i in range(5, len(toks)):
+            t = toks[i]
+            if t != mycall and importers._CALL_TOKEN.fullmatch(t) and prefixes.is_plausible_call(t) and not re.fullmatch(r"[A-Z]\d{2}", t):  # noqa: SLF001
+                exch = toks[i + 1:i + 4]
+                dok = next((x for x in exch if re.fullmatch(r"[A-Z]\d{2}|(?=.*[A-Z])(?=.*\d)[A-Z0-9]{3,8}", x)
+                            and not re.fullmatch(r"[A-R]{2}\d{2}([A-X]{2})?", x) and not re.fullmatch(r"[+-]?\d+", x)), "")
+                if prefixes.country(t) != "Deutschland":
+                    dok = ""
+                rows.append((t, "", dok))
+                break
+    call = head.get("CALLSIGN", "")
+    loc = head.get("GRID-LOCATOR", "")
+    own_dok = next((v for k, v in head.items() if k in ("SPECIFIC", "LOCATION") and re.fullmatch(r"[A-Z]\d{2}", v or "")), "")
+    if call and importers._CALL_TOKEN.fullmatch(call):  # noqa: SLF001
+        rows.insert(0, (call, loc if geo.is_valid_locator(loc) and len(loc) >= 6 else "", own_dok))
+    return rows
+
+
+def parse_darc_kw_logs(fetch: Fetch, e: Entry, progress=None) -> Parsed:
+    """Teilnehmer aus der Ergebnisliste des Jahres (bei mehreren Durchgängen je Durchgang), dann je Teilnehmer das Open Log."""
+    key = e.id.split(":")[1]
+    base, _, eds = e.url.partition("&editions=")
+    editions = [x for x in eds.split(",") if x] or [""]
+    urls: list[str] = []
+    for ed in editions:
+        calls = list(dict.fromkeys(c for c, _, _ in parse_html_tables(_text(fetch(kw_url(key, e.year, ed))))))
+        urls += [f"{base}&edition={ed or 2000}&call={c}&Show=1" for c in calls]
+    rows: list[tuple[str, str, str]] = []
+    for page in fetch_many(fetch, urls, progress):
+        if "QSO:" in page:
+            rows += parse_cabrillo(importers.html_to_text(page.encode("utf-8")))
+    return Parsed(rows, len(urls) + len(editions))
+
+
 def list_entries(fetch: Fetch, source: str, this_year: int) -> list[Entry]:
     if source == "darc-ukw":
         return list_darc_ukw(fetch, list(range(this_year, 2016, -1)))
@@ -308,6 +404,8 @@ def list_entries(fetch: Fetch, source: str, this_year: int) -> list[Entry]:
         return list_iaru_robot(fetch)
     if source == "iaru-robot-logs":
         return list_iaru_robot_logs(fetch)
+    if source == "darc-kw-logs":
+        return list_darc_kw_logs(fetch)
     raise ValueError(f"Unbekannte Quelle: {source}")
 
 
@@ -397,4 +495,6 @@ def parse_entry(fetch: Fetch, e: Entry, progress=None) -> Parsed:
         return Parsed(parse_iaru_csv(fetch(e.url).decode("iso-8859-1")))
     if e.source == "iaru-robot-logs":
         return parse_iaru_logs(fetch, e.id.split(":", 1)[1], progress)
+    if e.source == "darc-kw-logs":
+        return parse_darc_kw_logs(fetch, e, progress)
     raise ValueError(f"Unbekannte Quelle: {e.source}")

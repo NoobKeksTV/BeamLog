@@ -134,3 +134,77 @@ def test_iaru_robot_list_csv_and_logs():
         pass
     assert ra.parse_iaru_qsos(IARU_QSOS_MGM) == [("S52OR", "JN76MM", "")]  # FT8: nur Großfeld, mit „MM“ aufgefüllt -> weglassen
     assert ra.parse_iaru_csv('"DF0MU";"JO31PC"\n"";"JN19BQ"\n"0DF5TV";"JN48OL"\n') == [("DF0MU", "JO31PC", "")]
+
+
+CAB = """<pre>START-OF-LOG: 3.0
+CONTEST: WAG
+SPECIFIC: X36
+CALLSIGN: DA9AAA
+GRID-LOCATOR: JO50BU
+QSO: 28000 CW 2025-10-18 1502 DA9AAA        599 X36    EA9ACD        599 0
+QSO: 28000 CW 2025-10-18 1503 DA9AAA        599 X36    DL6KVA        599 V01
+QSO: 28000 CW 2025-10-18 1506 DA9AAA        599 X36    DR1D          599 G20
+QSO: 7049 DG 2025-05-13 1901 DA9AAA        -12  JO44 DL2LBK       -11  JO54
+END-OF-LOG:</pre>"""
+
+
+def test_parse_cabrillo_open_log():
+    from contestlogger import importers
+    rows = ra.parse_cabrillo(importers.html_to_text(CAB.encode()))
+    assert rows[0] == ("DA9AAA", "JO50BU", "X36")  # eigene Station mit Locator und DOK
+    assert ("DL6KVA", "", "V01") in rows and ("DR1D", "", "G20") in rows
+    assert ("EA9ACD", "", "") in rows  # Ausland sendet eine Nummer, keinen DOK
+    assert ("DL2LBK", "", "") in rows  # FT4: Großfeld ist kein DOK
+
+
+def test_darc_kw_logs_listing_and_parse():
+    form = """<select name="jahr" ><option value="2025">2025<option value="2024">2024</select>
+    <input type="hidden" name="contest" value="wag"  /><input type="hidden" name="edition" value="2000"  />"""
+    res = """<table><tr><th>Platz</th><th>Rufzeichen</th><th>DOK</th></tr><tr><td>1</td><td>DA9AAA</td><td>X36</td></tr></table>"""
+    base = f"{ra.HUB}/~waglog/user.cgi?fc=req_olog&contest=wag&form=referat&lang=de&status=show&jahr=2025"
+    pages = {f"{ra.HUB}/~waglog/user.cgi?fc=req_olog&form=referat&lang=de": form, ra.kw_url("waglog", 2025): res,
+             f"{base}&edition=2000&call=DA9AAA&Show=1": CAB}
+    fetch = lambda u: pages[u].encode()  # noqa: E731
+    es = ra.list_darc_kw_logs(fetch, ["waglog"])
+    assert [e.id for e in es] == ["darc-kw-logs:waglog:2025", "darc-kw-logs:waglog:2024"]
+    rows = ra.parse_entry(fetch, es[0], lambda n, t: True).rows
+    assert rows[0] == ("DA9AAA", "JO50BU", "X36") and ("DL6KVA", "", "V01") in rows
+
+
+def test_archive_job_runs_lists_in_parallel(tmp_path, monkeypatch):
+    """Mehrere Listen gleichzeitig: alle werden fertig, done_ids nennt jede genau einmal."""
+    import threading
+    monkeypatch.setenv("BEAMLOG_MAINTAINER", "1")
+    keys = {f"k{i}": f"Contest {i}" for i in range(5)}
+    pages = {f"{ra.HUB}/~{k}/arch_res.cgi?form=referat&lang=de": KW_PAGE for k in keys}
+    pages.update({ra.kw_url(k, y): KW_PAGE for k in keys for y in (2025, 2024)})
+    state = {"now": 0, "max": 0}
+    lock = threading.Lock()
+
+    class Resp:
+        def __init__(self, data): self.data = data
+        def read(self):
+            with lock:
+                state["now"] += 1; state["max"] = max(state["max"], state["now"])
+            time.sleep(0.05)
+            with lock:
+                state["now"] -= 1
+            return self.data
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: Resp(pages[req.full_url].encode()))
+    monkeypatch.setattr(ra, "DARC_KW", keys)
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        H = {"X-Admin-Token": c.post("/api/setup", json={"password": "admin1"}).json()["token"]}
+        ids = [e["id"] for e in c.post("/api/results/list", json={"source": "darc-kw"}, headers=H).json()["entries"]]
+        assert len(ids) == 10
+        c.post("/api/results/import", json={"ids": ids, "without_locator": True}, headers=H)
+        for _ in range(100):
+            j = c.get("/api/results/job", headers=H).json()
+            if not j["running"]:
+                break
+            time.sleep(0.1)
+        assert j["done"] == 10 and sorted(j["done_ids"]) == sorted(ids) and not j["errors"]
+        assert state["max"] > 1  # tatsächlich gleichzeitig geladen

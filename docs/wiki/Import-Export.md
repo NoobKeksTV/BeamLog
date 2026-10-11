@@ -42,12 +42,14 @@ jede veröffentlichte Ergebnisliste zum Anhaken – einzeln, je Contest/Jahrgang
 | DARC UKW-Conteste, Contest-Hub `dxhf2.darc.de` | ab 2017 | Rufzeichen, Locator, DOK, ODX-Station (`result.csv`) |
 | DARC UKW-Conteste, Archiv auf darc.de | 2008–2016 | Rufzeichen, DOK, Locator, ODX-Station (Textlisten) |
 | DARC-KW-Conteste (WAG, WAE CW/SSB/RTTY, 10 m, Fieldday CW/SSB, Oster-, Weihnachts-, Ausbildungs-, FT4-, RTTY-/Hell-Kurzcontest) | ab 2014 | nur Rufzeichen und DOK – Kurzwelle tauscht keinen Locator aus |
+| DARC-KW-Conteste: **Einzel-Logs** („Open Log“ des Contest-Hubs, je Teilnehmer das Cabrillo-Log) | ab 2017 | eigene Station mit Locator und DOK, dazu die DOKs aller deutschen QSO-Partner |
 | IARU-Region-1-UKW-Conteste (September, Oktober UHF, Marconi, Subregionals, Mikrowelle) und OK-Conteste, Archiv OK2KKW | ab 1985 | Rufzeichen und Locator |
 | IARU-Region-1-UKW-Conteste, Contest-Robot `iaru.oevsv.at` (Ergebnis-CSV je Contest, dazu die Gesamtliste `vhf.csv`) | ab 2019 | Rufzeichen und Locator |
 | IARU-Contest-Robot: **Einzel-Logs** aller Teilnehmer (je Teilnehmer alle QSOs) | ab 2019 | Rufzeichen und Locator aller QSO-Partner – auch Stationen ohne eigenes Log; als „unique“ (vermutlich verhört) oder ungültig markierte QSOs werden ausgelassen. Dauert 10–30 Minuten je Contest. |
 
-Zusammen rund 800 Listen (ohne die Einzel-Logs). Der Import läuft im Hintergrund (Fortschrittsbalken, abbrechbar, läuft auch nach dem Neuladen der
-Seite weiter) und schont die Server der Veranstalter mit einer kurzen Pause je Liste; alles auf einmal dauert etwa 20–30 Minuten.
+Zusammen rund 950 Listen (davon rund 170 mit Einzel-Logs). Die Suche fragt alle Quellen gleichzeitig ab. Der Import läuft im Hintergrund (Fortschrittsbalken, abbrechbar, läuft auch nach dem
+Neuladen der Seite weiter) und lädt bis zu sechs Listen gleichzeitig – je Server höchstens vier Abrufe zugleich, um die Veranstalter
+zu schonen. Die Anzeige zeigt jede gerade laufende Liste mit ihrem Fortschritt.
 Bereits importierte Listen sind markiert und werden mit „nur noch nicht importierte“ übersprungen.
 
 - Neuere Angaben gewinnen (das Datum der Liste zählt); ein älterer Locator bleibt als Alternative erhalten.

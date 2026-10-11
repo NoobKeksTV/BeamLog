@@ -994,15 +994,24 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     # ------------------------------------------------------------ Ergebnislisten-Archiv (DARC, IARU …) – Betreuer
     archive = {"entries": {}, "job": None}  # id -> Entry; laufender Import
+    ARCHIVE_LISTS_PARALLEL = 6  # so viele Listen werden gleichzeitig geladen (verschiedene Quellen und Conteste)
+    ARCHIVE_PER_HOST = 4  # höchstens so viele gleichzeitige Abrufe je Server – schont die Veranstalter
+    import threading as _threading
+    host_slots: dict[str, _threading.BoundedSemaphore] = {}
+    host_lock = _threading.Lock()
 
     def archive_fetch(url: str) -> bytes:
-        """Eine Seite laden – bei kurzen Verbindungsabbrüchen bis zu zweimal neu versuchen."""
+        """Eine Seite laden – je Server höchstens ARCHIVE_PER_HOST gleichzeitig; bei kurzen Verbindungsabbrüchen bis zu zweimal neu."""
         import urllib.error
+        import urllib.parse
         import urllib.request
+        host = urllib.parse.urlsplit(url).netloc.lower()
+        with host_lock:
+            slot = host_slots.setdefault(host, _threading.BoundedSemaphore(ARCHIVE_PER_HOST))
         req = urllib.request.Request(url, headers={"User-Agent": f"Mozilla/5.0 (compatible; BeamLog/{__version__}; +{__source_url__})"})
         for attempt in range(3):
             try:
-                with urllib.request.urlopen(req, timeout=60) as r:  # noqa: S310
+                with slot, urllib.request.urlopen(req, timeout=60) as r:  # noqa: S310
                     return r.read()
             except urllib.error.HTTPError:
                 raise  # 404 & Co.: Wiederholen hilft nicht
@@ -1045,56 +1054,80 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         ids = [i for i in body.get("ids") or [] if i in archive["entries"]]
         if not ids:
             raise HTTPException(400, "Keine Listen ausgewählt (vorher „Listen laden“)")
-        job = {"running": True, "cancel": False, "total": len(ids), "done": 0, "current": "", "new": 0, "known": 0, "dok": 0, "skipped": 0,
-               "rows": 0, "errors": [], "started": utcnow_iso(), "finished": ""}
+        job = {"running": True, "cancel": False, "total": len(ids), "done": 0, "current": "", "active": [], "done_ids": [], "new": 0, "known": 0,
+               "dok": 0, "skipped": 0, "rows": 0, "errors": [], "started": utcnow_iso(), "finished": ""}
         archive["job"] = job
         add_bare = bool(body.get("without_locator"))
+        active: dict[str, str] = {}  # id -> Anzeige (Name · Fortschritt) der gerade laufenden Listen
+
+        def show() -> None:
+            job["active"] = list(active.values())
+            job["current"] = " | ".join(job["active"])
+
+        def learn(e, parsed) -> int:
+            """Ergebnis einer Liste übernehmen – läuft im Event-Loop, also immer nur eine Liste zugleich in der Datenbank."""
+            when = f"{e.when}T00:00:00Z" if e.when else ""
+            n = 0
+            uniq = list(dict.fromkeys(parsed.rows))  # Einzel-Logs: dieselbe Station steht in Hunderten Logs
+            with db.bulk():
+                for call, loc, dok in uniq:
+                    if not loc and not add_bare and not db.lookup_call(call):
+                        job["skipped"] += 1
+                        continue
+                    before = db.row("SELECT dok FROM callbook WHERE call=?", (prefixes.core_call(call),))
+                    r = db.learn_call(call, loc, source=e.source, when=when, dok=dok)
+                    if r == "new":
+                        job["new"] += 1
+                    elif r == "known":
+                        job["known"] += 1
+                        if dok and before is not None and not before.get("dok"):
+                            job["dok"] += 1
+                    n += 1
+            job["rows"] += len(parsed.rows)
+            return n
 
         async def run():
             done = archive_done()
-            try:
-                for i in ids:
-                    if job["cancel"]:
-                        break
+            queue = list(ids)
+
+            async def worker():
+                while queue and not job["cancel"]:
+                    i = queue.pop(0)
                     e = archive["entries"][i]
-                    job["current"] = e.label
-                    def progress(n: int, total: int, label: str = e.label) -> bool:
-                        job["current"] = f"{label} · {n}/{total}"
-                        time.sleep(0.2)  # viele Einzelseiten: kurze Pause je Seite
+                    active[i] = e.label
+                    show()
+
+                    def progress(n: int, total: int, i: str = i, label: str = e.label) -> bool:
+                        active[i] = f"{label} · {n}/{total}"
+                        show()
+                        time.sleep(0.1)
                         return not job["cancel"]
                     try:
                         parsed = await asyncio.to_thread(results_archive.parse_entry, archive_fetch, e, progress)
                     except results_archive.Cancelled:
+                        active.pop(i, None)
                         break
                     except Exception as ex:  # noqa: BLE001
                         job["errors"].append({"id": i, "label": e.label, "error": str(ex)[:200]})
                         job["done"] += 1
+                        active.pop(i, None)
+                        show()
                         continue
-                    when = f"{e.when}T00:00:00Z" if e.when else ""
-                    n = 0
-                    uniq = list(dict.fromkeys(parsed.rows))  # Einzel-Logs: dieselbe Station steht in Hunderten Logs
-                    with db.bulk():
-                        for call, loc, dok in uniq:
-                            if not loc and not add_bare and not db.lookup_call(call):
-                                job["skipped"] += 1
-                                continue
-                            before = db.row("SELECT dok FROM callbook WHERE call=?", (prefixes.core_call(call),))
-                            r = db.learn_call(call, loc, source=e.source, when=when, dok=dok)
-                            if r == "new":
-                                job["new"] += 1
-                            elif r == "known":
-                                job["known"] += 1
-                                if dok and before is not None and not before.get("dok"):
-                                    job["dok"] += 1
-                            n += 1
-                    job["rows"] += len(parsed.rows)
+                    n = learn(e, parsed)
                     done[i] = {"at": utcnow_iso()[:10], "n": n}
                     db.set_setting("results_done", json.dumps(done))
                     job["done"] += 1
-                    await asyncio.sleep(0.3)  # Server der Veranstalter schonen
+                    job["done_ids"].append(i)
+                    active.pop(i, None)
+                    show()
+                    await asyncio.sleep(0.2)
+
+            try:
+                await asyncio.gather(*(worker() for _ in range(min(ARCHIVE_LISTS_PARALLEL, len(ids)))))
             finally:
                 job["running"] = False
-                job["current"] = ""
+                active.clear()
+                show()
                 job["finished"] = utcnow_iso()
                 db.add_audit("Ergebnislisten importiert", details=f"{job['done']}/{job['total']} Listen, {job['new']} neu, {job['known']} bekannt, "
                              f"{job['dok']} DOK ergänzt, {len(job['errors'])} Fehler", nick="Admin", admin=True)

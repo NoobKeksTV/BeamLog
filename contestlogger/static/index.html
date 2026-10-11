@@ -271,9 +271,9 @@
       <div class="card maint-only wide-card" id="archive-card">
         <h3>Ergebnislisten-Archiv: alle Conteste, alle Jahre <span class="tag">Betreuer</span></h3>
         <p class="muted small">Lädt die veröffentlichten Ergebnislisten direkt von den Veranstaltern und übernimmt Rufzeichen, Locator und DOK in die Stationsdatenbank:
-          <b>DARC UKW</b> (Contest-Hub ab 2017, Archiv 2008–2016), <b>DARC KW</b> (WAG, WAE, 10 m, Fieldday, Oster-, Weihnachts-, Ausbildungs-, FT4-, RTTY-, Hell-Contest ab 2014 – nur Rufzeichen und DOK)
+          <b>DARC UKW</b> (Contest-Hub ab 2017, Archiv 2008–2016), <b>DARC KW</b> (WAG, WAE, 10 m, Fieldday, Oster-, Weihnachts-, Ausbildungs-, FT4-, RTTY-, Hell-Contest ab 2014 – Rufzeichen und DOK; ab 2017 auch alle Einzel-Logs mit eigenem Locator und den DOKs der QSO-Partner)
           und die <b>IARU-Region-1-UKW-Conteste</b> (Contest-Robot ab 2019 mit Ergebnislisten und auf Wunsch allen Einzel-Logs, Archiv OK2KKW ab 1985).
-          Neuere Angaben gewinnen; ältere Locatoren bleiben als Alternative erhalten. Die Einzel-Logs bringen auch Stationen ohne eigenes Log mit, brauchen aber je Contest 10–30 Minuten.</p>
+          Neuere Angaben gewinnen; ältere Locatoren bleiben als Alternative erhalten. Bis zu sechs Listen werden gleichzeitig geladen (je Server höchstens vier Abrufe zugleich). Einzel-Logs brauchen je Contest einige Minuten.</p>
         <div class="row">
           <button type="button" id="btn-arch-scan" class="ghost">Verfügbare Listen suchen</button>
           <span id="arch-summary" class="muted small"></span>
@@ -287,6 +287,7 @@
         </div>
         <div id="arch-job" class="hidden">
           <div class="progress"><div id="arch-bar"></div></div>
+          <div id="arch-active" class="arch-active small"></div>
           <div class="row"><span id="arch-status" class="small grow"></span><button type="button" id="btn-arch-cancel" class="ghost small">Abbrechen</button></div>
         </div>
       </div>

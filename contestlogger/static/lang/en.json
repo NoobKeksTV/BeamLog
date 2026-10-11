@@ -639,5 +639,8 @@
  "Fertig": "Done",
  "{a} neu, {b} aktualisiert, {c} DOK ergänzt": "{a} new, {b} updated, {c} DOKs added",
  "ohne Locator übersprungen": "skipped without locator",
- "Ergebnislisten importiert": "Result lists imported"
+ "Ergebnislisten importiert": "Result lists imported",
+ "Suche Listen in {n} Quellen gleichzeitig …": "Searching lists in {n} sources at once …",
+ "Suche Listen … noch {n} Quellen": "Searching lists … {n} sources left",
+ "Listen fertig": "lists done"
 }

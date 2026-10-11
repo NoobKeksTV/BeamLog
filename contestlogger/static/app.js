@@ -1518,11 +1518,15 @@
     try {
       const r = await GET("/api/results/sources");
       tree.innerHTML = ""; tree.classList.remove("hidden"); Arch.entries = {};
-      for (const [n, src] of r.sources.entries()) {
-        sum.textContent = t("Suche Listen: {s} ({i}/{n}) …", { s: src.name, i: n + 1, n: r.sources.length });
-        try { const res = await api("POST", "/api/results/list", { source: src.key }); Arch.entries[src.key] = res.entries; tree.append(archSourceBlock(src, res.entries)); }
-        catch (err) { tree.append(el("div", { class: "warn small" }, `${src.name}: ${err.message}`)); }
-      }
+      // alle Quellen gleichzeitig abfragen; Anzeige in fester Reihenfolge, sobald eine Quelle fertig ist
+      const slots = r.sources.map((src) => { const d = el("div", { class: "muted small" }, `${src.name} …`); tree.append(d); return d; });
+      let left = r.sources.length;
+      sum.textContent = t("Suche Listen in {n} Quellen gleichzeitig …", { n: left });
+      await Promise.allSettled(r.sources.map(async (src, k) => {
+        try { const res = await api("POST", "/api/results/list", { source: src.key }); Arch.entries[src.key] = res.entries; slots[k].replaceWith(archSourceBlock(src, res.entries)); }
+        catch (err) { slots[k].className = "warn small"; slots[k].textContent = `${src.name}: ${err.message}`; }
+        finally { left -= 1; if (left) sum.textContent = t("Suche Listen … noch {n} Quellen", { n: left }); }
+      }));
       const all = Object.values(Arch.entries).flat();
       sum.textContent = t("{n} Listen gefunden, {d} davon schon importiert", { n: all.length, d: all.filter((e) => e.done).length });
       $("#arch-actions").classList.remove("hidden"); archCount();
@@ -1542,7 +1546,8 @@
     $("#arch-job").classList.remove("hidden");
     $("#arch-bar").style.width = `${Math.round(100 * (j.done || 0) / Math.max(1, j.total || 1))}%`;
     const fmt = (n) => (n || 0).toLocaleString("de");
-    $("#arch-status").textContent = (j.running ? `${j.done}/${j.total} · ${j.current || "…"} · ` : `${t("Fertig")}: ${j.done}/${j.total} ${t("Listen")} · `) +
+    const act = $("#arch-active"); act.innerHTML = ""; (j.running ? j.active || [] : []).forEach((x) => act.append(el("div", {}, "⟳ " + x)));
+    $("#arch-status").textContent = (j.running ? `${j.done}/${j.total} ${t("Listen fertig")} · ` : `${t("Fertig")}: ${j.done}/${j.total} ${t("Listen")} · `) +
       t("{a} neu, {b} aktualisiert, {c} DOK ergänzt", { a: fmt(j.new), b: fmt(j.known), c: fmt(j.dok) }) + (j.skipped ? ` · ${fmt(j.skipped)} ${t("ohne Locator übersprungen")}` : "") +
       (j.errors?.length ? ` · ${j.errors.length} ${t("Fehler")} (${j.errors[0].label}: ${j.errors[0].error})` : "") + ` · ${t("Stationsdatenbank")}: ${fmt(j.callbook_count)}`;
     $("#btn-arch-cancel").classList.toggle("hidden", !j.running);
@@ -1551,7 +1556,7 @@
       toast(t("Ergebnislisten importiert"), "ok"); renderCallbook();
       // erledigte Listen gleich als importiert markieren (abgebrochene/fehlerhafte bleiben offen)
       const failed = new Set((j.errors || []).map((e) => e.id)); const today = new Date().toISOString().slice(0, 10);
-      (Arch.lastIds || []).slice(0, j.done).filter((id) => !failed.has(id)).forEach((id) => {
+      (j.done_ids || []).filter((id) => !failed.has(id)).forEach((id) => {
         const cb = $(`.arch-sel[data-id="${CSS.escape(id)}"]`); if (!cb || cb.dataset.done) return;
         cb.dataset.done = "1"; cb.checked = false; cb.closest("label").classList.add("done"); cb.closest("label").append(el("span", { class: "muted small" }, ` ✓ ${today}`));
       });
