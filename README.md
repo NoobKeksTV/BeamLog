@@ -14,10 +14,11 @@ Integrierter **ON4KST-Chat** (je Station, DMs, Rundruf) · **Aircraft-Scatter** 
 [![Letzter Commit](https://img.shields.io/github/last-commit/NoobKeksTV/BeamLog?label=Letzter%20Commit)](https://github.com/NoobKeksTV/BeamLog/commits/main)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Plattformen](https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-portable-8b98a8)](https://github.com/NoobKeksTV/BeamLog/releases/latest)
+[![Live-Demo](https://img.shields.io/badge/Live--Demo-ausprobieren-ff8c1a)](https://beamlogdemo.lhprinting.de/)
 [![Lizenz: GNU AGPLv3](https://img.shields.io/badge/Lizenz-GNU%20AGPLv3-a32d2a)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/NoobKeksTV/BeamLog?style=social)](https://github.com/NoobKeksTV/BeamLog/stargazers)
 
-[**Download**](https://github.com/NoobKeksTV/BeamLog/releases/latest) · [**Wiki**](docs/wiki/Home.md) · [Installation](docs/wiki/Installation.md) · [Server-Deploy](docs/wiki/Deploy.md) · [Tastenkürzel](docs/wiki/Tastenkuerzel.md) · [Fehlersuche](docs/wiki/Fehlersuche.md)
+[**Download**](https://github.com/NoobKeksTV/BeamLog/releases/latest) · [**Live-Demo**](https://beamlogdemo.lhprinting.de/) · [**Wiki**](docs/wiki/Home.md) · [Installation](docs/wiki/Installation.md) · [Server-Deploy](docs/wiki/Deploy.md) · [Tastenkürzel](docs/wiki/Tastenkuerzel.md) · [Fehlersuche](docs/wiki/Fehlersuche.md)
 
 <br>
 
@@ -51,6 +52,12 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 | **Stationsdatenbank** | Rufzeichen, Locator, Name, DOK; wächst mit jedem QSO, der KST-Nutzerliste, Importen (DARC-Hub mit DOK) und Online-Abfragen; Export und Abgleich mit dem Repo |
 | **CAT / CW** | Frequenz vom Funkgerät (Hamlib, flrig), Sprachbausteine F2–F8 als CW |
 | **Betrieb** | Backups auf dem Server (crash-sicher), Aktionsprotokoll, Update-Prüfung mit Selbst-Aktualisierung, „Was ist neu“, mehrsprachig, hell/dunkel, Hilfe mit F1 |
+
+## Live-Demo
+
+Ohne Installation ausprobieren: **[beamlogdemo.lhprinting.de](https://beamlogdemo.lhprinting.de/)** – eine öffentliche BeamLog-Instanz mit
+Beispiel-Contest zum Herumklicken (Loggen, Karte, Statistik, Operator-Fenster). Alles, was du dort einträgst, ist für
+andere Besucher sichtbar und wird regelmäßig zurückgesetzt – bitte keine echten Logs oder Passwörter verwenden.
 
 ## Schnellstart
 
@@ -93,6 +100,43 @@ Das [Wiki](docs/wiki/Home.md) erklärt alles ausführlich: [Installation](docs/w
 Python 3.11, FastAPI + uvicorn, SQLite (WAL, synchron), WebSockets, Vanilla JS/HTML/CSS, Leaflet (lokal gebündelt), PyInstaller-Builds über GitHub Actions. Tests: `python -m pytest -q`. Portable Pakete: `python build_tools/build.py`.
 
 Datenquellen: Flugzeuge von [adsb.fi](https://adsb.fi) (nicht-kommerziell) oder einem eigenen ADS-B-Empfänger; Karten von [OpenStreetMap](https://www.openstreetmap.org); Ergebnislisten vom [DARC-Contest-Hub](https://dxhf2.darc.de).
+
+## Zubehör von LH Printing
+
+<sub>Eigenwerbung – BeamLog bleibt kostenlos und frei. Wer das Projekt unterstützen möchte: Lars Hölker (DN2LH) betreibt
+mit **[LH Printing](https://lhprinting.de/?utm_source=github&utm_medium=readme&utm_campaign=beamlog)** eine kleine 3D-Druckerei, unter anderem mit Zubehör für Funkamateure.</sub>
+
+<table>
+<tr>
+<td align="center" width="25%">
+<a href="https://lhprinting.de/produkte/SX-4S6S-FOXA?utm_source=github&utm_medium=readme&utm_campaign=beamlog"><img src="docs/lh-printing/mastschelle.jpg" width="180" alt="Mastschelle 35 mm am Mast"></a><br>
+<b>Mastschellen 35 mm</b><br>
+<sub>Für Masten und Antennen, mit V2A-Edelstahlschrauben M6, wetterfest – ideal für Portabel- und Fieldday-Aufbauten</sub><br>
+<a href="https://lhprinting.de/produkte/SX-4S6S-FOXA?utm_source=github&utm_medium=readme&utm_campaign=beamlog">Zum Shop →</a>
+</td>
+<td align="center" width="25%">
+<a href="https://lhprinting.de/produkte/4D-JN23-QASW?utm_source=github&utm_medium=readme&utm_campaign=beamlog"><img src="docs/lh-printing/wetterschutzgehaeuse.jpg" width="180" alt="Wetterschutzgehäuse"></a><br>
+<b>Wetterschutzgehäuse</b><br>
+<sub>Outdoor-Gehäuse für Kamera, Außensteckdose oder Sensor – hält Regen ab, 137 × 104 × 90 mm</sub><br>
+<a href="https://lhprinting.de/produkte/4D-JN23-QASW?utm_source=github&utm_medium=readme&utm_campaign=beamlog">Zum Shop →</a>
+</td>
+<td align="center" width="25%">
+<a href="https://lhprinting.de/produkte/ordner/fld_1778880175338?v=3D-KAB-SCH&utm_source=github&utm_medium=readme&utm_campaign=beamlog"><img src="docs/lh-printing/messleitungshalter.jpg" width="180" alt="Messleitungshalter"></a><br>
+<b>Messleitungshalter</b><br>
+<sub>Ordnung im Shack, Labor und in der Werkstatt: Wandhalter für Messleitungen und Kabel 4–10 mm, 2 Stück</sub><br>
+<a href="https://lhprinting.de/produkte/ordner/fld_1778880175338?v=3D-KAB-SCH&utm_source=github&utm_medium=readme&utm_campaign=beamlog">Zum Shop →</a>
+</td>
+<td align="center" width="25%">
+<a href="https://lhprinting.de/produkte/KS-H30M-N5P6?utm_source=github&utm_medium=readme&utm_campaign=beamlog"><img src="docs/lh-printing/qsl-ablage.jpg" width="180" alt="QSL-Kartenablage"></a><br>
+<b>QSL-Kartenablage</b><br>
+<sub>Stapelbare Ablage für QSL-Karten und Postkarten – damit nach dem Contest nichts liegen bleibt</sub><br>
+<a href="https://lhprinting.de/produkte/KS-H30M-N5P6?utm_source=github&utm_medium=readme&utm_campaign=beamlog">Zum Shop →</a>
+</td>
+</tr>
+</table>
+
+Alle Amateurfunk-Artikel: **[lhprinting.de › Amateurfunk](https://lhprinting.de/produkte?kategorie=Amateurfunk&utm_source=github&utm_medium=readme&utm_campaign=beamlog)** · Sonderwünsche (eigene Halter,
+Gehäuse, Adapter) über die [Anfrage](https://lhprinting.de/anfragen?utm_source=github&utm_medium=readme&utm_campaign=beamlog).
 
 ## Lizenz und Copyright
 
