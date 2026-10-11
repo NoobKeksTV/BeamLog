@@ -21,6 +21,28 @@ Das Script
 
 Danach läuft der Logger unter `http://<server-ip>/`. `--url` setzt die Adresse, die im QR-Code und in Links erscheint.
 
+### Teile weglassen: ohne nginx, ohne Dienst, ohne Backup-Cron
+
+Jeder Teil lässt sich abschalten, die Optionen sind beliebig kombinierbar:
+
+| Option | Wirkung |
+|---|---|
+| `--no-nginx` | nginx wird weder installiert noch eingerichtet – für einen eigenen Reverse-Proxy (z. B. ein vorhandenes nginx/Apache/Caddy mit anderen Seiten) oder `PORT=80` direkt. Eine früher angelegte BeamLog-Site wird entfernt; nginx selbst und andere Sites bleiben unberührt. |
+| `--no-service` | Kein systemd-Dienst – BeamLog startest du selbst (eigene Unit, Container, Supervisor …); das Skript zeigt am Ende den Startbefehl. Ein früher angelegter Dienst `beamlog` wird angehalten und entfernt. |
+| `--no-backup` | Kein täglicher Backup-Cron (ein vorhandener wird entfernt). Die Sicherungen des Servers selbst (`BACKUP_MIN`) laufen weiter. |
+| `--with-nginx`, `--with-service`, `--with-backup` | Schalten den jeweiligen Teil wieder ein. |
+
+```bash
+sudo bash deploy/install.sh --no-nginx                 # eigener Reverse-Proxy auf 127.0.0.1:8000
+sudo bash deploy/install.sh --no-nginx --no-backup     # mehrere gleichzeitig
+sudo bash deploy/install.sh --update --with-nginx      # nginx später doch wieder einrichten
+sudo bash deploy/install.sh --help                     # alle Optionen
+```
+
+Die Wahl wird in `/etc/beamlog/install.options` gemerkt – ein späteres `--update` hält sich daran, ohne dass die
+Optionen erneut angegeben werden müssen. Ohne nginx und mit dem Standard `HOST=127.0.0.1` ist BeamLog nur am Server
+selbst erreichbar (richtig für einen eigenen Reverse-Proxy); direkt im LAN: `HOST=0.0.0.0` in `beamlog.env`.
+
 Die Sicherungen des Servers lassen sich in der Verwaltung einsehen und anstoßen:
 
 ![Backups auf dem Server](img/backups.png)

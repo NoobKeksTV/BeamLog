@@ -13,7 +13,7 @@ Danach läuft der Logger unter `http://<server-ip>/`. Enthalten:
 
 | Datei | Zweck |
 |---|---|
-| `install.sh` | Kopiert das Programm nach `/opt/beamlog`, legt den Nutzer `beamlog` an, installiert Dienst, nginx-Site und Backup-Cron. `--update` spielt eine neue Version ein, `--url` setzt die öffentliche Adresse (QR-Code). |
+| `install.sh` | Kopiert das Programm nach `/opt/beamlog`, legt den Nutzer `beamlog` an, installiert Dienst, nginx-Site und Backup-Cron. `--update` spielt eine neue Version ein, `--url` setzt die öffentliche Adresse (QR-Code). `--no-nginx`, `--no-service`, `--no-backup` lassen Teile weg (kombinierbar, für Updates gemerkt; `--with-…` schaltet wieder ein, `--help` zeigt alles). |
 | `beamlog.env` | Vorlage für `/etc/beamlog/beamlog.env` – **alle Server-Einstellungen** (Host, Port, Datenbank, Backup-Takt, öffentliche Adresse, KST-Server, GitHub-Token). |
 | `beamlog.service` | systemd-Dienst: liest `/etc/beamlog/beamlog.env`, Neustart bei Absturz, gehärtet (PrivateTmp, ProtectSystem). |
 | `nginx-beamlog.conf` | nginx-Site auf Port 80 mit WebSocket-Weiterleitung. |

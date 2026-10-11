@@ -18,6 +18,10 @@ legt den Systembenutzer `beamlog` an, schreibt die Konfiguration `/etc/beamlog/b
 richtet den systemd-Dienst und die nginx-Site ein und aktiviert ein tägliches Backup nach
 `/var/lib/beamlog/backup/` (30 Tage Aufbewahrung). `--url http://contest.local/` setzt die öffentliche Adresse.
 
+Teile weglassen (kombinierbar, wird für `--update` gemerkt): `--no-nginx` (eigener Reverse-Proxy oder `PORT=80` direkt),
+`--no-service` (BeamLog selbst starten), `--no-backup` (kein Backup-Cron); `--with-…` schaltet wieder ein, `--help` zeigt alles.
+Beispiel: `sudo bash deploy/install.sh --no-nginx --no-backup`.
+
 ## Einstellungen: /etc/beamlog/beamlog.env
 
 Alle Server-Einstellungen stehen in dieser Datei (`.env`-Format), die Unit selbst enthält keine Optionen:
@@ -54,7 +58,7 @@ sudo bash deploy/install.sh --update
 | `portable/` | Dateien für die portable Version (Binary statt venv) inkl. `beamlog.env`-Vorlage und Port-80-Unit |
 | `nginx-beamlog.conf` | nginx-Site auf Port 80, Reverse-Proxy inkl. WebSocket, statische Dateien direkt |
 | `nginx-beamlog-ssl.conf` | optionale HTTPS-Variante mit selbstsigniertem Zertifikat |
-| `install.sh` | Installation / Update in einem Rutsch |
+| `install.sh` | Installation / Update in einem Rutsch; `--no-nginx`, `--no-service`, `--no-backup` lassen Teile weg (kombinierbar) |
 | `backup.sh` | Konsistentes SQLite-Backup (Cron) |
 
 Pfade: Code `/opt/beamlog`, Datenbank `/var/lib/beamlog/beamlog.db`.
