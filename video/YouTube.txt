@@ -1,0 +1,52 @@
+BeamLog – Texte für YouTube
+===========================
+
+Video:        BeamLog_Promo_VoiceOver.mp4 (alternativ BeamLog_Promo_Musik.mp4 ohne Stimme)
+Vorschaubild: BeamLog_YouTube_Thumbnail.png (1280×720)
+Untertitel:   Sprechertext.srt (optional als deutsche Untertitel hochladen)
+
+
+TITEL
+-----
+BeamLog – der kostenlose UKW-Contest-Logger fürs ganze Team (ON4KST, Aircraft-Scatter, EDI)
+
+
+BESCHREIBUNG
+------------
+BeamLog ist ein kostenloser, webbasierter Contest-Logger für UKW-Contests (DARC / IARU Region 1), basierend auf DD3KU WinContest. Ein kleiner Server im LAN ist der zentrale Speicher, geloggt wird im Browser an beliebig vielen Plätzen gleichzeitig: PC, Laptop, Tablet oder Handy.
+
+📥 Download BeamLog 1.0 (Windows, Linux, macOS – ohne Installation): https://github.com/NoobKeksTV/BeamLog/releases/latest
+📖 Projekt & Anleitung: https://github.com/NoobKeksTV/BeamLog
+
+Das kann BeamLog:
+✅ Loggen mit Vorschlägen aus der Stationsdatenbank – Locator, Entfernung und Richtung automatisch
+✅ Dupe-Check beim Tippen, Plausibilitätsprüfung Rufzeichen ↔ Locator
+✅ Mehrere Stationen (2 m, 70 cm, 23 cm …) parallel, jede mit eigenem Log und eigener Nummer
+✅ Operator-Fenster für den zweiten Monitor – jede Eingabe live und groß
+✅ Team-Chat zwischen allen Plätzen
+✅ ON4KST-Chat direkt eingebaut: Nachrichten an dich, Direktnachrichten, Nutzerliste mit km und Richtung, ein Klick übernimmt die Station in den Logger
+✅ Aircraft-Scatter wie AirScout: Flugzeuge auf dem Pfad, Kreuzungszeit, Mindesthöhe, Höhenreserve und Höhenprofil (adsb.fi oder eigener ADS-B-Empfänger)
+✅ Statistik: Punkte, Großfelder-Karte, Stundenverlauf, ODX, Richtungen – auch als Großanzeige
+✅ EDI (REG1TEST) mit Log-Prüfung, alle Bänder als ZIP, dazu Cabrillo, ADIF, CSV
+✅ Import kompletter WinContest-Ordner, Offline-Karten, CAT/CW, Backups, Selbst-Aktualisierung
+✅ Server-Betrieb auf Debian / Raspberry Pi mit systemd und nginx
+
+Kapitel:
+0:00 Was ist BeamLog? Loggen mit Vorschlägen
+0:20 Dupe-Check & Operator-Fenster
+0:33 Team-Chat & ON4KST-Chat
+0:54 Aircraft-Scatter
+1:07 Statistik
+1:20 Stationsdatenbank, EDI-Export & Download
+
+BeamLog ist freie Software (GNU AGPLv3) von Lars Hölker, DN2LH. Feedback, Fehlerberichte und Ideen gerne als Issue auf GitHub oder in die Kommentare. 73!
+
+#Amateurfunk #HamRadio #UKW #Contest #DARC
+
+
+TAGS (kommagetrennt in das Tag-Feld einfügen)
+----
+BeamLog, Contest Logger, UKW Contest, Amateurfunk, Ham Radio, Amateur Radio, Contest Logging, Logbuch, Logprogramm, WinContest, DD3KU, ON4KST, KST Chat, Aircraft Scatter, AirScout, ADS-B, EDI, REG1TEST, DARC, IARU Region 1, VHF, UHF, 2m, 70cm, 23cm, Fieldday, Portabelbetrieb, Funkamateur, DN2LH, Open Source
+
+
+Nach dem Hochladen: YouTube-Link im README eintragen (Kommentar „YOUTUBE:“ über dem Vorschaubild).

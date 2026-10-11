@@ -10,5 +10,6 @@ Stationsdatenbank, Dupe-Check, Operator-Fenster, Team-Chat, ON4KST-Chat, Aircraf
 | `BeamLog_Promo_Sprechertext.mp4` | Musik und Effekte, der Sprechertext läuft oben als Untertitel mit – zum Einsprechen durch eine echte Stimme |
 | `Sprechertext.md` / `Sprechertext.srt` | Sprechertext mit Einsatzzeiten (Tabelle bzw. Untertiteldatei) |
 | `BeamLog_YouTube_Thumbnail.png` | Vorschaubild für YouTube (1280×720) |
+| `YouTube.txt` | Titel, Beschreibung (mit Kapiteln) und Tags für das YouTube-Video |
 
 Musik und Effekte sind eigens für das Video erzeugt (keine fremden Rechte).
