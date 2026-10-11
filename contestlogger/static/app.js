@@ -173,7 +173,9 @@
     renderLangSelect();
     $("#version").textContent = "v" + S.info.version;
     $$(".maint-only").forEach((e) => e.classList.toggle("hidden", !S.info.maintainer)); $$(".maint-hide").forEach((e) => e.classList.toggle("hidden", !!S.info.maintainer));
-    $("#footer-text").textContent = `${S.info.app} ${S.info.version} · ${S.info.copyright}`;
+    // Fußzeile mit Lizenz und Link zum Quellcode (GNU AGPLv3, Abschnitt 13: Quellcode für Nutzer über das Netz)
+    $("#footer-text").replaceChildren(`${S.info.app} ${S.info.version} · ${S.info.copyright} · ${S.info.license} · `,
+      el("a", { href: S.info.source_url, target: "_blank", rel: "noopener" }, t("Quellcode")));
     if (!S.info.admin_configured) await askSetup();
     if (!S.nick) await askNick();
     $("#nick-badge").textContent = S.nick;
@@ -882,7 +884,7 @@
         K(["◐"], t("Hell/Dunkel umschalten.")),
         K([t("Sprache")], t("Umschalten der Oberfläche; eigene Übersetzungen über die Verwaltung."))),
       P(t("Export und Abgabe: in der Verwaltung unter „Export / Abgabe“ – EDI je Station/Band (mit Log-Prüfung), ADIF, CSV oder alle Bänder als EDI-ZIP. Jede Änderung steht im Aktionsprotokoll.")),
-      el("div", { class: "row" }, el("span", { class: "muted small grow" }, `${S.info.app || "BeamLog"} ${S.info.version || ""} · ${S.info.copyright || ""}`), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")))));
+      el("div", { class: "row" }, el("span", { class: "muted small grow" }, `${S.info.app || "BeamLog"} ${S.info.version || ""} · ${S.info.copyright || ""} · ${S.info.license || ""}`, " · ", el("a", { href: S.info.source_url, target: "_blank", rel: "noopener" }, t("Quellcode"))), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")))));
     box.classList.add("wide");
   }
   $("#help-btn")?.addEventListener("click", helpDialog);

@@ -13,7 +13,7 @@ User=contestlogger
 Group=contestlogger
 WorkingDirectory=/opt/contestlogger
 # Einstellungen aus /etc/contestlogger/contestlogger.env; Host und Port werden hier fest auf 0.0.0.0:80 gesetzt
-ExecStart=/opt/contestlogger/ContestLogger --config /etc/contestlogger/contestlogger.env --host 0.0.0.0 --port 80
+ExecStart=/opt/contestlogger/BeamLog --config /etc/contestlogger/contestlogger.env --host 0.0.0.0 --port 80
 Restart=always
 RestartSec=3
 

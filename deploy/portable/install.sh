@@ -2,8 +2,8 @@
 # Installiert die PORTABLE Linux-Version von BeamLog (aus dem Release-ZIP, kein Python nötig)
 # auf Debian/Ubuntu/Raspberry Pi OS als systemd-Dienst hinter nginx.
 #
-#   unzip ContestLogger-<version>-linux-x86_64.zip
-#   cd ContestLogger
+#   unzip BeamLog-<version>-linux-x86_64.zip
+#   cd BeamLog
 #   sudo bash deploy/install.sh                 # Erstinstallation (nginx, Dienst, Backup-Cron)
 #   sudo bash deploy/install.sh --update        # neue Version einspielen und Dienst neu starten
 #   sudo bash deploy/install.sh --url http://contest.local/   # Adresse für QR-Code/Links setzen
@@ -14,7 +14,7 @@ set -euo pipefail
 APP_DIR=/opt/contestlogger
 DATA_DIR=/var/lib/contestlogger
 CONF=/etc/contestlogger/contestlogger.env
-SRC_DIR="$(cd "$(dirname "$0")/.." && pwd)"       # der entpackte ContestLogger-Ordner
+SRC_DIR="$(cd "$(dirname "$0")/.." && pwd)"       # der entpackte BeamLog-Ordner
 MODE=install
 PUBLIC_URL=""
 while [ $# -gt 0 ]; do
@@ -27,7 +27,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$(id -u)" -ne 0 ]; then echo "Bitte mit sudo ausführen."; exit 1; fi
-if [ ! -x "$SRC_DIR/ContestLogger" ]; then echo "ContestLogger-Binary nicht gefunden in $SRC_DIR – bitte aus dem entpackten ZIP-Ordner aufrufen."; exit 1; fi
+if [ ! -x "$SRC_DIR/BeamLog" ]; then echo "BeamLog-Binary nicht gefunden in $SRC_DIR – bitte aus dem entpackten ZIP-Ordner aufrufen."; exit 1; fi
 
 if [ "$MODE" = install ]; then
   echo "== Pakete installieren (nginx, sqlite3 für Backups)"
@@ -39,7 +39,7 @@ fi
 echo "== Programm nach $APP_DIR kopieren (Daten bleiben in $DATA_DIR)"
 mkdir -p "$APP_DIR" "$DATA_DIR/lang"
 rsync -a --delete --exclude data "$SRC_DIR/" "$APP_DIR/"
-chmod +x "$APP_DIR"/ContestLogger* "$APP_DIR"/*.sh 2>/dev/null || true
+chmod +x "$APP_DIR"/BeamLog* "$APP_DIR"/*.sh 2>/dev/null || true
 chown -R contestlogger:contestlogger "$APP_DIR" "$DATA_DIR"
 
 echo "== Konfiguration $CONF"

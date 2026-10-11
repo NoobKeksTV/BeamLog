@@ -4,8 +4,8 @@ Diese Dateien liegen im Linux-Release-ZIP unter `deploy/` und richten BeamLog al
 ohne Python auf dem Server. Das Linux-Binary wird auf Ubuntu 22.04 gebaut und läuft auf Debian 12 (Bookworm), Ubuntu 22.04 und neuer (glibc ≥ 2.35).
 
 ```bash
-unzip ContestLogger-<version>-linux-x86_64.zip
-cd ContestLogger
+unzip BeamLog-<version>-linux-x86_64.zip
+cd BeamLog
 sudo bash deploy/install.sh --url http://contest.local/     # Erstinstallation
 ```
 
@@ -28,7 +28,7 @@ sudo mkdir -p /opt/contestlogger /var/lib/contestlogger
 sudo cp -r ./* /opt/contestlogger/
 sudo useradd --system --home /opt/contestlogger --shell /usr/sbin/nologin contestlogger
 sudo chown -R contestlogger:contestlogger /opt/contestlogger /var/lib/contestlogger
-sudo chmod +x /opt/contestlogger/ContestLogger*
+sudo chmod +x /opt/contestlogger/BeamLog*
 
 # 2. Konfiguration anlegen (Werte bei Bedarf anpassen: nano /etc/contestlogger/contestlogger.env)
 sudo mkdir -p /etc/contestlogger

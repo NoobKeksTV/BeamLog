@@ -89,7 +89,7 @@ def main() -> None:
     intro = Path(__file__).parent / "release_intro" / f"{new_tag}.md"
     if new_tag and intro.exists():
         out += [intro.read_text(encoding="utf-8").strip(), ""]
-    out += ["Portable Versionen (kein Python nötig): ZIP entpacken, `ContestLogger.exe` bzw. `./ContestLogger` starten. Siehe START.txt im Paket.", ""]
+    out += ["Portable Versionen (kein Python nötig): ZIP entpacken, `BeamLog.exe` bzw. `./BeamLog` starten. Siehe START.txt im Paket.", ""]
     out.append(f"## Änderungen{' seit ' + prev if prev else ''}")
     if not commits:
         out.append("- (keine Änderungen seit dem letzten Release)")

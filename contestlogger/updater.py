@@ -93,14 +93,17 @@ def download(asset: dict, token: str = "", dest_dir: Path | None = None, progres
     return dest
 
 
+PKG_DIRS = ("BeamLog", "ContestLogger")  # Ordner/Programmnamen im ZIP (ContestLogger = Name bis 0.9)
+
+
 def extract(zip_path: Path, staging: Path) -> Path:
-    """ZIP entpacken; liefert den Ordner mit den Programmdateien (ContestLogger/ im ZIP)."""
+    """ZIP entpacken; liefert den Ordner mit den Programmdateien (BeamLog/ im ZIP, bis 0.9 ContestLogger/)."""
     with zipfile.ZipFile(zip_path) as z:
         z.extractall(staging)
         names = z.namelist()
-    root = staging / "ContestLogger" if any(n.startswith("ContestLogger/") for n in names) else staging
+    root = next((staging / d for d in PKG_DIRS if any(n.startswith(d + "/") for n in names)), staging)
     for f in root.rglob("*"):
-        if f.is_file() and (f.name.startswith("ContestLogger") or f.suffix == ".sh"):
+        if f.is_file() and (f.name.startswith(PKG_DIRS) or f.suffix == ".sh"):
             try:
                 f.chmod(0o755)
             except OSError:
@@ -123,7 +126,7 @@ def install_files(src: Path, dst: Path) -> list[str]:
             target.mkdir(parents=True, exist_ok=True)
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists() and (target.name.startswith("ContestLogger") and target.suffix in ("", ".exe")):
+        if target.exists() and (target.name.startswith(PKG_DIRS) and target.suffix in ("", ".exe")):
             old = target.with_name(target.name + ".old")
             try:
                 if old.exists():

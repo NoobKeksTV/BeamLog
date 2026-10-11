@@ -12,7 +12,7 @@ Group=contestlogger
 WorkingDirectory=/opt/contestlogger
 # Alle Einstellungen (Host, Port, Datenbank, Backup-Takt, öffentliche Adresse …) stehen in
 # /etc/contestlogger/contestlogger.env – nach Änderungen:  sudo systemctl restart contestlogger
-ExecStart=/opt/contestlogger/ContestLogger --config /etc/contestlogger/contestlogger.env
+ExecStart=/opt/contestlogger/BeamLog --config /etc/contestlogger/contestlogger.env
 Restart=always
 RestartSec=3
 

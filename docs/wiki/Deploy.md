@@ -5,8 +5,8 @@ Für einen dauerhaft laufenden Server (z. B. Raspberry Pi oder ein kleiner Debia
 ## Schnellinstallation
 
 ```bash
-unzip ContestLogger-<version>-linux-x86_64.zip
-cd ContestLogger
+unzip BeamLog-<version>-linux-x86_64.zip
+cd BeamLog
 sudo bash deploy/install.sh --url http://contest.local/
 ```
 
@@ -35,7 +35,7 @@ sudo mkdir -p /opt/contestlogger /var/lib/contestlogger
 sudo cp -r ./* /opt/contestlogger/
 sudo useradd --system --home /opt/contestlogger --shell /usr/sbin/nologin contestlogger
 sudo chown -R contestlogger:contestlogger /opt/contestlogger /var/lib/contestlogger
-sudo chmod +x /opt/contestlogger/ContestLogger*
+sudo chmod +x /opt/contestlogger/BeamLog*
 
 # 2. Konfiguration anlegen (Werte bei Bedarf anpassen: nano /etc/contestlogger/contestlogger.env)
 sudo mkdir -p /etc/contestlogger
@@ -85,7 +85,7 @@ Die Unit `deploy/contestlogger.service` (Auszug):
 [Service]
 User=contestlogger
 WorkingDirectory=/opt/contestlogger
-ExecStart=/opt/contestlogger/ContestLogger --config /etc/contestlogger/contestlogger.env
+ExecStart=/opt/contestlogger/BeamLog --config /etc/contestlogger/contestlogger.env
 Restart=always
 PrivateTmp=true
 ProtectSystem=strict

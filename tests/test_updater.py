@@ -17,9 +17,9 @@ def test_version_compare_and_platform():
 
 
 def test_check_latest_mocked(monkeypatch):
-    rel = {"tag_name": "v9.9.9", "name": "ContestLogger 9.9.9", "body": "Notes", "published_at": "2026-10-05T10:00:00Z", "html_url": "https://x/",
-           "assets": [{"name": f"ContestLogger-9.9.9-{updater.platform_tag()}.zip", "size": 10, "url": "https://api/asset/1", "browser_download_url": "https://x/a.zip"},
-                      {"name": "ContestLogger-9.9.9-other-x.zip", "size": 10, "url": "https://api/asset/2", "browser_download_url": ""}]}
+    rel = {"tag_name": "v9.9.9", "name": "BeamLog 9.9.9", "body": "Notes", "published_at": "2026-10-05T10:00:00Z", "html_url": "https://x/",
+           "assets": [{"name": f"BeamLog-9.9.9-{updater.platform_tag()}.zip", "size": 10, "url": "https://api/asset/1", "browser_download_url": "https://x/a.zip"},
+                      {"name": "BeamLog-9.9.9-other-x.zip", "size": 10, "url": "https://api/asset/2", "browser_download_url": ""}]}
 
     class R(io.BytesIO):
         headers = {}
@@ -48,6 +48,34 @@ def test_extract_zip_layout(tmp_path):
         zf.writestr("ContestLogger/ContestLogger", "bin"); zf.writestr("ContestLogger/start.sh", "sh"); zf.writestr("ContestLogger/README.md", "r")
     root = updater.extract(z, tmp_path / "x")
     assert root.name == "ContestLogger" and (root / "README.md").exists()
+    z2 = tmp_path / "b.zip"  # ab 1.0 heißen Ordner und Programm BeamLog
+    with zipfile.ZipFile(z2, "w") as zf:
+        zf.writestr("BeamLog/BeamLog", "bin"); zf.writestr("BeamLog/README.md", "r")
+    root = updater.extract(z2, tmp_path / "y")
+    assert root.name == "BeamLog" and (root / "BeamLog").exists()
+
+
+def test_install_files_renames_running_beamlog(tmp_path):
+    src = tmp_path / "src"; src.mkdir(); (src / "BeamLog").write_bytes(b"new")
+    dst = tmp_path / "dst"; dst.mkdir(); (dst / "BeamLog").write_bytes(b"old")
+    updater.install_files(src, dst)
+    assert (dst / "BeamLog").read_bytes() == b"new" and (dst / "BeamLog.old").read_bytes() == b"old"
+
+
+def test_migrate_from_contestlogger(tmp_path):
+    import run
+    old = tmp_path / "ContestLogger"; (old / "data" / "backup").mkdir(parents=True)
+    (old / "ContestLogger.exe").write_bytes(b"x"); (old / "data" / "contestlogger.db").write_text("DB"); (old / "contestlogger.env").write_text("PORT=8080")
+    new = tmp_path / "BeamLog"; (new / "data" / "lang").mkdir(parents=True)
+    run.migrate_from_contestlogger(new)
+    assert (new / "data" / "contestlogger.db").read_text() == "DB" and (new / "data" / "backup").is_dir() and (new / "contestlogger.env").exists()
+    assert (old / "data" / "contestlogger.db").exists()  # Original bleibt
+    (new / "data" / "contestlogger.db").write_text("NEU")
+    run.migrate_from_contestlogger(new)  # vorhandene Daten werden nie überschrieben
+    assert (new / "data" / "contestlogger.db").read_text() == "NEU"
+    inner = old / "BeamLog"; (inner / "data").mkdir(parents=True)  # neuer Ordner im alten entpackt
+    run.migrate_from_contestlogger(inner)
+    assert (inner / "data" / "contestlogger.db").read_text() == "DB"
 
 
 def test_changelog_and_update_api(tmp_path, monkeypatch):

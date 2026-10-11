@@ -6,10 +6,10 @@
     python build_tools/build.py --no-zip   # ohne ZIP-Paket
 
 Ergebnis in dist/:
-    ContestLogger[.exe]          Server + Weboberfläche (Daten in ./data neben der Datei)
-    ContestLogger-CAT[.exe]      CAT-Bridge (Frequenz/CW vom Funkgerät an den Server)
-    ContestLogger-Import[.exe]   Import eines kompletten WinContest-Ordners
-    ContestLogger-<version>-<os>-<arch>.zip   alles zusammen, portabel
+    BeamLog[.exe]          Server + Weboberfläche (Daten in ./data neben der Datei)
+    BeamLog-CAT[.exe]      CAT-Bridge (Frequenz/CW vom Funkgerät an den Server)
+    BeamLog-Import[.exe]   Import eines kompletten WinContest-Ordners
+    BeamLog-<version>-<os>-<arch>.zip   alles zusammen, portabel
 """
 from __future__ import annotations
 
@@ -75,9 +75,9 @@ def main() -> None:
     icon = ROOT / "build_tools" / "icon.ico"
     if icon.exists() and os.name == "nt":
         server_extra.append(f"--icon={icon}")
-    build("ContestLogger", "run.py", onefile, server_extra)
-    build("ContestLogger-CAT", "tools/cat_bridge.py", onefile, [])
-    build("ContestLogger-Import", "tools/import_dd3ku.py", onefile, [])
+    build("BeamLog", "run.py", onefile, server_extra)
+    build("BeamLog-CAT", "tools/cat_bridge.py", onefile, [])
+    build("BeamLog-Import", "tools/import_dd3ku.py", onefile, [])
 
     # Portables Paket
     pkg = dist / "portable"
@@ -92,23 +92,23 @@ def main() -> None:
     shutil.copy(ROOT / "LICENSE", pkg / "LICENSE") if (ROOT / "LICENSE").exists() else None
     exe = ".exe" if os.name == "nt" else ""
     (pkg / "START.txt").write_text(
-        f"BeamLog {__version__} – portable Version (Programmdateien heißen weiterhin ContestLogger…)\n\n"
-        f"1. ContestLogger{exe} starten (Doppelklick). Der Server läuft, die Oberfläche öffnet sich im Browser.\n"
+        f"BeamLog {__version__} – portable Version\n\n"
+        f"1. BeamLog{exe} starten (Doppelklick). Der Server läuft, die Oberfläche öffnet sich im Browser.\n"
         f"   Andere Rechner im LAN: die beim Start angezeigte Adresse eingeben (oder QR-Code in der Oberfläche).\n"
         f"2. Alle Daten liegen im Ordner data/ neben dem Programm (Datenbank, Backups, eigene Sprachen).\n"
         f"   Zum Umziehen auf einen anderen Rechner einfach den ganzen Ordner kopieren.\n"
-        f"3. Optionen: ContestLogger{exe} --port 8080   --backup-min 5   --public-url http://contest.local/\n"
+        f"3. Optionen: BeamLog{exe} --port 8080   --backup-min 5   --public-url http://contest.local/\n"
         f"   Dauerhaft: contestlogger.env.example nach contestlogger.env kopieren und Werte eintragen.\n\n"
-        f"ContestLogger-CAT{exe}: Frequenz/CW vom Funkgerät (Hamlib rigctld) an den Server melden, z. B.\n"
-        f"   ContestLogger-CAT{exe} --server http://192.168.1.10:8000 --station 1 --password 70cm --cw\n"
-        f"ContestLogger-Import{exe}: alten WinContest-Ordner übernehmen, z. B.\n"
-        f"   ContestLogger-Import{exe} \"D:\\Contest\" --db data\\contestlogger.db\n\n"
+        f"BeamLog-CAT{exe}: Frequenz/CW vom Funkgerät (Hamlib rigctld) an den Server melden, z. B.\n"
+        f"   BeamLog-CAT{exe} --server http://192.168.1.10:8000 --station 1 --password 70cm --cw\n"
+        f"BeamLog-Import{exe}: alten WinContest-Ordner übernehmen, z. B.\n"
+        f"   BeamLog-Import{exe} \"D:\\Contest\" --db data\\contestlogger.db\n\n"
         f"Beenden: Fenster schließen oder Strg+C. Vorher wird automatisch ein Backup geschrieben.\n",
         encoding="utf-8")
     if os.name == "nt":
-        (pkg / "ContestLogger-Port8080.bat").write_text('@echo off\r\ncd /d "%~dp0"\r\nContestLogger.exe --port 8080\r\npause\r\n')
+        (pkg / "BeamLog-Port8080.bat").write_text('@echo off\r\ncd /d "%~dp0"\r\nBeamLog.exe --port 8080\r\npause\r\n')
     else:
-        (pkg / "start.sh").write_text('#!/usr/bin/env bash\ncd "$(dirname "$0")"\n./ContestLogger "$@"\n')
+        (pkg / "start.sh").write_text('#!/usr/bin/env bash\ncd "$(dirname "$0")"\n./BeamLog "$@"\n')
         os.chmod(pkg / "start.sh", 0o755)
     shutil.copy(ROOT / "contestlogger.env.example", pkg / "contestlogger.env.example")
     if platform.system() == "Linux":
@@ -123,10 +123,10 @@ def main() -> None:
     if not a.no_zip:
         osname = {"Windows": "windows", "Linux": "linux", "Darwin": "macos"}.get(platform.system(), platform.system().lower())
         arch = platform.machine().lower().replace("amd64", "x86_64").replace("aarch64", "arm64")
-        zname = dist / f"ContestLogger-{__version__}-{osname}-{arch}.zip"
+        zname = dist / f"BeamLog-{__version__}-{osname}-{arch}.zip"
         with zipfile.ZipFile(zname, "w", zipfile.ZIP_DEFLATED) as z:
             for f in pkg.rglob("*"):
-                info = zipfile.ZipInfo.from_file(f, f"ContestLogger/{f.relative_to(pkg)}")
+                info = zipfile.ZipInfo.from_file(f, f"BeamLog/{f.relative_to(pkg)}")
                 if f.is_dir():
                     z.writestr(info, "")
                 else:

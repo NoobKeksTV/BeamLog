@@ -617,5 +617,6 @@
  "erwartet / Vergleich": "expected / reference",
  "Kopfdaten & Allgemeines": "Header & general",
  "Online-Abgleich: {p}, {n} Rufzeichen neu abgefragt.": "Online check: {p}, {n} callsigns looked up.",
- "✖ {e} Fehler, {w} Hinweise – Fehler vor dem Export beheben. Klick auf eine Zeile öffnet das QSO.": "✖ {e} errors, {w} warnings – fix errors before export. Click a row to open the QSO."
+ "✖ {e} Fehler, {w} Hinweise – Fehler vor dem Export beheben. Klick auf eine Zeile öffnet das QSO.": "✖ {e} errors, {w} warnings – fix errors before export. Click a row to open the QSO.",
+ "Quellcode": "Source code"
 }

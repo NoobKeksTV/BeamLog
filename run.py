@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import socket
 import sys
 from pathlib import Path
@@ -35,6 +36,23 @@ def portable_base() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path.cwd()
+
+
+def migrate_from_contestlogger(base: Path) -> None:
+    """Umstieg von 0.9.x (hieß „ContestLogger“): liegt der neue BeamLog-Ordner neben dem alten Ordner ContestLogger
+    (oder darin) und hat noch keine eigenen Daten, werden data/ und contestlogger.env einmalig hinüberkopiert."""
+    if (base / "data" / "contestlogger.db").exists():
+        return
+    for old in (base.parent / "ContestLogger", base.parent):
+        if old == base or not (old / "data" / "contestlogger.db").exists():
+            continue
+        if not any((old / n).is_file() for n in ("ContestLogger.exe", "ContestLogger")):
+            continue
+        shutil.copytree(old / "data", base / "data", dirs_exist_ok=True)
+        if (old / "contestlogger.env").exists() and not (base / "contestlogger.env").exists():
+            shutil.copy2(old / "contestlogger.env", base / "contestlogger.env")
+        print(f"  Daten aus der bisherigen Installation übernommen: {old / 'data'}  (Original bleibt unverändert)")
+        return
 
 
 CONFIG_KEYS = ("HOST", "PORT", "DB", "BACKUP_MIN", "PUBLIC_URL", "OPEN_BROWSER", "KST_HOST", "KST_PORT", "GITHUB_TOKEN", "MAINTAINER", "DEV")
@@ -70,6 +88,11 @@ def main() -> None:
     pre = argparse.ArgumentParser(add_help=False)
     pre.add_argument("--config")
     pre_a, _ = pre.parse_known_args()
+    if getattr(sys, "frozen", False):
+        try:
+            migrate_from_contestlogger(portable_base())
+        except OSError as e:
+            print(f"  Übernahme der alten Daten fehlgeschlagen: {e}")
     cfg_path = find_config(pre_a.config)
     cfg = load_env_file(cfg_path) if cfg_path else {}
     # Umgebungsvariablen (CONTESTLOGGER_HOST …) überstimmen die Datei, Kommandozeile überstimmt beides

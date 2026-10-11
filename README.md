@@ -14,15 +14,17 @@ Integrierter **ON4KST-Chat** (je Station, DMs, Rundruf) · **Aircraft-Scatter** 
 [![Letzter Commit](https://img.shields.io/github/last-commit/NoobKeksTV/BeamLog?label=Letzter%20Commit)](https://github.com/NoobKeksTV/BeamLog/commits/main)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Plattformen](https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-portable-8b98a8)](https://github.com/NoobKeksTV/BeamLog/releases/latest)
+[![Lizenz: GNU AGPLv3](https://img.shields.io/badge/Lizenz-GNU%20AGPLv3-a32d2a)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/NoobKeksTV/BeamLog?style=social)](https://github.com/NoobKeksTV/BeamLog/stargazers)
 
-[**Download**](https://github.com/NoobKeksTV/BeamLog/releases/latest) · [**Wiki**](docs/wiki/Home.md) · [Installation](docs/wiki/Installation.md) · [Server-Deploy](docs/wiki/Deploy.md) · [Tastenkürzel](docs/wiki/Tastenkuerzel.md) · [Fehlersuche](docs/wiki/Fehlersuche.md) · [🎬 Video](video/)
+[**Download**](https://github.com/NoobKeksTV/BeamLog/releases/latest) · [**Wiki**](docs/wiki/Home.md) · [Installation](docs/wiki/Installation.md) · [Server-Deploy](docs/wiki/Deploy.md) · [Tastenkürzel](docs/wiki/Tastenkuerzel.md) · [Fehlersuche](docs/wiki/Fehlersuche.md)
 
 <br>
 
-<a href="video/BeamLog_Promo_VoiceOver.mp4"><img src="docs/video-vorschau.jpg" width="760" alt="BeamLog im Video – Klick startet das Video (1:42)"></a>
+<!-- YOUTUBE: sobald das Video online ist, das Bild verlinken: <a href="https://youtu.be/XXXX"><img …></a> -->
+<img src="docs/video-vorschau.jpg" width="760" alt="BeamLog im Video (1:42)">
 
-<sub>🎬 <a href="video/BeamLog_Promo_VoiceOver.mp4"><b>Video ansehen</b></a> (1:42, mit Sprecherin) · <a href="video/BeamLog_Promo_Musik.mp4">nur Musik</a> · YouTube: <i>folgt</i><!-- YOUTUBE: hier den Link eintragen, z. B. <a href="https://youtu.be/XXXX">auf YouTube</a> --></sub>
+<sub>🎬 Das Video „BeamLog in 1:42 Minuten“ erscheint in Kürze auf YouTube.</sub>
 
 </div>
 
@@ -53,9 +55,11 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 ## Schnellstart
 
 1. [ZIP für dein System laden](https://github.com/NoobKeksTV/BeamLog/releases/latest) und entpacken.
-2. `ContestLogger.exe` (Windows) bzw. `./ContestLogger` (Linux/macOS) starten. *(BeamLog hieß früher „ContestLogger“ – die Programmdateien tragen weiterhin diesen Namen, damit Updates nahtlos funktionieren; alte Links auf das GitHub-Projekt leiten automatisch weiter.)* Der Browser öffnet `http://localhost:8000`; andere Rechner nutzen die beim Start angezeigte LAN-Adresse oder den QR-Code (📱).
+2. `BeamLog.exe` (Windows) bzw. `./BeamLog` (Linux/macOS) starten. Der Browser öffnet `http://localhost:8000`; andere Rechner nutzen die beim Start angezeigte LAN-Adresse oder den QR-Code (📱).
 3. Admin-Passwort festlegen, unter **Verwaltung** die Stationen anlegen und den ersten Contest erstellen.
 4. Im Reiter **Loggen** Station wählen und loslegen. F1 zeigt alle Tastenkürzel.
+
+> **Umstieg von ContestLogger 0.9.x:** BeamLog hieß bis Version 0.9 „ContestLogger“. Version 1.0 einmal von Hand laden und entpacken – liegt der neue Ordner `BeamLog` neben dem alten Ordner `ContestLogger` (oder darin), übernimmt BeamLog beim ersten Start automatisch eine Kopie von `data/` und `contestlogger.env`. Ab 1.0 aktualisiert sich BeamLog wieder selbst; alte Links auf das GitHub-Projekt leiten weiter.
 
 Dauerhafte Einstellungen (Port, Datenbank, Adresse für den QR-Code …) stehen in `contestlogger.env` neben dem Programm (Vorlage `contestlogger.env.example`). Für einen dauerhaft laufenden Server (Debian, nginx, systemd): im Linux-ZIP liegt `deploy/`, Einstellungen dann in `/etc/contestlogger/contestlogger.env`, Anleitung im [Wiki](docs/wiki/Deploy.md).
 
@@ -92,7 +96,23 @@ Datenquellen: Flugzeuge von [adsb.fi](https://adsb.fi) (nicht-kommerziell) oder 
 
 ## Lizenz und Copyright
 
-© 2026 Lars Hölker (DN2LH). Siehe [LICENSE](LICENSE).
+BeamLog ist freie Software unter der **[GNU Affero General Public License v3.0](LICENSE)** (GNU AGPLv3).
+
+```
+BeamLog – Contest-Logger für UKW-Contests
+Copyright (C) 2026 Lars Hölker (DN2LH)
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU Affero General Public License as published by the Free Software Foundation, version 3.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details: https://www.gnu.org/licenses/agpl-3.0
+```
+
+Kurz gesagt: Nutzen, weitergeben und verändern ist erlaubt. Wer eine veränderte Version weitergibt **oder anderen über
+das Netz (z. B. als Server im LAN oder Internet) zur Verfügung stellt**, muss deren Quellcode ebenfalls unter der AGPLv3
+offenlegen. Der Link „Quellcode“ in der Fußzeile der Oberfläche zeigt auf dieses Projekt.
 
 ---
 

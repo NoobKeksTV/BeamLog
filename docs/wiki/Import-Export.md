@@ -12,7 +12,7 @@ Den kompletten Ordner von WinContest auswählen (z. B. `D:\Contest`). Übernomme
 - `Contest.dat` (DD3KUs verschlüsselte Stationsdatenbank) kann nicht gelesen werden; die mitgelieferte Startdatenbank und die DARC-Ergebnislisten ersetzen sie.
 - Das Ergebnis zeigt zuerst die Gesamtzahlen (Dateien, Contests, QSOs, Rufzeichen neu/bekannt), Details je Datei ausklappbar.
 
-Kommandozeile: `ContestLogger-Import "D:\Contest" --db data\contestlogger.db`.
+Kommandozeile: `BeamLog-Import "D:\Contest" --db data\contestlogger.db`.
 
 ## Einzelne Datei importieren
 

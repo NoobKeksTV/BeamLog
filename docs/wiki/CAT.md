@@ -1,6 +1,6 @@
 # CAT-Anbindung und CW
 
-`ContestLogger-CAT` (bzw. `tools/cat_bridge.py`) läuft auf dem Rechner, an dem das Funkgerät hängt, und meldet die Frequenz an den Server. Sie erscheint in der Stationsleiste, im Operator-Fenster und wird je QSO gespeichert (ADIF `FREQ`).
+`BeamLog-CAT` (bzw. `tools/cat_bridge.py`) läuft auf dem Rechner, an dem das Funkgerät hängt, und meldet die Frequenz an den Server. Sie erscheint in der Stationsleiste, im Operator-Fenster und wird je QSO gespeichert (ADIF `FREQ`).
 
 ![Frequenz in der Stationsleiste](img/cat-frequenz.png)
 
@@ -12,9 +12,9 @@
 ## Start
 
 ```
-ContestLogger-CAT --server http://192.168.1.10:8000 --station 1 --password 70cm
-ContestLogger-CAT --server http://192.168.1.10:8000 --station 1 --password 70cm --rigctld 127.0.0.1:4532
-ContestLogger-CAT --server http://192.168.1.10:8000 --station 1 --password 70cm --flrig 127.0.0.1:12345
+BeamLog-CAT --server http://192.168.1.10:8000 --station 1 --password 70cm
+BeamLog-CAT --server http://192.168.1.10:8000 --station 1 --password 70cm --rigctld 127.0.0.1:4532
+BeamLog-CAT --server http://192.168.1.10:8000 --station 1 --password 70cm --flrig 127.0.0.1:12345
 ```
 
 Die Bridge fragt die Frequenz alle paar Sekunden ab und meldet Änderungen.

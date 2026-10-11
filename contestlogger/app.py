@@ -17,7 +17,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __version__, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, tiles, updater
+from . import __app_name__, __copyright__, __license__, __source_url__, __version__, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, tiles, updater
 from .db import Database, normalize_dok
 
 STATIC = Path(__file__).parent / "static"
@@ -231,7 +231,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     @app.get("/api/info")
     def info():
         return {
-            "app": __app_name__, "version": __version__, "copyright": __copyright__,
+            "app": __app_name__, "version": __version__, "copyright": __copyright__, "license": __license__, "source_url": __source_url__,
             "admin_configured": db.admin_configured(), "callbook_count": db.callbook_count(),
             "server_time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "public_url": public_url or os.environ.get("CONTESTLOGGER_URL", ""),
