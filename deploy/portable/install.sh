@@ -33,6 +33,7 @@ if [ ! -x "$SRC_DIR/BeamLog" ]; then echo "BeamLog-Binary nicht gefunden in $SRC
 # Server aus Version 0.9 (hieß „ContestLogger“): Dienst, Nutzer, Pfade und Dateien auf BeamLog umstellen.
 # Die alten Daten in /var/lib/contestlogger bleiben als Sicherung liegen (kopiert, nicht verschoben).
 MIGRATED=0
+NGINX_FAILED=0
 migrate_from_contestlogger() {
   [ -e /etc/systemd/system/contestlogger.service ] || [ -d /etc/contestlogger ] || return 0
   echo "== Umstellung von ContestLogger auf BeamLog"
@@ -117,13 +118,20 @@ if [ "$MODE" = install ] || [ "$MIGRATED" = 1 ]; then
   fi
   ln -sf /etc/nginx/sites-available/beamlog /etc/nginx/sites-enabled/beamlog
   rm -f /etc/nginx/sites-enabled/default
-  nginx -t && systemctl reload nginx
-
-  echo "== Tägliches Backup (03:15 Uhr) nach $DATA_DIR/backup-daily (30 Tage)"
-  cp "$APP_DIR/deploy/backup.sh" /usr/local/bin/beamlog-backup
-  chmod +x /usr/local/bin/beamlog-backup
-  echo "15 3 * * * root /usr/local/bin/beamlog-backup" > /etc/cron.d/beamlog-backup
+  # nginx starten, falls es (noch) nicht läuft – ein reines „reload“ scheitert bei gestopptem nginx
+  if nginx -t; then
+    systemctl enable nginx >/dev/null 2>&1 || true
+    systemctl reload-or-restart nginx || NGINX_FAILED=1
+  else
+    NGINX_FAILED=1
+  fi
 fi
+
+# Tägliches Backup – bei jedem Lauf einrichten (fehlt sonst, falls ein früherer Lauf abgebrochen ist)
+echo "== Tägliches Backup (03:15 Uhr) nach $DATA_DIR/backup-daily (30 Tage)"
+cp "$APP_DIR/deploy/backup.sh" /usr/local/bin/beamlog-backup
+chmod +x /usr/local/bin/beamlog-backup
+echo "15 3 * * * root /usr/local/bin/beamlog-backup" > /etc/cron.d/beamlog-backup
 
 sleep 1
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
@@ -133,3 +141,10 @@ echo "Datenbank: $DATA_DIR/beamlog.db   Logs: journalctl -u beamlog -f"
 echo "Einstellungen: $CONF   (danach: sudo systemctl restart beamlog)"
 echo "Update später: neues ZIP entpacken und dort  sudo bash deploy/install.sh --update"
 if [ "$MIGRATED" = 1 ]; then echo "Umgestellt von ContestLogger – die alten Daten liegen noch in /var/lib/contestlogger und können gelöscht werden."; fi
+if [ "$NGINX_FAILED" = 1 ]; then
+  echo
+  echo "!! nginx läuft nicht – BeamLog selbst läuft (127.0.0.1:8000), ist aber über Port 80 noch nicht erreichbar."
+  echo "   Ursache ansehen:   sudo journalctl -u nginx -n 30 --no-pager"
+  echo "   Port 80 belegt?    sudo ss -ltnp 'sport = :80'   (z. B. apache2: sudo systemctl disable --now apache2)"
+  echo "   Danach:            sudo systemctl enable --now nginx"
+fi
