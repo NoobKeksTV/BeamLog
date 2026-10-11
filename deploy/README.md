@@ -18,9 +18,24 @@ legt den Systembenutzer `beamlog` an, schreibt die Konfiguration `/etc/beamlog/b
 richtet den systemd-Dienst und die nginx-Site ein und aktiviert ein tägliches Backup nach
 `/var/lib/beamlog/backup/` (30 Tage Aufbewahrung). `--url http://contest.local/` setzt die öffentliche Adresse.
 
-Teile weglassen (kombinierbar, wird für `--update` gemerkt): `--no-nginx` (eigener Reverse-Proxy oder `PORT=80` direkt),
-`--no-service` (BeamLog selbst starten), `--no-backup` (kein Backup-Cron); `--with-…` schaltet wieder ein, `--help` zeigt alles.
-Beispiel: `sudo bash deploy/install.sh --no-nginx --no-backup`.
+### Teile weglassen
+
+Beliebig kombinierbar; die Wahl wird in `/etc/beamlog/install.options` gemerkt und gilt auch für `--update`:
+
+| Option | Wirkung |
+|---|---|
+| `--no-nginx` | nginx weder installieren noch einrichten (eigener Reverse-Proxy oder `PORT=80` direkt); eine frühere BeamLog-Site wird entfernt, andere Sites bleiben |
+| `--no-service` | kein systemd-Dienst – das Skript zeigt den Startbefehl; ein früherer Dienst `beamlog` wird angehalten und entfernt |
+| `--no-backup` | kein täglicher Backup-Cron (ein vorhandener wird entfernt) |
+| `--with-nginx` / `--with-service` / `--with-backup` | wieder einrichten |
+
+```bash
+sudo bash deploy/install.sh --no-nginx                 # ohne nginx (eigener Reverse-Proxy auf 127.0.0.1:8000)
+sudo bash deploy/install.sh --no-service               # ohne systemd-Dienst (BeamLog selbst starten)
+sudo bash deploy/install.sh --no-nginx --no-backup     # mehrere gleichzeitig
+sudo bash deploy/install.sh --update --with-nginx      # einen Teil später wieder einrichten
+sudo bash deploy/install.sh --help                     # alle Optionen
+```
 
 ## Einstellungen: /etc/beamlog/beamlog.env
 

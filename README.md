@@ -69,7 +69,19 @@ Admin- und Stations-Passwort: `demo`. Eine eigene Demo-Instanz einrichten: [Wiki
 
 > **Umstieg von ContestLogger 0.9.x:** BeamLog hieß bis Version 0.9 „ContestLogger“. Version 1.0 einmal von Hand laden und entpacken – liegt der neue Ordner `BeamLog` neben dem alten Ordner `ContestLogger` (oder darin), übernimmt BeamLog beim ersten Start automatisch eine Kopie von `data/` und `contestlogger.env` (die Datenbank heißt danach `beamlog.db`, die Einstellungen `beamlog.env`). Ab 1.0 aktualisiert sich BeamLog wieder selbst; alte Links auf das GitHub-Projekt leiten weiter.
 
-Dauerhafte Einstellungen (Port, Datenbank, Adresse für den QR-Code …) stehen in `beamlog.env` neben dem Programm (Vorlage `beamlog.env.example`). Für einen dauerhaft laufenden Server (Debian, nginx, systemd): im Linux-ZIP liegt `deploy/`, Einstellungen dann in `/etc/beamlog/beamlog.env`, Anleitung im [Wiki](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy).
+Dauerhafte Einstellungen (Port, Datenbank, Adresse für den QR-Code …) stehen in `beamlog.env` neben dem Programm (Vorlage `beamlog.env.example`).
+
+**Als Dienst auf einem Debian-/Ubuntu-Server oder Raspberry Pi** (systemd, nginx auf Port 80, tägliches Backup) – im entpackten Linux-ZIP:
+
+```bash
+sudo bash deploy/install.sh --url http://contest.local/   # Erstinstallation
+sudo bash deploy/install.sh --update                      # später: neue Version einspielen
+```
+
+Teile lassen sich weglassen, auch mehrere gleichzeitig: `--no-nginx` (eigener Reverse-Proxy oder `PORT=80` direkt),
+`--no-service` (ohne systemd-Dienst), `--no-backup` (ohne Backup-Cron) – die Wahl wird für spätere Updates gemerkt,
+`--with-…` schaltet wieder ein, `--help` zeigt alles. Einstellungen dann in `/etc/beamlog/beamlog.env`, Anleitung im
+[Wiki › Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy) (dort auch die [öffentliche Demo-Instanz](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy#öffentliche-demo-instanz) mit `DEMO=1`).
 
 Aus dem Quellcode: `pip install -r requirements.txt && python run.py` (Python 3.11+).
 

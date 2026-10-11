@@ -9,7 +9,22 @@ cd BeamLog
 sudo bash deploy/install.sh --url http://contest.local/     # Erstinstallation
 ```
 
-Danach läuft der Logger unter `http://<server-ip>/`. Enthalten:
+Danach läuft der Logger unter `http://<server-ip>/`.
+
+Teile weglassen – beliebig kombinierbar, die Wahl wird in `/etc/beamlog/install.options` gemerkt und gilt auch für `--update`:
+
+```bash
+sudo bash deploy/install.sh --no-nginx                 # ohne nginx (eigener Reverse-Proxy auf 127.0.0.1:8000)
+sudo bash deploy/install.sh --no-service               # ohne systemd-Dienst (BeamLog selbst starten)
+sudo bash deploy/install.sh --no-nginx --no-backup     # mehrere gleichzeitig
+sudo bash deploy/install.sh --update --with-nginx      # einen Teil später wieder einrichten
+sudo bash deploy/install.sh --help                     # alle Optionen
+```
+
+`--no-nginx` entfernt nur eine frühere BeamLog-Site (nginx selbst und andere Sites bleiben), `--no-service` hält einen
+früheren Dienst `beamlog` an und entfernt ihn, `--no-backup` entfernt den Backup-Cron.
+
+Enthalten:
 
 | Datei | Zweck |
 |---|---|
@@ -66,6 +81,8 @@ PUBLIC_URL=http://contest.local/                # Adresse im QR-Code und in Link
 #KST_HOST=www.on4kst.info
 #KST_PORT=23000
 #GITHUB_TOKEN=                                  # nur für ein privates Repo
+#DEMO=1                                         # öffentliche Demo-Instanz (löscht täglich alles, siehe Wiki „Server-Deploy“)
+#DEMO_RESET=03:00                               # Uhrzeit des täglichen Zurücksetzens
 ```
 
 Nach Änderungen: `sudo systemctl restart beamlog`. `install.sh` legt die Datei beim ersten Lauf an und lässt sie bei Updates
@@ -86,6 +103,8 @@ sudo bash deploy/install.sh --update          # im entpackten BeamLog-Ordner: st
 ```
 
 Nur `sudo systemctl restart beamlog` reicht beim Wechsel zwischen den beiden Varianten nicht, weil dann nginx weiter Port 80 belegt.
+Läuft auf dem Server schon ein anderer Webserver/Reverse-Proxy, den das Skript nicht anfassen soll: mit `--no-nginx`
+installieren und dort an `127.0.0.1:8000` weiterleiten (WebSocket `/ws` nicht vergessen, Vorlage: `nginx-beamlog.conf`).
 
 ## Dienst bedienen
 
