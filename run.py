@@ -110,6 +110,38 @@ def adopt_legacy_names(base: Path) -> None:
         print(f"  Datenbank umbenannt: {old.name} -> {new.name}")
 
 
+LEGACY_DATA_DIRS = ("/var/lib/beamlog", "/var/lib/contestlogger")  # Server-Datenordner bis 1.0.3 bzw. 0.9
+
+
+def prepare_data(db: str) -> str:
+    """Datenordner (samt backup/ und lang/) anlegen, falls er fehlt, und prüfen, ob BeamLog dort schreiben darf –
+    sonst eine verständliche Meldung mit der Lösung statt eines Absturzes. Zeigt die Einstellung noch auf den alten
+    Server-Ordner (/var/lib/beamlog), die Daten liegen aber schon im Programmordner, wird der Programmordner genommen."""
+    p = Path(db)
+    local = portable_base() / "data" / "beamlog.db"
+    if not p.exists() and str(p.parent) in LEGACY_DATA_DIRS and local.exists():
+        print(f"  Hinweis: {p} gibt es nicht mehr, die Daten liegen jetzt in {local} – DB=… in der .env bitte anpassen.")
+        p = local
+    try:
+        for d in (p.parent, p.parent / "backup", p.parent / "lang"):
+            d.mkdir(parents=True, exist_ok=True)
+        probe = p.parent / ".schreibtest"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        for f in (p, Path(f"{p}-wal"), Path(f"{p}-shm")):
+            if f.exists() and not os.access(f, os.W_OK):
+                raise PermissionError(13, "keine Schreibrechte", str(f))
+    except OSError as e:
+        import getpass
+        user = getpass.getuser()
+        where = e.filename or p.parent
+        fix = (f"sudo chown -R {user}: {p.parent}" if os.name != "nt" else "Ordnerrechte prüfen oder einen anderen Ordner wählen (--db)")
+        sys.exit(f"BeamLog kann nicht in {where} schreiben ({e.strerror or e}).\n"
+                 f"  Läuft als Nutzer „{user}“. Lösung: {fix}\n"
+                 f"  Als Server-Dienst: sudo bash deploy/install.sh --update (setzt die Rechte neu).")
+    return str(p)
+
+
 def check_port(host: str, port: int) -> None:
     """Port vorab prüfen und bei Problemen verständlich erklären, statt mit einer knappen uvicorn-Meldung zu enden."""
     try:
@@ -196,6 +228,9 @@ def main() -> None:
     if cfg_path:
         print(f"  Konfiguration: {cfg_path}")
     url = a.public_url or (f"http://{lan_ip()}/" if a.host in ("127.0.0.1", "localhost") else f"http://{lan_ip()}:{a.port}/")
+    if pre_a.config and not Path(pre_a.config).exists() and cfg_path is None:
+        print(f"  Hinweis: Konfiguration {pre_a.config} nicht gefunden – es gelten die Standardwerte.")
+    a.db = prepare_data(a.db)
     app = create_app(a.db, backup_interval_min=a.backup_min, public_url=url)
     print(f"\n  {__app_name__} {__version__}  {__copyright__}")
     print(f"  Lokal:    http://localhost:{a.port}")

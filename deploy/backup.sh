@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tägliche konsistente Sicherung der SQLite-Datenbank (behält 30 Tage).
 set -euo pipefail
-DATA_DIR="${1:-/var/lib/beamlog}"   # Datenordner (install.sh --here übergibt <ordner>/data)
+DATA_DIR="${1:-/opt/beamlog/data}"   # Datenordner (install.sh übergibt ihn)
 mkdir -p "$DATA_DIR/backup"
 STAMP=$(date -u +%Y%m%d-%H%M%S)
 python3 - <<PY

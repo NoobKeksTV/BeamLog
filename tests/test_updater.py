@@ -158,3 +158,25 @@ def test_env_file_inline_comments_and_port_check(tmp_path):
         with pytest.raises(SystemExit) as e:
             run.check_port("127.0.0.1", busy.getsockname()[1])
     assert "belegt" in str(e.value)
+
+
+def test_prepare_data_creates_folders_and_explains_permissions(tmp_path, monkeypatch):
+    import pytest
+
+    import run
+    db = tmp_path / "neu" / "tief" / "beamlog.db"
+    assert run.prepare_data(str(db)) == str(db)
+    assert all((db.parent / d).is_dir() for d in ("backup", "lang"))  # fehlende Ordner werden angelegt
+    db.write_text("x")
+    monkeypatch.setattr(run.os, "access", lambda f, mode: False)  # Datei gehört z. B. root
+    with pytest.raises(SystemExit) as e:
+        run.prepare_data(str(db))
+    assert "kann nicht in" in str(e.value) and "chown" in str(e.value)
+
+
+def test_prepare_data_follows_moved_server_data(tmp_path, monkeypatch):
+    import run
+    (tmp_path / "data").mkdir(); (tmp_path / "data" / "beamlog.db").write_text("x")
+    monkeypatch.setattr(run, "portable_base", lambda: tmp_path)
+    monkeypatch.setattr(run, "LEGACY_DATA_DIRS", (str(tmp_path / "varlib"),))
+    assert run.prepare_data(str(tmp_path / "varlib" / "beamlog.db")) == str(tmp_path / "data" / "beamlog.db")

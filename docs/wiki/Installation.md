@@ -48,7 +48,8 @@ Unter Windows im Explorer als `.env.` eingeben (der Punkt am Ende verschwindet) 
 `copy .env.example .env`; unter macOS/Linux sind Dateien mit Punkt vorne versteckt (`ls -a`, im Finder `⌘⇧.`).
 
 > Bis Version 1.0.3 hieß die Datei `beamlog.env`. Eine vorhandene `beamlog.env` benennt BeamLog beim Start
-> automatisch in `.env` um (ebenso `install.sh --update` auf dem Server: `/etc/beamlog/beamlog.env` → `/etc/beamlog/.env`).
+> automatisch in `.env` um. Auf dem Server holt `install.sh --update` außerdem alles in einen Ordner: `/etc/beamlog/beamlog.env`
+> → `/opt/beamlog/.env`, Daten aus `/var/lib/beamlog` → `/opt/beamlog/data`.
 
 
 ```ini
@@ -61,7 +62,7 @@ OPEN_BROWSER=1        # Windows: Browser beim Start öffnen
 #MAINTAINER=1         # nur für den Betreuer der zentralen Stationsdatenbank
 ```
 
-Die Datei wird beim Start gemeldet („Konfiguration: …“). Reihenfolge: Kommandozeile überstimmt Umgebungsvariablen `BEAMLOG_<KEY>` (z. B. `BEAMLOG_PORT=8080`), diese überstimmen die Datei. Ein anderer Ort geht mit `--config /pfad/datei.env` oder `BEAMLOG_CONFIG`. Auf einem Server liegt die Datei unter `/etc/beamlog/.env`, siehe [Deploy](Deploy.md).
+Die Datei wird beim Start gemeldet („Konfiguration: …“). Reihenfolge: Kommandozeile überstimmt Umgebungsvariablen `BEAMLOG_<KEY>` (z. B. `BEAMLOG_PORT=8080`), diese überstimmen die Datei. Ein anderer Ort geht mit `--config /pfad/datei.env` oder `BEAMLOG_CONFIG`. Auf einem Server liegt die Datei unter `/opt/beamlog/.env`, siehe [Deploy](Deploy.md).
 
 Umzug auf einen anderen Rechner: einfach den ganzen Ordner kopieren. Die Datenbank liegt in `data/beamlog.db`, Sicherungen in `data/backup/`.
 
