@@ -17,9 +17,18 @@ Teile weglassen – beliebig kombinierbar, die Wahl wird in `/etc/beamlog/instal
 sudo bash deploy/install.sh --no-nginx                 # ohne nginx (eigener Reverse-Proxy auf 127.0.0.1:8000)
 sudo bash deploy/install.sh --no-service               # ohne systemd-Dienst (BeamLog selbst starten)
 sudo bash deploy/install.sh --no-nginx --no-backup     # mehrere gleichzeitig
+sudo bash deploy/install.sh --deps-only                # nur Python & Co. installieren, im Ordner bleiben, selbst starten
+sudo bash deploy/install.sh --here                     # im Ordner bleiben, aber mit Dienst, nginx und Backup
 sudo bash deploy/install.sh --update --with-nginx      # einen Teil später wieder einrichten
 sudo bash deploy/install.sh --help                     # alle Optionen
 ```
+
+**Wohin installiert wird:** Mit Dienst kopiert das Skript BeamLog nach `/opt/beamlog` (Daten in `/var/lib/beamlog`,
+Einstellungen in `/etc/beamlog/beamlog.env`): Der Dienst läuft dort als eigener Systemnutzer `beamlog` mit gehärteter
+Unit, die keinen Zugriff auf `/home` hat, und ein neu entpacktes ZIP lässt sich per `--update` einfach darüberspielen.
+Das Skript kündigt das Kopieren deutlich an. **Ohne Dienst (`--no-service`) wird nichts kopiert** – BeamLog bleibt
+automatisch im aktuellen Ordner. Mit `--here` bleibt es auch mit Dienst dort (die Unit läuft dann als dein Nutzer).
+`--system` hebt eine gemerkte `--here`-Wahl wieder auf.
 
 `--no-nginx` entfernt nur eine frühere BeamLog-Site (nginx selbst und andere Sites bleiben), `--no-service` hält einen
 früheren Dienst `beamlog` an und entfernt ihn, `--no-backup` entfernt den Backup-Cron.

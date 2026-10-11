@@ -9,4 +9,5 @@ build/
 dist/
 *.spec
 /beamlog.env
+/.install.options
 /contestlogger.env

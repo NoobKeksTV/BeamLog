@@ -18,7 +18,13 @@ legt den Systembenutzer `beamlog` an, schreibt die Konfiguration `/etc/beamlog/b
 richtet den systemd-Dienst und die nginx-Site ein und aktiviert ein tägliches Backup nach
 `/var/lib/beamlog/backup/` (30 Tage Aufbewahrung). `--url http://contest.local/` setzt die öffentliche Adresse.
 
-### Teile weglassen
+### Teile weglassen und im Ordner bleiben
+
+**Wohin installiert wird:** Mit Dienst kopiert das Skript BeamLog nach `/opt/beamlog` (Daten in `/var/lib/beamlog`,
+Einstellungen in `/etc/beamlog/beamlog.env`): Der Dienst läuft dort als eigener Systemnutzer `beamlog` mit gehärteter
+Unit, die keinen Zugriff auf `/home` hat, und ein neu entpacktes ZIP lässt sich per `--update` einfach darüberspielen.
+Das Skript kündigt das Kopieren deutlich an. **Ohne Dienst (`--no-service`) wird nichts kopiert** – BeamLog bleibt
+automatisch im aktuellen Ordner. Mit `--here` bleibt es auch mit Dienst dort (die Unit läuft dann als dein Nutzer).
 
 Beliebig kombinierbar; die Wahl wird in `/etc/beamlog/install.options` gemerkt und gilt auch für `--update`:
 
@@ -28,11 +34,16 @@ Beliebig kombinierbar; die Wahl wird in `/etc/beamlog/install.options` gemerkt u
 | `--no-service` | kein systemd-Dienst – das Skript zeigt den Startbefehl; ein früherer Dienst `beamlog` wird angehalten und entfernt |
 | `--no-backup` | kein täglicher Backup-Cron (ein vorhandener wird entfernt) |
 | `--with-nginx` / `--with-service` / `--with-backup` | wieder einrichten |
+| `--here` | Nicht kopieren: BeamLog bleibt im aktuellen Ordner und läuft als der aufrufende Nutzer; Daten in `./data`, Einstellungen in `./beamlog.env`. Dienst, nginx und Backup-Cron zeigen auf diesen Ordner. |
+| `--deps-only` | Nur die Voraussetzungen installieren (Systempakete, beim Quellcode zusätzlich `./.venv`) – wie `--here --no-nginx --no-service --no-backup`; danach selbst starten. |
+| `--system` | Gemerkte `--here`-Wahl aufheben und wieder nach `/opt/beamlog` installieren. |
 
 ```bash
 sudo bash deploy/install.sh --no-nginx                 # ohne nginx (eigener Reverse-Proxy auf 127.0.0.1:8000)
 sudo bash deploy/install.sh --no-service               # ohne systemd-Dienst (BeamLog selbst starten)
 sudo bash deploy/install.sh --no-nginx --no-backup     # mehrere gleichzeitig
+sudo bash deploy/install.sh --deps-only                # nur Python & Co. installieren, im Ordner bleiben, selbst starten
+sudo bash deploy/install.sh --here                     # im Ordner bleiben, aber mit Dienst, nginx und Backup
 sudo bash deploy/install.sh --update --with-nginx      # einen Teil später wieder einrichten
 sudo bash deploy/install.sh --help                     # alle Optionen
 ```

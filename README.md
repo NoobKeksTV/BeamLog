@@ -79,8 +79,12 @@ sudo bash deploy/install.sh --update                      # später: neue Versio
 ```
 
 Teile lassen sich weglassen, auch mehrere gleichzeitig: `--no-nginx` (eigener Reverse-Proxy oder `PORT=80` direkt),
-`--no-service` (ohne systemd-Dienst), `--no-backup` (ohne Backup-Cron) – die Wahl wird für spätere Updates gemerkt,
-`--with-…` schaltet wieder ein, `--help` zeigt alles. Einstellungen dann in `/etc/beamlog/beamlog.env`, Anleitung im
+`--no-service` (ohne systemd-Dienst), `--no-backup` (ohne Backup-Cron); die Wahl wird für spätere Updates gemerkt,
+`--with-…` schaltet wieder ein, `--help` zeigt alles.
+
+Mit Dienst kopiert das Skript BeamLog nach `/opt/beamlog` (Einstellungen in `/etc/beamlog/beamlog.env`) und sagt das
+deutlich. Ohne Dienst wird nichts kopiert, BeamLog bleibt im aktuellen Ordner: `--deps-only` installiert nur Python & Co.,
+`--here` bleibt im Ordner und richtet trotzdem Dienst, nginx und Backup ein. Anleitung im
 [Wiki › Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy) (dort auch die [öffentliche Demo-Instanz](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy#öffentliche-demo-instanz) mit `DEMO=1`).
 
 Aus dem Quellcode: `pip install -r requirements.txt && python run.py` (Python 3.11+).
