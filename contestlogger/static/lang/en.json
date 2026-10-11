@@ -618,5 +618,16 @@
  "Kopfdaten & Allgemeines": "Header & general",
  "Online-Abgleich: {p}, {n} Rufzeichen neu abgefragt.": "Online check: {p}, {n} callsigns looked up.",
  "✖ {e} Fehler, {w} Hinweise – Fehler vor dem Export beheben. Klick auf eine Zeile öffnet das QSO.": "✖ {e} errors, {w} warnings – fix errors before export. Click a row to open the QSO.",
- "Quellcode": "Source code"
+ "Quellcode": "Source code",
+ "Änderungen speichern": "Save changes",
+ "vorher: {v}": "before: {v}",
+ "Vorschlag: {v}": "Suggestion: {v}",
+ "Vorschlag aus der Log-Prüfung eingetragen ({c}). Prüfen und mit „Änderungen speichern“ übernehmen.": "Suggestion from the log check filled in ({c}). Check it and apply with “Save changes”.",
+ "Jeder Punkt ist ein Flugzeug: links/rechts = wo es entlang des Pfads steht (km ab der eigenen Station), Höhe = Flughöhe. Es wandert mit, während es fliegt (Aktualisierung alle 5 s).": "Each dot is an aircraft: left/right = where it is along the path (km from your station), height = flight level. It moves as the aircraft flies (updated every 5 s).",
+ "Mindesthöhe (darüber sehen beide Stationen das Flugzeug)": "Minimum altitude (above it both stations see the aircraft)",
+ "Zone gemeinsamer Sichtbarkeit": "Zone of mutual visibility",
+ "im Korridor": "in corridor",
+ "kreuzt bald": "crossing soon",
+ "sichtbar, neben dem Pfad": "visible, beside the path",
+ "zu tief": "too low"
 }

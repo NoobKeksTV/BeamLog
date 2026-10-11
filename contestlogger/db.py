@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from . import geo, prefixes
+from .logcheck import norm_rst
 from . import scoring as scoring_mod
 
 SCHEMA = """
@@ -600,7 +601,7 @@ class Database:
                    serial_sent,serial_rcvd,mode,band,comment,km,bearing,points,dupe,logged_by,created_at,updated_at,freq,exch_rcvd)
                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (station_id, ts, q["call"], q["core_call"], q["locator"], q["square"], q["country"],
-                 str(q.get("rst_sent") or "59"), str(q.get("rst_rcvd") or "59"), serial,
+                 norm_rst(q.get("rst_sent") or "59"), norm_rst(q.get("rst_rcvd") or "59"), serial,
                  str(q.get("serial_rcvd") or ""), q.get("mode") or station["mode"], band,
                  q.get("comment") or "", q["km"], q["bearing"], points, dupe, logged_by, now, now, str(q.get("freq") or ""), q["exch_rcvd"]),
             )
@@ -625,7 +626,7 @@ class Database:
                 """UPDATE qsos SET ts_utc=?,call=?,core_call=?,locator=?,square=?,country=?,rst_sent=?,rst_rcvd=?,
                    serial_sent=?,serial_rcvd=?,mode=?,band=?,comment=?,km=?,bearing=?,points=?,dupe=?,updated_at=?,freq=?,exch_rcvd=? WHERE id=?""",
                 (q["ts_utc"], q["call"], q["core_call"], q["locator"], q["square"], q["country"],
-                 str(q["rst_sent"]), str(q["rst_rcvd"]), int(q["serial_sent"]), str(q["serial_rcvd"]),
+                 norm_rst(q["rst_sent"]), norm_rst(q["rst_rcvd"]), int(q["serial_sent"]), str(q["serial_rcvd"]),
                  q["mode"], q["band"], q["comment"] or "", q["km"], q["bearing"], points, dupe, utcnow(), str(q.get("freq") or ""), q["exch_rcvd"], qid),
             )
         self.recheck_dupes(old["station_id"])

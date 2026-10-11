@@ -6,6 +6,7 @@ import io
 from datetime import datetime
 
 from . import __version__, scoring
+from .logcheck import norm_rst
 
 CABRILLO_FREQ = {"50MHz": "50", "70MHz": "70", "144MHz": "144", "222MHz": "222", "432MHz": "432", "902MHz": "902", "1296MHz": "1.2G", "2320MHz": "2.3G",
                  "3400MHz": "3.4G", "5760MHz": "5.7G", "10368MHz": "10G", "24048MHz": "24G", "47088MHz": "47G", "76032MHz": "75G"}
@@ -89,7 +90,7 @@ def export_edi(contest: dict, station: dict, qsos: list[dict]) -> str:
         d = _dt(q["ts_utc"])
         lines.append(";".join([
             d.strftime("%y%m%d"), d.strftime("%H%M"), q["call"], EDI_MODE.get(q["mode"], "1"),
-            q["rst_sent"], f"{int(q['serial_sent']):03d}", q["rst_rcvd"], str(q["serial_rcvd"]).zfill(3) if str(q["serial_rcvd"]).isdigit() else str(q["serial_rcvd"]),
+            norm_rst(q["rst_sent"]), f"{int(q['serial_sent']):03d}", norm_rst(q["rst_rcvd"]), str(q["serial_rcvd"]).zfill(3) if str(q["serial_rcvd"]).isdigit() else str(q["serial_rcvd"]),
             q.get("exch_rcvd") or "", q["locator"], str(q["points"]), "", "", "", "D" if q["dupe"] else "",
         ]))
     return "\r\n".join(lines) + "\r\n"
@@ -130,8 +131,8 @@ def export_cabrillo(contest: dict, station: dict, qsos: list[dict]) -> str:
     freq = CABRILLO_FREQ.get(station["band"], station["band"].replace("MHz", ""))
     for q in qsos:
         d = _dt(q["ts_utc"])
-        sent = f"{q['rst_sent']} {int(q['serial_sent']):03d} {station['locator']}" + (f" {own_exch}" if own_exch else "")
-        rcvd = f"{q['rst_rcvd']} {str(q['serial_rcvd']).zfill(3) if str(q['serial_rcvd']).isdigit() else (q['serial_rcvd'] or '---')} {q['locator'] or '------'}" + (f" {q['exch_rcvd']}" if q.get("exch_rcvd") else "")
+        sent = f"{norm_rst(q['rst_sent'])} {int(q['serial_sent']):03d} {station['locator']}" + (f" {own_exch}" if own_exch else "")
+        rcvd = f"{norm_rst(q['rst_rcvd'])} {str(q['serial_rcvd']).zfill(3) if str(q['serial_rcvd']).isdigit() else (q['serial_rcvd'] or '---')} {q['locator'] or '------'}" + (f" {q['exch_rcvd']}" if q.get("exch_rcvd") else "")
         lines.append(f"QSO: {freq:>5} {CABRILLO_MODE.get(q['mode'], 'PH')} {d.strftime('%Y-%m-%d %H%M')} {station['call']:<13} {sent} {q['call']:<13} {rcvd}" + ("  X-QSO" if q["dupe"] else ""))
     lines.append("END-OF-LOG:")
     return "\r\n".join(lines) + "\r\n"
@@ -155,7 +156,7 @@ def export_adif(contest: dict, station: dict, qsos: list[dict]) -> str:
         out.append("".join([
             _adif_field("CALL", q["call"]), _adif_field("QSO_DATE", d.strftime("%Y%m%d")),
             _adif_field("TIME_ON", d.strftime("%H%M")), _adif_field("MODE", q["mode"]),
-            _adif_field("RST_SENT", q["rst_sent"]), _adif_field("RST_RCVD", q["rst_rcvd"]),
+            _adif_field("RST_SENT", norm_rst(q["rst_sent"])), _adif_field("RST_RCVD", norm_rst(q["rst_rcvd"])),
             _adif_field("GRIDSQUARE", q["locator"]), _adif_field("STX", f"{int(q['serial_sent']):03d}"),
             _adif_field("SRX", q["serial_rcvd"]), _adif_field("BAND", ADIF_BAND.get(q["band"], q["band"])),
             _adif_field("SRX_STRING", q.get("exch_rcvd") or ""), _adif_field("DARC_DOK", q.get("exch_rcvd") or ""),
@@ -174,8 +175,8 @@ def export_csv(contest: dict, station: dict, qsos: list[dict]) -> str:
     w.writerow(["Datum", "Zeit UTC", "Rufzeichen", "RST geg", "Nr geg", "RST erh", "Nr erh", "DOK erh", "Locator", "km", "Grad", "Punkte", "Land", "Modus", "Band", "Dupe", "Kommentar", "Operator"])
     for q in sorted(qsos, key=lambda q: (q["ts_utc"], q["id"])):
         d = _dt(q["ts_utc"])
-        w.writerow([d.strftime("%d.%m.%Y"), d.strftime("%H:%M"), q["call"], q["rst_sent"], f"{int(q['serial_sent']):03d}",
-                    q["rst_rcvd"], q["serial_rcvd"], q.get("exch_rcvd") or "", q["locator"], q["km"], q["bearing"], q["points"], q["country"],
+        w.writerow([d.strftime("%d.%m.%Y"), d.strftime("%H:%M"), q["call"], norm_rst(q["rst_sent"]), f"{int(q['serial_sent']):03d}",
+                    norm_rst(q["rst_rcvd"]), q["serial_rcvd"], q.get("exch_rcvd") or "", q["locator"], q["km"], q["bearing"], q["points"], q["country"],
                     q["mode"], q["band"], "D" if q["dupe"] else "", q["comment"], q["logged_by"]])
     return buf.getvalue()
 

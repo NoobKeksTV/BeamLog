@@ -488,10 +488,10 @@
     const renderRows = () => {
       tbody.innerHTML = "";
       const rows = perQso.filter((x) => (state.lvl === "all" || x.lvl === state.lvl) && (!state.field || (x.field || t("Sonstiges")) === state.field));
-      for (const x of rows) tbody.append(el("tr", { class: `chk-${x.lvl}`, title: x.msg, onclick: async () => { const q = (await qsosOf()).find((q) => q.id === x.qso_id); closeModal(); if (q) editQso(q); } },
+      for (const x of rows) tbody.append(el("tr", { class: `chk-${x.lvl}`, title: x.msg, onclick: async () => { const q = (await qsosOf()).find((q) => q.id === x.qso_id); closeModal(); if (q) editQso(q, { fix: x.fix, field: x.field, onSaved: () => runCheck(opts) }); } },
         el("td", { class: "lvl" }, x.lvl === "err" ? "✖" : "⚠"), el("td", { class: "num" }, x.serial ? pad3(x.serial) : ""), el("td", {}, x.ts ? fmtTime(x.ts) : ""),
         el("td", {}, el("b", {}, x.call || "")), el("td", { class: "fld" }, x.field || "–"),
-        el("td", { class: "ist" }, x.logged || (x.field ? "" : x.msg)), el("td", { class: "soll" }, x.expected || "")));
+        el("td", { class: "ist" }, x.logged || (x.field ? "" : x.msg)), el("td", { class: "soll" }, x.expected || "", x.fix ? el("div", { class: "fix" }, "✎ " + t("Vorschlag: {v}", { v: Object.values(x.fix).join(", ") })) : null)));
       if (!rows.length) tbody.append(el("tr", {}, el("td", { colspan: 7, class: "muted" }, perQso.length ? t("Keine Befunde in dieser Auswahl.") : t("Alle QSOs ohne Befund."))));
       chips.querySelectorAll("button").forEach((b) => b.classList.toggle("active", (b.dataset.lvl && b.dataset.lvl === state.lvl) || (b.dataset.field !== undefined && b.dataset.field === state.field)));
     };
@@ -765,9 +765,16 @@
     } catch (err) { toast(err.message, "err"); Sound.play("error"); }
   }
 
-  function editQso(q) {
+  // Feld eines Prüfbefunds -> Eingabefeld im Bearbeiten-Dialog
+  const CHECK_FIELD_INPUT = { "Locator": "#e-loc", "Locator (fein)": "#e-loc", "Land": "#e-loc", "Entfernung": "#e-loc", "Rufzeichen": "#e-call", "RST geg.": "#e-rs",
+    "RST erh.": "#e-rr", "Nr erh.": "#e-nr", "Nr geg.": "#e-ns", "Zeit": "#e-ts", "DOK": "#e-dok" };
+  const FIX_INPUT = { locator: "#e-loc", call: "#e-call", rst_sent: "#e-rs", rst_rcvd: "#e-rr", serial_rcvd: "#e-nr", serial_sent: "#e-ns", exch_rcvd: "#e-dok" };
+  // opts (aus der Log-Prüfung): fix = Korrekturvorschlag {feld: wert} – wird gleich eingetragen und markiert;
+  // field = betroffenes Feld (wird hervorgehoben); onSaved = danach z. B. die Prüfung neu öffnen
+  function editQso(q, opts = {}) {
     const box = modal(el("div", {},
       el("h3", {}, t("QSO #{nr} bearbeiten – {call}", { nr: q.serial_sent, call: q.call })),
+      el("p", { id: "e-fixnote", class: "hint hidden" }),
       el("form", { id: "edit-form", class: "stack" },
         el("div", { class: "grid2" },
           lab(t("Datum/Zeit UTC"), el("input", { id: "e-ts", value: q.ts_utc.slice(0, 16).replace("T", " ") })),
@@ -780,8 +787,30 @@
           lab(t("DOK erhalten"), el("input", { id: "e-dok", value: q.exch_rcvd || "", maxlength: 8 })),
           lab(t("Modus"), el("input", { id: "e-mode", value: q.mode })),
           lab(t("Kommentar"), el("input", { id: "e-cmt", value: q.comment }))),
-        el("div", { class: "row" }, el("button", { class: "primary" }, t("Speichern")), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Abbrechen")),
+        el("div", { class: "row" }, el("button", { class: "primary", id: "e-save" }, t("Änderungen speichern")), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Abbrechen")),
           el("span", { class: "grow" }), el("button", { type: "button", class: "ghost danger", onclick: () => { closeModal(); deleteQso(q); } }, t("Löschen"))))));
+    // Geänderte Felder hervorheben (gelb, alter Wert im Tooltip)
+    const inputs = [...box.querySelectorAll("#edit-form input")];
+    const orig = new Map(inputs.map((i) => [i, i.value]));
+    const mark = () => {
+      let n = 0;
+      for (const i of inputs) {
+        const ch = i.value.trim() !== String(orig.get(i)).trim(); i.classList.toggle("changed", ch); if (ch) n++;
+        i.title = ch ? t("vorher: {v}", { v: orig.get(i) || "–" }) : "";
+      }
+      box.querySelector("#e-save").classList.toggle("pulse", n > 0);
+    };
+    inputs.forEach((i) => i.addEventListener("input", mark));
+    const fixes = Object.entries(opts.fix || {}).filter(([k]) => FIX_INPUT[k]);
+    if (fixes.length) {
+      const parts = fixes.map(([k, v]) => { const inp = box.querySelector(FIX_INPUT[k]); const before = inp.value; inp.value = v; return `${inp.closest("label").firstChild.textContent}: ${before || "–"} → ${v}`; });
+      const note = box.querySelector("#e-fixnote");
+      note.textContent = t("Vorschlag aus der Log-Prüfung eingetragen ({c}). Prüfen und mit „Änderungen speichern“ übernehmen.", { c: parts.join(", ") });
+      note.classList.remove("hidden");
+    }
+    mark();
+    const focusEl = (fixes.length && box.querySelector(FIX_INPUT[fixes[0][0]])) || (opts.field && box.querySelector(CHECK_FIELD_INPUT[opts.field] || ""));
+    if (focusEl) { if (!fixes.length) focusEl.classList.add("attention"); setTimeout(() => { focusEl.focus(); focusEl.select?.(); }, 50); }
     box.querySelector("#edit-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const g = (id) => box.querySelector(id).value.trim();
@@ -790,6 +819,7 @@
       try {
         await api("PATCH", `/api/qsos/${q.id}`, { ts_utc: ts.slice(0, 16) + ":00Z", call: g("#e-call"), locator: g("#e-loc"), serial_sent: Number(g("#e-ns")), rst_sent: g("#e-rs"), rst_rcvd: g("#e-rr"), serial_rcvd: g("#e-nr"), exch_rcvd: g("#e-dok"), mode: g("#e-mode"), comment: g("#e-cmt") }, { stationId: q.station_id });
         closeModal(); toast(t("QSO gespeichert"), "ok");
+        if (opts.onSaved) opts.onSaved();
       } catch (err) { toast(err.message, "err"); }
     });
   }
@@ -1008,7 +1038,14 @@
     if (r.zone) svg += `<rect x="${x(r.zone.from_km)}" y="${H - Bt + 2}" width="${Math.max(2, x(r.zone.to_km) - x(r.zone.from_km))}" height="4" fill="#3ddc84" opacity=".7"/>`;
     for (const p of r.planes) { if (p.at_km < 0 || p.at_km > r.dist_km) continue; svg += `<circle cx="${x(p.at_km)}" cy="${y(p.alt_m)}" r="${p.size === "heavy" ? 5 : 3.5}" fill="${PLANE_COL[p.status]}" stroke="#000" stroke-width=".5"><title>${esc(planeTitle(p).replace(/<[^>]+>/g, ""))}</title></circle>`; }
     svg += `<text x="${L}" y="${H - 3}" font-size="9" fill="currentColor" opacity=".6">${esc(r.my)}</text><text x="${W - 6}" y="${H - 3}" font-size="9" text-anchor="end" fill="currentColor" opacity=".6">${esc(r.other)} · ${r.dist_km} km</text></svg>`;
-    const box = el("div", { class: "plane-profile-box" }); box.innerHTML = svg; return box;
+    const box = el("div", { class: "plane-profile-box" }); box.innerHTML = svg;
+    // Legende: was Linie, Balken und Punkte bedeuten
+    const dot = (st, label) => el("span", {}, el("i", { class: "dot", style: `background:${PLANE_COL[st]}` }), t(label));
+    box.append(el("div", { class: "plane-legend", title: t("Jeder Punkt ist ein Flugzeug: links/rechts = wo es entlang des Pfads steht (km ab der eigenen Station), Höhe = Flughöhe. Es wandert mit, während es fliegt (Aktualisierung alle 5 s).") },
+      el("span", {}, el("i", { class: "line" }), t("Mindesthöhe (darüber sehen beide Stationen das Flugzeug)")),
+      el("span", {}, el("i", { class: "bar" }), t("Zone gemeinsamer Sichtbarkeit")),
+      dot("hot", "im Korridor"), dot("soon", "kreuzt bald"), dot("visible", "sichtbar, neben dem Pfad"), dot("low", "zu tief"), dot("far", "außer Reichweite")));
+    return box;
   }
   const Planes = {
     on: localStorage.getItem("cl.planes") === "1", timer: null, last: "", busy: false, profile: localStorage.getItem("cl.planes.profile") !== "0",

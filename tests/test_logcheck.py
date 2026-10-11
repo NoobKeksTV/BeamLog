@@ -62,3 +62,31 @@ def test_plausibility(tmp_path):
         assert any("Niederlande" in e["msg"] for e in res["errors"])
         r = c.get("/api/calc", params={"my": "JO31AA", "loc": "JO22AA", "call": "DL8NAS"}).json()
         assert any("Deutschland" in w for w in r["warnings"]) and any("Stationsdatenbank" in w for w in r["warnings"])
+
+
+def test_rst_leading_zero_is_fixed_silently(tmp_path):
+    from contestlogger import exporters
+    from contestlogger.logcheck import norm_rst
+    assert norm_rst("059") == "59" and norm_rst("0599") == "599" and norm_rst("59") == "59" and norm_rst("0") == "0" and norm_rst("9") == "9"
+    db = Database(tmp_path / "t.db")
+    cid = db.create_contest("T", "2026-05-02T14:00:00Z", "2026-05-03T14:00:00Z")
+    sid = db.create_station(cid, "DN2LH/P", "JO31AA", "432MHz", "SSB", "", {})
+    q = db.add_qso(sid, {"call": "DL8NAS", "locator": "JN59LE", "ts_utc": "2026-05-02T15:00:00Z", "serial_rcvd": "010", "rst_sent": "059", "rst_rcvd": "0599"})
+    assert (q["rst_sent"], q["rst_rcvd"]) == ("59", "599")  # beim Speichern still korrigiert
+    db.conn.execute("UPDATE qsos SET rst_sent='059' WHERE id=?", (q["id"],)); db.conn.commit()  # Altbestand
+    res = check_station(db.get_contest(cid), db.get_station(sid), db.list_qsos(sid))
+    assert not any("RST" in e["msg"] for e in res["errors"])  # kein Fehler bei der Prüfung
+    edi = exporters.export_edi(db.get_contest(cid), db.get_station(sid), db.list_qsos(sid))
+    assert ";59;001;599;010;" in edi  # Export mit „59“ statt „059“
+
+
+def test_check_suggests_fix_from_callbook(tmp_path):
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        H = {"X-Admin-Token": c.post("/api/setup", json={"password": "admin1"}).json()["token"]}
+        cid = c.post("/api/contests", json={"name": "T"}, headers=H).json()["id"]
+        sid = c.post(f"/api/contests/{cid}/stations", json={"call": "DN2LH", "locator": "JO31AA", "band": "432MHz"}, headers=H).json()["id"]
+        c.post(f"/api/stations/{sid}/qsos", json={"call": "DK5EW", "locator": "", "serial_rcvd": "001"}, headers=H)  # Startdatenbank kennt DK5EW
+        res = c.get(f"/api/stations/{sid}/check").json()
+        item = next(e for e in res["errors"] if e.get("call") == "DK5EW" and e["field"] == "Locator")
+        assert item["fix"]["locator"].startswith("JN")

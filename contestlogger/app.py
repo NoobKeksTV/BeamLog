@@ -1094,13 +1094,37 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                     checked += 1
                 ext = (row.get("ext_locator") or "").upper()
                 if ext and q["locator"] and ext[:4] != q["locator"].upper()[:4]:
-                    res["warnings"].append({"qso_id": q["id"], "serial": q["serial_sent"], "call": q["call"], "field": "Locator", "logged": q["locator"].upper(), "expected": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')}: {ext}", "ts": q["ts_utc"], "msg": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')} kennt {core} mit {ext} (Log: {q['locator']}) – Locator prüfen"})
+                    res["warnings"].append({"qso_id": q["id"], "serial": q["serial_sent"], "call": q["call"], "field": "Locator", "logged": q["locator"].upper(), "expected": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')}: {ext}", "ts": q["ts_utc"], "fix": {"locator": ext}, "msg": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')} kennt {core} mit {ext} (Log: {q['locator']}) – Locator prüfen"})
                 elif ext and q["locator"] and ext != q["locator"].upper() and len(q["locator"]) >= 6 and len(ext) >= 6:
-                    res["warnings"].append({"qso_id": q["id"], "serial": q["serial_sent"], "call": q["call"], "field": "Locator (fein)", "logged": q["locator"].upper(), "expected": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')}: {ext}", "ts": q["ts_utc"], "msg": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')}: {core} mit {ext} eingetragen (Log: {q['locator']}) – Portabelbetrieb?"})
+                    res["warnings"].append({"qso_id": q["id"], "serial": q["serial_sent"], "call": q["call"], "field": "Locator (fein)", "logged": q["locator"].upper(), "expected": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')}: {ext}", "ts": q["ts_utc"], "fix": {"locator": ext}, "msg": f"{lookup.PROVIDERS.get(row.get('ext_source'), 'Online-DB')}: {core} mit {ext} eingetragen (Log: {q['locator']}) – Portabelbetrieb?"})
             res["lookup"] = {"provider": client.provider, "checked_now": checked}
         else:
             res["lookup"] = {"provider": "none", "checked_now": 0}
+        add_fixes(res, qsos)
         return res
+
+    def add_fixes(res: dict, qsos: list[dict]) -> None:
+        """Korrekturvorschläge aus der Stationsdatenbank (Locator, DOK), wo ein Befund keinen eigenen hat.
+        Die Oberfläche trägt den Vorschlag beim Öffnen des QSOs schon ein und hebt ihn hervor."""
+        by_id = {q["id"]: q for q in qsos}
+        for item in res["errors"] + res["warnings"]:
+            q = by_id.get(item.get("qso_id"))
+            if not q or item.get("fix"):
+                continue
+            field = item.get("field") or ""
+            row = db.lookup_call(q["call"]) or {}
+            if field in ("Locator", "Land"):
+                cand = [c for c in [row.get("ext_locator"), row.get("locator"), *(row.get("alt_locators") or "").split(",")] if c]
+                logged = (q.get("locator") or "").upper()
+                if len(logged) == 4:  # nur 4-stellig geloggt: Vorschlag muss im selben Großfeld liegen
+                    cand = [c for c in cand if c.strip().upper().startswith(logged)]
+                for c in cand:
+                    c = c.strip().upper()
+                    if c and c != logged and geo.is_valid_locator(c) and len(c) >= 6 and prefixes.check_plausibility(q["call"], c).get("ok", True):
+                        item["fix"] = {"locator": c}
+                        break
+            elif field == "DOK" and row.get("dok"):
+                item["fix"] = {"exch_rcvd": row["dok"]}
 
     # ------------------------------------------------------------ Update-API
     @app.get("/api/update/status")

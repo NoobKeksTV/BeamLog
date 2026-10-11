@@ -10,6 +10,13 @@ from datetime import datetime, timedelta, timezone
 from . import geo, prefixes
 
 RST_RE = re.compile(r"^[1-5][1-9][1-9]?$")
+
+
+def norm_rst(value) -> str:
+    """RST mit führenden Nullen („059“, „0599“) still auf die übliche Form bringen; alles andere bleibt wie es ist."""
+    s = str(value if value is not None else "").strip()
+    t = s.lstrip("0")
+    return t if RST_RE.match(t) else s
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 NUM_RE = re.compile(r"^\d+([.,]\d+)?$")
 # Wertungsgruppen, die die IARU-Region-1-/DARC-Auswerter kennen (REG1TEST PSect); frei eingetragene Texte geben nur einen Hinweis
@@ -89,9 +96,9 @@ def check_station(contest: dict, station: dict, qsos: list[dict]) -> dict:
             err(f"Locator „{q['locator']}“ ungültig", q, "Locator", q["locator"], "z. B. JO31AA")
         elif len(q["locator"]) < 6:
             warn(f"Locator „{q['locator']}“ nur 4-stellig – Entfernung ist ungenau", q, "Locator", q["locator"], "6 Stellen")
-        if not RST_RE.match(str(q["rst_sent"])):
+        if not RST_RE.match(norm_rst(q["rst_sent"])):
             err(f"RST gegeben „{q['rst_sent']}“ ungültig", q, "RST geg.", str(q["rst_sent"]), "z. B. 59 / 599")
-        if not RST_RE.match(str(q["rst_rcvd"])):
+        if not RST_RE.match(norm_rst(q["rst_rcvd"])):
             err(f"RST erhalten „{q['rst_rcvd']}“ ungültig", q, "RST erh.", str(q["rst_rcvd"]), "z. B. 59 / 599")
         if not str(q["serial_rcvd"]).strip():
             warn("Empfangene Nummer fehlt", q, "Nr erh.", "–", "Nummer")
