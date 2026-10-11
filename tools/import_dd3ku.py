@@ -3,7 +3,7 @@
 
     python tools/import_dd3ku.py /pfad/zu/Contest            # alles importieren
     python tools/import_dd3ku.py /pfad/zu/Contest --callbook-only
-    python tools/import_dd3ku.py /pfad/zu/Contest --db data/contestlogger.db
+    python tools/import_dd3ku.py /pfad/zu/Contest --db data/beamlog.db
 
 Gelesen werden Datenbank/*.mdb (falls mdbtools installiert) bzw. Datenbank/*.txt,
 DD3KU/*.EXP, Auswertung/**/*.edi und ADIF/*.adi. Jede Log-Datei wird zu einem
@@ -26,7 +26,7 @@ from contestlogger.prefixes import core_call  # noqa: E402
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("folder", type=Path)
-    ap.add_argument("--db", default="data/contestlogger.db")
+    ap.add_argument("--db", default="data/beamlog.db")
     ap.add_argument("--callbook-only", action="store_true", help="nur Rufzeichen/Locator lernen, keine Contests anlegen")
     a = ap.parse_args()
 

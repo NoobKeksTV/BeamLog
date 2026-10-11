@@ -16,7 +16,7 @@ from pathlib import Path
 
 import uvicorn
 
-from contestlogger import __app_name__, __copyright__, __version__
+from contestlogger import __app_name__, __copyright__, __version__, env
 from contestlogger.app import create_app
 
 
@@ -40,8 +40,8 @@ def portable_base() -> Path:
 
 def migrate_from_contestlogger(base: Path) -> None:
     """Umstieg von 0.9.x (hieß „ContestLogger“): liegt der neue BeamLog-Ordner neben dem alten Ordner ContestLogger
-    (oder darin) und hat noch keine eigenen Daten, werden data/ und contestlogger.env einmalig hinüberkopiert."""
-    if (base / "data" / "contestlogger.db").exists():
+    (oder darin) und hat noch keine eigenen Daten, werden data/ und die Einstellungsdatei einmalig hinüberkopiert."""
+    if any((base / "data" / n).exists() for n in ("beamlog.db", "contestlogger.db")):
         return
     for old in (base.parent / "ContestLogger", base.parent):
         if old == base or not (old / "data" / "contestlogger.db").exists():
@@ -49,10 +49,23 @@ def migrate_from_contestlogger(base: Path) -> None:
         if not any((old / n).is_file() for n in ("ContestLogger.exe", "ContestLogger")):
             continue
         shutil.copytree(old / "data", base / "data", dirs_exist_ok=True)
-        if (old / "contestlogger.env").exists() and not (base / "contestlogger.env").exists():
-            shutil.copy2(old / "contestlogger.env", base / "contestlogger.env")
+        if (old / "contestlogger.env").exists() and not (base / "beamlog.env").exists():
+            shutil.copy2(old / "contestlogger.env", base / "beamlog.env")
         print(f"  Daten aus der bisherigen Installation übernommen: {old / 'data'}  (Original bleibt unverändert)")
         return
+
+
+def adopt_legacy_names(base: Path) -> None:
+    """Dateinamen bis 0.9 auf BeamLog umstellen: contestlogger.env -> beamlog.env, data/contestlogger.db -> data/beamlog.db
+    (samt -wal/-shm). Nur wenn es die neue Datei noch nicht gibt; schlägt das Umbenennen fehl, bleibt alles wie es war."""
+    if (base / "contestlogger.env").exists() and not (base / "beamlog.env").exists():
+        os.replace(base / "contestlogger.env", base / "beamlog.env")
+    old, new = base / "data" / "contestlogger.db", base / "data" / "beamlog.db"
+    if old.exists() and not new.exists():
+        for suffix in ("-wal", "-shm", ""):
+            if Path(f"{old}{suffix}").exists():
+                os.replace(f"{old}{suffix}", f"{new}{suffix}")
+        print(f"  Datenbank umbenannt: {old.name} -> {new.name}")
 
 
 CONFIG_KEYS = ("HOST", "PORT", "DB", "BACKUP_MIN", "PUBLIC_URL", "OPEN_BROWSER", "KST_HOST", "KST_PORT", "GITHUB_TOKEN", "MAINTAINER", "DEV")
@@ -68,7 +81,7 @@ def load_env_file(path: Path) -> dict[str, str]:
         if not line or line.startswith("#") or "=" not in line:
             continue
         k, v = line.split("=", 1)
-        k = k.strip().upper().removeprefix("CONTESTLOGGER_")
+        k = k.strip().upper().removeprefix("BEAMLOG_").removeprefix("CONTESTLOGGER_")
         v = v.strip().strip('"').strip("'")
         if k in CONFIG_KEYS:
             out[k] = v
@@ -76,8 +89,11 @@ def load_env_file(path: Path) -> dict[str, str]:
 
 
 def find_config(explicit: str | None) -> Path | None:
-    """Reihenfolge: --config, CONTESTLOGGER_CONFIG, contestlogger.env neben dem Programm, /etc/contestlogger/contestlogger.env."""
-    cands = [explicit, os.environ.get("CONTESTLOGGER_CONFIG"), str(portable_base() / "contestlogger.env"), "/etc/contestlogger/contestlogger.env"]
+    """Reihenfolge: --config, BEAMLOG_CONFIG, beamlog.env neben dem Programm, /etc/beamlog/beamlog.env
+    (dazu die alten Namen contestlogger.env und /etc/contestlogger/contestlogger.env aus 0.9)."""
+    base = portable_base()
+    cands = [explicit, env("CONFIG"), str(base / "beamlog.env"), str(base / "contestlogger.env"),
+             "/etc/beamlog/beamlog.env", "/etc/contestlogger/contestlogger.env"]
     for c in cands:
         if c and Path(c).exists():
             return Path(c)
@@ -88,30 +104,31 @@ def main() -> None:
     pre = argparse.ArgumentParser(add_help=False)
     pre.add_argument("--config")
     pre_a, _ = pre.parse_known_args()
-    if getattr(sys, "frozen", False):
-        try:
+    try:
+        if getattr(sys, "frozen", False):
             migrate_from_contestlogger(portable_base())
-        except OSError as e:
-            print(f"  Übernahme der alten Daten fehlgeschlagen: {e}")
+        adopt_legacy_names(portable_base())
+    except OSError as e:
+        print(f"  Übernahme der alten Daten fehlgeschlagen: {e}")
     cfg_path = find_config(pre_a.config)
     cfg = load_env_file(cfg_path) if cfg_path else {}
-    # Umgebungsvariablen (CONTESTLOGGER_HOST …) überstimmen die Datei, Kommandozeile überstimmt beides
+    # Umgebungsvariablen (BEAMLOG_HOST …, alt: CONTESTLOGGER_HOST …) überstimmen die Datei, Kommandozeile überstimmt beides
     for k in CONFIG_KEYS:
-        if os.environ.get(f"CONTESTLOGGER_{k}"):
-            cfg[k] = os.environ[f"CONTESTLOGGER_{k}"]
+        if env(k):
+            cfg[k] = env(k)
     for k in ("KST_HOST", "KST_PORT", "GITHUB_TOKEN", "MAINTAINER", "DEV"):  # werden von den Modulen direkt aus der Umgebung gelesen
         if cfg.get(k):
-            os.environ[f"CONTESTLOGGER_{k}"] = cfg[k]
-    p = argparse.ArgumentParser(description=f"{__app_name__} {__version__}  –  Einstellungen auch über contestlogger.env (siehe contestlogger.env.example)")
+            os.environ[f"BEAMLOG_{k}"] = cfg[k]
+    p = argparse.ArgumentParser(description=f"{__app_name__} {__version__}  –  Einstellungen auch über beamlog.env (siehe beamlog.env.example)")
     p.add_argument("--config", help="Pfad zur Konfigurationsdatei (KEY=VALUE)")
     p.add_argument("--host", default=cfg.get("HOST") or "0.0.0.0")
     p.add_argument("--port", type=int, default=int(cfg.get("PORT") or 8000))
-    p.add_argument("--db", default=cfg.get("DB") or str(portable_base() / "data" / "contestlogger.db"))
+    p.add_argument("--db", default=cfg.get("DB") or str(portable_base() / "data" / "beamlog.db"))
     p.add_argument("--backup-min", type=float, default=float(cfg.get("BACKUP_MIN") or 15), help="automatische Sicherung alle N Minuten (0 = aus)")
     p.add_argument("--public-url", default=cfg.get("PUBLIC_URL") or "", help="Adresse für den QR-Code, z. B. http://contest.local/ (hinter nginx)")
     a = p.parse_args()
     if cfg.get("OPEN_BROWSER", "").lower() in ("0", "false", "no", "nein"):
-        os.environ["CONTESTLOGGER_NO_BROWSER"] = "1"
+        os.environ["BEAMLOG_NO_BROWSER"] = "1"
     if cfg_path:
         print(f"  Konfiguration: {cfg_path}")
     url = a.public_url or (f"http://{lan_ip()}/" if a.host in ("127.0.0.1", "localhost") else f"http://{lan_ip()}:{a.port}/")
@@ -120,7 +137,7 @@ def main() -> None:
     print(f"  Lokal:    http://localhost:{a.port}")
     print(f"  Im LAN:   {url}")
     print(f"  Daten:    {a.db}  (Backups alle {a.backup_min:g} min in backup/)\n")
-    if getattr(sys, "frozen", False) and os.name == "nt" and os.environ.get("CONTESTLOGGER_NO_BROWSER") != "1":
+    if getattr(sys, "frozen", False) and os.name == "nt" and env("NO_BROWSER") != "1":
         import threading
         import webbrowser
         threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{a.port}")).start()

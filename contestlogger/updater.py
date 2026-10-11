@@ -76,7 +76,7 @@ def check_latest(token: str = "", timeout: float = 15) -> dict[str, Any]:
 
 def download(asset: dict, token: str = "", dest_dir: Path | None = None, progress=None, timeout: float = 60) -> Path:
     """ZIP-Asset laden (über die API-URL, damit es auch bei privatem Repo klappt)."""
-    dest_dir = dest_dir or Path(tempfile.mkdtemp(prefix="contestlogger-update-"))
+    dest_dir = dest_dir or Path(tempfile.mkdtemp(prefix="beamlog-update-"))
     dest = dest_dir / asset["name"]
     req = urllib.request.Request(asset["url"], headers=_headers(token, accept="application/octet-stream"))
     with urllib.request.urlopen(req, timeout=timeout) as r, open(dest, "wb") as fh:
@@ -151,7 +151,7 @@ def apply_update(asset: dict, token: str = "", progress=None) -> dict[str, Any]:
     """Komplettes Update einspielen. Liefert {"restart": "exec"|"batch", "copied": n, ...}."""
     if not is_frozen():
         raise RuntimeError("Quellcode-Installation: bitte mit „git pull“ und „pip install -r requirements.txt“ aktualisieren.")
-    staging = Path(tempfile.mkdtemp(prefix="contestlogger-staging-"))
+    staging = Path(tempfile.mkdtemp(prefix="beamlog-staging-"))
     zip_path = download(asset, token, staging, progress)
     root = extract(zip_path, staging / "x")
     base = base_dir()

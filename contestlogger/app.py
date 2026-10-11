@@ -17,7 +17,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __license__, __source_url__, __version__, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, tiles, updater
+from . import __app_name__, __copyright__, __license__, __source_url__, __version__, env, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, tiles, updater
 from .db import Database, normalize_dok
 
 STATIC = Path(__file__).parent / "static"
@@ -25,8 +25,8 @@ SEED = Path(__file__).parent / "seed" / "stationsdatenbank.csv"
 
 
 def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: float | None = None, public_url: str = "") -> FastAPI:
-    db = Database(db_path or os.environ.get("CONTESTLOGGER_DB", "data/contestlogger.db"))
-    interval = backup_interval_min if backup_interval_min is not None else float(os.environ.get("CONTESTLOGGER_BACKUP_MIN", "15"))
+    db = Database(db_path or env("DB", "data/beamlog.db"))
+    interval = backup_interval_min if backup_interval_min is not None else float(env("BACKUP_MIN", "15"))
 
     async def backup_loop():
         while True:
@@ -174,8 +174,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     REPO_CALLBOOK_URL = "https://api.github.com/repos/NoobKeksTV/BeamLog/contents/contestlogger/seed/stationsdatenbank.csv?ref=main"
 
     def github_token() -> str:
-        """Optionales GitHub-Token nur aus Umgebung/Config (CONTESTLOGGER_GITHUB_TOKEN) – das Repo ist öffentlich, normalerweise leer."""
-        return os.environ.get("CONTESTLOGGER_GITHUB_TOKEN", "")
+        """Optionales GitHub-Token nur aus Umgebung/Config (BEAMLOG_GITHUB_TOKEN) – das Repo ist öffentlich, normalerweise leer."""
+        return env("GITHUB_TOKEN")
     lookup_state = {"client": None}
     lookup_cache: dict[str, float] = {}  # Call -> Zeitpunkt der letzten erfolglosen Abfrage
 
@@ -194,15 +194,15 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             raise HTTPException(403, "Admin-Anmeldung erforderlich")
 
     def is_maintainer() -> bool:
-        """Betreuer-Modus (MAINTAINER=1 in contestlogger.env): Quellen-Importe für die zentrale Stationsdatenbank."""
+        """Betreuer-Modus (MAINTAINER=1 in beamlog.env): Quellen-Importe für die zentrale Stationsdatenbank."""
         on = ("1", "true", "yes", "ja", "on")
-        return os.environ.get("CONTESTLOGGER_MAINTAINER", "").strip().lower() in on or os.environ.get("CONTESTLOGGER_DEV", "").strip().lower() in on
+        return env("MAINTAINER").strip().lower() in on or env("DEV").strip().lower() in on
 
     def require_maintainer(x_admin_token: str | None = Header(default=None)) -> None:
         if not is_admin(x_admin_token):
             raise HTTPException(403, "Admin-Anmeldung erforderlich")
         if not is_maintainer():
-            raise HTTPException(403, "Nur im Betreuer-Modus (MAINTAINER=1 in contestlogger.env). Normale Installationen holen die Liste über „Nach neuen suchen (Repo)“.")
+            raise HTTPException(403, "Nur im Betreuer-Modus (MAINTAINER=1 in beamlog.env). Normale Installationen holen die Liste über „Nach neuen suchen (Repo)“.")
 
     def require_station(sid: int, token: str | None, admin: str | None) -> dict:
         station = db.get_station(sid)
@@ -225,7 +225,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     def audit_txt(limit: int = 5000):
         lines = [f"{r['ts_utc']}  {r['nick'] or '?'}{' [Admin]' if r['admin'] else ''}  {r['action']}  {r['details']}  {'(' + str(r['status']) + ')' if r['status'] >= 400 else ''}".rstrip()
                  for r in reversed(db.list_audit(min(int(limit), 20000)))]
-        return PlainTextResponse("\n".join(lines), headers={"Content-Disposition": "attachment; filename=contestlogger-protokoll.txt"})
+        return PlainTextResponse("\n".join(lines), headers={"Content-Disposition": "attachment; filename=beamlog-protokoll.txt"})
 
     # ------------------------------------------------------------ Allgemein
     @app.get("/api/info")
@@ -234,7 +234,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             "app": __app_name__, "version": __version__, "copyright": __copyright__, "license": __license__, "source_url": __source_url__,
             "admin_configured": db.admin_configured(), "callbook_count": db.callbook_count(),
             "server_time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "public_url": public_url or os.environ.get("CONTESTLOGGER_URL", ""),
+            "public_url": public_url or env("URL"),
             "tile_url": db.get_setting("tile_url", "") or "",
             "tile_cache": db.get_setting("tile_cache", "0") == "1",  # Kacheln über den Server (Offline-Cache) statt direkt vom Kachelserver
             "lookup_provider": db.get_setting("lookup_provider", "none") or "none",

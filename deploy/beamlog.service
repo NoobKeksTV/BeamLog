@@ -1,0 +1,27 @@
+# systemd-Unit für BeamLog
+# Installation: sudo cp deploy/beamlog.service /etc/systemd/system/ && sudo systemctl enable --now beamlog
+[Unit]
+Description=BeamLog – Amateurfunk-Contest-Logger
+After=network.target
+
+[Service]
+Type=simple
+User=beamlog
+Group=beamlog
+WorkingDirectory=/opt/beamlog
+Environment=PYTHONUNBUFFERED=1
+# Alle Einstellungen (Host, Port, Datenbank, Backup-Takt, öffentliche Adresse …) stehen in
+# /etc/beamlog/beamlog.env – nach Änderungen:  sudo systemctl restart beamlog
+ExecStart=/opt/beamlog/.venv/bin/python run.py --config /etc/beamlog/beamlog.env
+Restart=always
+RestartSec=3
+
+# Härtung
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/beamlog
+
+[Install]
+WantedBy=multi-user.target

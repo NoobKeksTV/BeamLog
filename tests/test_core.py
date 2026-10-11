@@ -81,3 +81,16 @@ def test_bad_call(db):
     sid = db.create_station(cid, "DN2LH", "JO31AA", "432MHz", "SSB", "")
     with pytest.raises(ValueError):
         db.add_qso(sid, {"call": "ABC"})
+
+
+def test_backups_old_and_new_names(tmp_path):
+    db = Database(tmp_path / "beamlog.db")
+    b = db.backup_dir; b.mkdir()
+    (b / "contestlogger-20261001-120000-manual.db").write_text("alt")  # Sicherung aus 0.9
+    new = db.create_backup("manual")
+    names = [x["name"] for x in db.list_backups()]
+    assert names[0] == new.name and new.name.startswith("beamlog-") and "contestlogger-20261001-120000-manual.db" in names
+    for i in range(55):  # Aufräumen erfasst alte und neue Namen gemeinsam
+        (b / f"beamlog-20261002-{i:06d}-manual.db").write_text("x")
+    db.prune_backups()
+    assert len(db.list_backups()) == 50 and not (b / "contestlogger-20261001-120000-manual.db").exists()

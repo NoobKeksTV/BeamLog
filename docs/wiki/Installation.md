@@ -1,7 +1,7 @@
 # Installation
 
 BeamLog gibt es als **portable Version** (kein Python nötig) für Windows, Linux und macOS sowie als Quellcode.
-BeamLog hieß bis Version 0.9 „ContestLogger“. **Umstieg von 0.9.x:** Version 1.0 einmal von Hand laden und entpacken – liegt der neue Ordner `BeamLog` neben dem alten Ordner `ContestLogger` (oder darin), übernimmt BeamLog beim ersten Start automatisch eine Kopie von `data/` und `contestlogger.env`. Sonst den Ordner `data/` einfach von Hand hinüberkopieren. Ab 1.0 aktualisiert sich BeamLog wieder selbst.
+BeamLog hieß bis Version 0.9 „ContestLogger“. **Umstieg von 0.9.x:** Version 1.0 einmal von Hand laden und entpacken – liegt der neue Ordner `BeamLog` neben dem alten Ordner `ContestLogger` (oder darin), übernimmt BeamLog beim ersten Start automatisch eine Kopie von `data/` und `contestlogger.env` (die Datenbank heißt danach `beamlog.db`, die Einstellungen `beamlog.env`). Sonst den Ordner `data/` einfach von Hand hinüberkopieren. Ab 1.0 aktualisiert sich BeamLog wieder selbst.
 
 ## Portable Version (empfohlen)
 
@@ -16,7 +16,7 @@ BeamLog hieß bis Version 0.9 „ContestLogger“. **Umstieg von 0.9.x:** Versio
    | `BeamLog-Import(.exe)` | Kommandozeilen-Import eines alten WinContest-Ordners |
    | `start.sh` / `BeamLog-Port8080.bat` | Startskripte |
    | `data/` | Datenbank, Backups, eigene Sprachdateien – **das ist alles, was gesichert werden muss** |
-   | `contestlogger.env.example` | Vorlage für dauerhafte Einstellungen (als `contestlogger.env` daneben ablegen) |
+   | `beamlog.env.example` | Vorlage für dauerhafte Einstellungen (als `beamlog.env` daneben ablegen) |
    | `deploy/` (nur Linux) | Dienst- und nginx-Dateien für einen Debian-Server, siehe [Deploy](Deploy.md) |
    | `START.txt`, `README.md` | Kurzanleitung |
 
@@ -41,9 +41,9 @@ BeamLog --backup-min 5               # Sicherung alle 5 Minuten (0 = aus, Standa
 BeamLog --public-url http://contest.local/   # Adresse für QR-Code und Links
 ```
 
-### Dauerhafte Einstellungen: `contestlogger.env`
+### Dauerhafte Einstellungen: `beamlog.env`
 
-Statt jedes Mal Optionen anzugeben, `contestlogger.env.example` nach `contestlogger.env` kopieren (neben das Programm) und die Werte eintragen:
+Statt jedes Mal Optionen anzugeben, `beamlog.env.example` nach `beamlog.env` kopieren (neben das Programm) und die Werte eintragen:
 
 ```ini
 HOST=0.0.0.0          # 127.0.0.1 = nur lokal
@@ -55,9 +55,9 @@ OPEN_BROWSER=1        # Windows: Browser beim Start öffnen
 #MAINTAINER=1         # nur für den Betreuer der zentralen Stationsdatenbank
 ```
 
-Die Datei wird beim Start gemeldet („Konfiguration: …“). Reihenfolge: Kommandozeile überstimmt Umgebungsvariablen `CONTESTLOGGER_<KEY>` (z. B. `CONTESTLOGGER_PORT=8080`), diese überstimmen die Datei. Ein anderer Ort geht mit `--config /pfad/datei.env` oder `CONTESTLOGGER_CONFIG`. Auf einem Server liegt die Datei unter `/etc/contestlogger/contestlogger.env`, siehe [Deploy](Deploy.md).
+Die Datei wird beim Start gemeldet („Konfiguration: …“). Reihenfolge: Kommandozeile überstimmt Umgebungsvariablen `BEAMLOG_<KEY>` (z. B. `BEAMLOG_PORT=8080`), diese überstimmen die Datei. Ein anderer Ort geht mit `--config /pfad/datei.env` oder `BEAMLOG_CONFIG`. Auf einem Server liegt die Datei unter `/etc/beamlog/beamlog.env`, siehe [Deploy](Deploy.md).
 
-Umzug auf einen anderen Rechner: einfach den ganzen Ordner kopieren. Die Datenbank liegt in `data/contestlogger.db`, Sicherungen in `data/backup/`.
+Umzug auf einen anderen Rechner: einfach den ganzen Ordner kopieren. Die Datenbank liegt in `data/beamlog.db`, Sicherungen in `data/backup/`.
 
 ### Linux: Hinweis zu glibc
 

@@ -12,7 +12,7 @@ Den kompletten Ordner von WinContest auswählen (z. B. `D:\Contest`). Übernomme
 - `Contest.dat` (DD3KUs verschlüsselte Stationsdatenbank) kann nicht gelesen werden; die mitgelieferte Startdatenbank und die DARC-Ergebnislisten ersetzen sie.
 - Das Ergebnis zeigt zuerst die Gesamtzahlen (Dateien, Contests, QSOs, Rufzeichen neu/bekannt), Details je Datei ausklappbar.
 
-Kommandozeile: `BeamLog-Import "D:\Contest" --db data\contestlogger.db`.
+Kommandozeile: `BeamLog-Import "D:\Contest" --db data\beamlog.db`.
 
 ## Einzelne Datei importieren
 
@@ -28,7 +28,7 @@ Hinweise: Beim automatischen Import braucht die Datei den eigenen Locator im Kop
 
 ## Ergebnislisten (DARC / IARU / UKW-Contest-Club)
 
-Nur im Betreuer-Modus sichtbar (`MAINTAINER=1` in `contestlogger.env`), siehe [Stationsdatenbank](Stationsdatenbank.md#zentrale-pflege-wer-importiert-was).
+Nur im Betreuer-Modus sichtbar (`MAINTAINER=1` in `beamlog.env`), siehe [Stationsdatenbank](Stationsdatenbank.md#zentrale-pflege-wer-importiert-was).
 
 Veröffentlichte Ergebnislisten enthalten Rufzeichen und Locator aller Teilnehmer. Datei (HTML, PDF, TXT, CSV), eingefügter Text oder die URL der Ergebnisseite; vor der Übernahme gibt es eine Vorschau.
 

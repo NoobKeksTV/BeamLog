@@ -1,18 +1,18 @@
 # systemd-Unit für die portable Linux-Version von BeamLog (Binary aus dem Release-ZIP)
 # Installation über deploy/install.sh – oder von Hand:
-#   sudo cp deploy/contestlogger.service /etc/systemd/system/ && sudo systemctl enable --now contestlogger
+#   sudo cp deploy/beamlog.service /etc/systemd/system/ && sudo systemctl enable --now beamlog
 [Unit]
 Description=BeamLog – Amateurfunk-Contest-Logger (portable)
 After=network.target
 
 [Service]
 Type=simple
-User=contestlogger
-Group=contestlogger
-WorkingDirectory=/opt/contestlogger
+User=beamlog
+Group=beamlog
+WorkingDirectory=/opt/beamlog
 # Alle Einstellungen (Host, Port, Datenbank, Backup-Takt, öffentliche Adresse …) stehen in
-# /etc/contestlogger/contestlogger.env – nach Änderungen:  sudo systemctl restart contestlogger
-ExecStart=/opt/contestlogger/BeamLog --config /etc/contestlogger/contestlogger.env
+# /etc/beamlog/beamlog.env – nach Änderungen:  sudo systemctl restart beamlog
+ExecStart=/opt/beamlog/BeamLog --config /etc/beamlog/beamlog.env
 Restart=always
 RestartSec=3
 
@@ -21,7 +21,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/contestlogger
+ReadWritePaths=/var/lib/beamlog
 
 [Install]
 WantedBy=multi-user.target

@@ -23,10 +23,10 @@ import time
 from datetime import datetime, timezone
 from typing import Awaitable, Callable
 
-from . import geo, prefixes
+from . import env, geo, prefixes
 
 import os
-HOST, PORT = os.environ.get("CONTESTLOGGER_KST_HOST", "www.on4kst.info"), int(os.environ.get("CONTESTLOGGER_KST_PORT", "23000"))
+HOST, PORT = env("KST_HOST", "www.on4kst.info"), int(env("KST_PORT", "23000"))
 ROOMS = {1: "50/70 MHz", 2: "144/432 MHz", 3: "Microwave", 4: "EME/JT65", 5: "Low Band", 6: "50 MHz IARU R2", 7: "50 MHz IARU R2",
          8: "144/432 MHz IARU R2", 9: "144/432 MHz IARU R3", 10: "kHz", 11: "WARC", 12: "28 MHz", 13: "40 MHz"}
 
@@ -217,7 +217,7 @@ class KstClient:
 
     _in_roster = False
     _roster_buf: dict[str, dict]
-    ROSTER_INTERVAL = int(os.environ.get("CONTESTLOGGER_KST_ROSTER_SEC", "600"))  # Nutzerliste alle 10 min -> Stationsdatenbank wächst automatisch
+    ROSTER_INTERVAL = int(env("KST_ROSTER_SEC", "600"))  # Nutzerliste alle 10 min -> Stationsdatenbank wächst automatisch
 
     async def _roster_loop(self) -> None:
         while not self._stop:

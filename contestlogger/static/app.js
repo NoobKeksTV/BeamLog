@@ -22,7 +22,7 @@
   };
   const POPUP = new URLSearchParams(location.search).get("popup") === "chat";
   if (POPUP) document.body.classList.add("popup");
-  const BC = ("BroadcastChannel" in window) ? new BroadcastChannel("contestlogger") : null;
+  const BC = ("BroadcastChannel" in window) ? new BroadcastChannel("beamlog") : null;
   // ------------------------------------------------------------ Sprache
   // Schlüssel = deutscher Originaltext; Übersetzungen kommen aus /static/lang/<code>.json bzw. data/lang/<code>.json.
   let LANG = {};

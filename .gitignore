@@ -8,4 +8,5 @@ venv/
 build/
 dist/
 *.spec
-contestlogger.env
+/beamlog.env
+/contestlogger.env

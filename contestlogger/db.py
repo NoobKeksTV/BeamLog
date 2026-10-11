@@ -1,4 +1,4 @@
-"""SQLite-Datenhaltung. Eine Datei (`data/contestlogger.db`) enthält alles:
+"""SQLite-Datenhaltung. Eine Datei (`data/beamlog.db`, bis 0.9 `contestlogger.db`) enthält alles:
 Contests, Stationen, QSOs, Call-Buch, Chat und Einstellungen.
 """
 from __future__ import annotations
@@ -256,7 +256,7 @@ class Database:
 
     def create_backup(self, reason: str = "auto") -> Path:
         self.backup_dir.mkdir(parents=True, exist_ok=True)
-        name = f"contestlogger-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{reason}.db"
+        name = f"beamlog-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{reason}.db"
         self.backup_to(self.backup_dir / name)
         self.prune_backups()
         self.add_audit("Backup erstellt", details=f"{name} ({reason})", nick="Server")
@@ -283,11 +283,16 @@ class Database:
         with self.conn:
             self.conn.execute("DELETE FROM audit WHERE id < (SELECT COALESCE(MAX(id),0) FROM audit) - ?", (keep,))
 
+    def _backup_files(self, pattern: str) -> list[Path]:
+        """Sicherungen, neueste zuerst – beamlog-… und die alten contestlogger-… (bis 0.9) gemeinsam, nach Zeitstempel sortiert."""
+        files = [f for pre in ("beamlog-", "contestlogger-") for f in self.backup_dir.glob(pre + pattern)]
+        return sorted(files, key=lambda f: f.name.split("-", 1)[1], reverse=True)
+
     def list_backups(self) -> list[dict]:
         if not self.backup_dir.exists():
             return []
         out = []
-        for f in sorted(self.backup_dir.glob("contestlogger-*.db"), reverse=True):
+        for f in self._backup_files("*.db"):
             st = f.stat()
             out.append({"name": f.name, "size": st.st_size,
                         "ts_utc": datetime.fromtimestamp(st.st_mtime, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")})
@@ -295,10 +300,11 @@ class Database:
 
     def prune_backups(self, keep_auto: int = 48, keep_manual: int = 50) -> None:
         """Automatische Sicherungen: die letzten 48 behalten (bei 15 min = 12 h) plus eine pro Tag für 30 Tage."""
-        files = sorted(self.backup_dir.glob("contestlogger-*-auto.db"), reverse=True)
+        files = self._backup_files("*-auto.db")
         daily_seen: set[str] = set()
         for i, f in enumerate(files):
-            day = f.name[14:22]
+            m = re.search(r"-(\d{8})-\d{6}-", f.name)
+            day = m.group(1) if m else f.name
             if i < keep_auto:
                 daily_seen.add(day)
                 continue
@@ -306,7 +312,7 @@ class Database:
                 daily_seen.add(day)
                 continue
             f.unlink(missing_ok=True)
-        manual = sorted(self.backup_dir.glob("contestlogger-*-manual.db"), reverse=True)
+        manual = self._backup_files("*-manual.db")
         for f in manual[keep_manual:]:
             f.unlink(missing_ok=True)
 
