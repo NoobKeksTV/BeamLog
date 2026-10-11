@@ -47,9 +47,10 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             return 0
         res = importers.parse_callbook_csv(SEED.read_text(encoding="utf-8"))
         import re as _re
-        for call, loc, name in res.callbook:
-            when = f"{name}T00:00:00Z" if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) else ""
-            db.learn_call(call, loc, source="seed", name="" if when else name, when=when, dok=res.doks.get(call, ""))
+        with db.bulk():
+            for call, loc, name in res.callbook:
+                when = f"{name}T00:00:00Z" if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) else ""
+                db.learn_call(call, loc, source="seed", name="" if when else name, when=when, dok=res.doks.get(call, ""))
         db.set_setting("seeded", "1")
         return len(res.callbook)
 
@@ -1230,16 +1231,17 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         res = importers.parse_callbook_csv(text)
         new = known = changed = 0
         import re as _re
-        for call, loc, name in res.callbook:
-            when = f"{name}T00:00:00Z" if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) else ""
-            before = db.lookup_call(call)
-            r = db.learn_call(call, loc, source="repo", name="" if when else name, when=when, dok=res.doks.get(call, ""))
-            if r == "new":
-                new += 1
-            elif r == "known":
-                known += 1
-                if before and loc and before.get("locator") != loc:
-                    changed += 1
+        with db.bulk():
+            for call, loc, name in res.callbook:
+                when = f"{name}T00:00:00Z" if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) else ""
+                before = db.lookup_call(call)
+                r = db.learn_call(call, loc, source="repo", name="" if when else name, when=when, dok=res.doks.get(call, ""))
+                if r == "new":
+                    new += 1
+                elif r == "known":
+                    known += 1
+                    if before and loc and before.get("locator") != loc:
+                        changed += 1
         db.add_audit("Stationsdatenbank aus dem Repo abgeglichen", details=f"{len(res.callbook)} Einträge, {new} neu, {changed} Locator geändert", nick="Admin", admin=True)
         return {"total": len(res.callbook), "new": new, "known": known, "changed": changed, "callbook_count": db.callbook_count(), "url": url}
 

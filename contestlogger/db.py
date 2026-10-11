@@ -4,6 +4,7 @@ Contests, Stationen, QSOs, Call-Buch, Chat und Einstellungen.
 from __future__ import annotations
 
 import hashlib
+from contextlib import contextmanager
 import hmac
 import json
 import os
@@ -878,6 +879,17 @@ class Database:
                     r["km"] = geo.distance_km_int(station["locator"], r["locator"])
                     r["bearing"] = int(round(geo.bearing_deg(station["locator"], r["locator"]))) % 360
         return rows
+
+    @contextmanager
+    def bulk(self):
+        """Viele Einzel-Schreibvorgänge (z. B. 6000 Einträge der Startdatenbank) ohne Plattensync je Eintrag –
+        mit synchronous=FULL dauerte das unter Windows Minuten. Danach wieder voll abgesichert."""
+        self.conn.execute("PRAGMA synchronous = OFF")
+        try:
+            yield
+        finally:
+            self.conn.execute("PRAGMA synchronous = FULL")
+            self.conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
 
     def lookup_call(self, call: str) -> dict | None:
         core = prefixes.core_call(call)
