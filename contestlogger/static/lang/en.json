@@ -629,5 +629,15 @@
  "im Korridor": "in corridor",
  "kreuzt bald": "crossing soon",
  "sichtbar, neben dem Pfad": "visible, beside the path",
- "zu tief": "too low"
+ "zu tief": "too low",
+ "{n} Listen importieren": "Import {n} lists",
+ "Listen": "lists",
+ "schon importiert": "already imported",
+ "Suche Listen: {s} ({i}/{n}) …": "Searching lists: {s} ({i}/{n}) …",
+ "{n} Listen gefunden, {d} davon schon importiert": "{n} lists found, {d} already imported",
+ "{n} Listen laden? Das dauert etwa {m} Minuten und läuft im Hintergrund weiter.": "Load {n} lists? This takes about {m} minutes and continues in the background.",
+ "Fertig": "Done",
+ "{a} neu, {b} aktualisiert, {c} DOK ergänzt": "{a} new, {b} updated, {c} DOKs added",
+ "ohne Locator übersprungen": "skipped without locator",
+ "Ergebnislisten importiert": "Result lists imported"
 }

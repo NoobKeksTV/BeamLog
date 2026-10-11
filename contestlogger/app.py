@@ -17,8 +17,8 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __license__, __source_url__, __version__, env, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, tiles, updater
-from .db import Database, normalize_dok
+from . import __app_name__, __copyright__, __license__, __source_url__, __version__, env, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, results_archive, tiles, updater
+from .db import Database, normalize_dok, utcnow as utcnow_iso
 
 STATIC = Path(__file__).parent / "static"
 SEED = Path(__file__).parent / "seed" / "stationsdatenbank.csv"
@@ -991,6 +991,120 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             total += len(res.callbook)
             report.append({"url": url, "calls": len(res.callbook)})
         return {"total": total, "callbook_count": db.callbook_count(), "files": report}
+
+    # ------------------------------------------------------------ Ergebnislisten-Archiv (DARC, IARU …) – Betreuer
+    archive = {"entries": {}, "job": None}  # id -> Entry; laufender Import
+
+    def archive_fetch(url: str) -> bytes:
+        """Eine Seite laden – bei kurzen Verbindungsabbrüchen bis zu zweimal neu versuchen."""
+        import urllib.error
+        import urllib.request
+        req = urllib.request.Request(url, headers={"User-Agent": f"Mozilla/5.0 (compatible; BeamLog/{__version__}; +{__source_url__})"})
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=60) as r:  # noqa: S310
+                    return r.read()
+            except urllib.error.HTTPError:
+                raise  # 404 & Co.: Wiederholen hilft nicht
+            except OSError:
+                if attempt == 2:
+                    raise
+                time.sleep(2 + 3 * attempt)
+        return b""
+
+    def archive_done() -> dict:
+        try:
+            return json.loads(db.get_setting("results_done", "") or "{}")
+        except ValueError:
+            return {}
+
+    @app.get("/api/results/sources", dependencies=[Depends(require_maintainer)])
+    def results_sources():
+        return {"sources": [{"key": k, **v} for k, v in results_archive.SOURCES.items()], "done": archive_done()}
+
+    @app.post("/api/results/list", dependencies=[Depends(require_maintainer)])
+    async def results_list(body: dict):
+        """Alle verfügbaren Listen einer Quelle aufzählen (lädt nur die Übersichtsseiten)."""
+        source = body.get("source", "")
+        try:
+            entries = await asyncio.to_thread(results_archive.list_entries, archive_fetch, source, datetime.now(timezone.utc).year)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, f"Quelle nicht erreichbar: {e}")
+        archive["entries"].update({e.id: e for e in entries})
+        done = archive_done()
+        return {"source": source, "entries": [{**e.as_dict(), "done": done.get(e.id)} for e in entries]}
+
+    @app.post("/api/results/import", dependencies=[Depends(require_maintainer)])
+    async def results_import(body: dict):
+        """Ausgewählte Listen im Hintergrund laden und übernehmen. without_locator: Stationen ohne Locator (KW) neu aufnehmen –
+        sonst ergänzen KW-Listen nur den DOK bereits bekannter Stationen."""
+        if archive["job"] and archive["job"]["running"]:
+            raise HTTPException(409, "Es läuft bereits ein Import")
+        ids = [i for i in body.get("ids") or [] if i in archive["entries"]]
+        if not ids:
+            raise HTTPException(400, "Keine Listen ausgewählt (vorher „Listen laden“)")
+        job = {"running": True, "cancel": False, "total": len(ids), "done": 0, "current": "", "new": 0, "known": 0, "dok": 0, "skipped": 0,
+               "rows": 0, "errors": [], "started": utcnow_iso(), "finished": ""}
+        archive["job"] = job
+        add_bare = bool(body.get("without_locator"))
+
+        async def run():
+            done = archive_done()
+            try:
+                for i in ids:
+                    if job["cancel"]:
+                        break
+                    e = archive["entries"][i]
+                    job["current"] = e.label
+                    try:
+                        parsed = await asyncio.to_thread(results_archive.parse_entry, archive_fetch, e)
+                    except Exception as ex:  # noqa: BLE001
+                        job["errors"].append({"id": i, "label": e.label, "error": str(ex)[:200]})
+                        job["done"] += 1
+                        continue
+                    when = f"{e.when}T00:00:00Z" if e.when else ""
+                    n = 0
+                    with db.bulk():
+                        for call, loc, dok in parsed.rows:
+                            if not loc and not add_bare and not db.lookup_call(call):
+                                job["skipped"] += 1
+                                continue
+                            before = db.row("SELECT dok FROM callbook WHERE call=?", (prefixes.core_call(call),))
+                            r = db.learn_call(call, loc, source=e.source, when=when, dok=dok)
+                            if r == "new":
+                                job["new"] += 1
+                            elif r == "known":
+                                job["known"] += 1
+                                if dok and before is not None and not before.get("dok"):
+                                    job["dok"] += 1
+                            n += 1
+                    job["rows"] += len(parsed.rows)
+                    done[i] = {"at": utcnow_iso()[:10], "n": n}
+                    db.set_setting("results_done", json.dumps(done))
+                    job["done"] += 1
+                    await asyncio.sleep(0.3)  # Server der Veranstalter schonen
+            finally:
+                job["running"] = False
+                job["current"] = ""
+                job["finished"] = utcnow_iso()
+                db.add_audit("Ergebnislisten importiert", details=f"{job['done']}/{job['total']} Listen, {job['new']} neu, {job['known']} bekannt, "
+                             f"{job['dok']} DOK ergänzt, {len(job['errors'])} Fehler", nick="Admin", admin=True)
+
+        archive["task"] = asyncio.create_task(run())
+        return {k: v for k, v in job.items() if k != "cancel"}
+
+    @app.get("/api/results/job", dependencies=[Depends(require_maintainer)])
+    def results_job():
+        job = archive["job"]
+        return ({k: v for k, v in job.items() if k != "cancel"} | {"callbook_count": db.callbook_count()}) if job else {"running": False}
+
+    @app.post("/api/results/job/cancel", dependencies=[Depends(require_maintainer)])
+    def results_cancel():
+        if archive["job"]:
+            archive["job"]["cancel"] = True
+        return {"ok": True}
 
     @app.get("/api/callbook/export.csv")
     def callbook_export():

@@ -32,11 +32,28 @@ Nur im Betreuer-Modus sichtbar (`MAINTAINER=1` in `beamlog.env`), siehe [Station
 
 Veröffentlichte Ergebnislisten enthalten Rufzeichen und Locator aller Teilnehmer. Datei (HTML, PDF, TXT, CSV), eingefügter Text oder die URL der Ergebnisseite; vor der Übernahme gibt es eine Vorschau.
 
-## DARC-Contest-Hub direkt laden
+## Ergebnislisten-Archiv: alle Conteste, alle Jahre
 
-Nur im Betreuer-Modus sichtbar.
+*Nur im Betreuer-Modus (Verwaltung → Stationsdatenbank & Import).* „Verfügbare Listen suchen“ fragt alle Quellen ab und zeigt
+jede veröffentlichte Ergebnisliste zum Anhaken – einzeln, je Contest/Jahrgang oder je Quelle:
 
-Lädt die offiziellen `result.csv`-Dateien vom DARC-Contest-Hub (`dxhf2.darc.de`) für ein Jahr oder alle Jahre seit 2017 – pro Contest 500–900 Rufzeichen mit Locator, dazu die ODX-Gegenstationen. Braucht Internet auf dem Server.
+| Quelle | Zeitraum | Inhalt |
+|---|---|---|
+| DARC UKW-Conteste, Contest-Hub `dxhf2.darc.de` | ab 2017 | Rufzeichen, Locator, DOK, ODX-Station (`result.csv`) |
+| DARC UKW-Conteste, Archiv auf darc.de | 2008–2016 | Rufzeichen, DOK, Locator, ODX-Station (Textlisten) |
+| DARC-KW-Conteste (WAG, WAE CW/SSB/RTTY, 10 m, Fieldday CW/SSB, Oster-, Weihnachts-, Ausbildungs-, FT4-, RTTY-/Hell-Kurzcontest) | ab 2014 | nur Rufzeichen und DOK – Kurzwelle tauscht keinen Locator aus |
+| IARU-Region-1-UKW-Conteste (September, Oktober UHF, Marconi, Subregionals, Mikrowelle) und OK-Conteste, Archiv OK2KKW | ab 1985 | Rufzeichen und Locator |
+
+Zusammen rund 700 Listen. Der Import läuft im Hintergrund (Fortschrittsbalken, abbrechbar, läuft auch nach dem Neuladen der
+Seite weiter) und schont die Server der Veranstalter mit einer kurzen Pause je Liste; alles auf einmal dauert etwa 20–30 Minuten.
+Bereits importierte Listen sind markiert und werden mit „nur noch nicht importierte“ übersprungen.
+
+- Neuere Angaben gewinnen (das Datum der Liste zählt); ein älterer Locator bleibt als Alternative erhalten.
+- KW-Listen ergänzen standardmäßig nur den **DOK** bereits bekannter Stationen. Mit „Stationen ohne Locator neu aufnehmen“
+  kommen auch alle übrigen KW-Teilnehmer dazu (nur Rufzeichen und DOK – ohne Entfernung/Richtung).
+- Der **IARU-Contest-Robot** (`iaru.oevsv.at`, Ergebnisse ab 2019) untersagt automatische Abrufe (robots.txt). Seine CSV-Dateien
+  („CSV“ auf der Ergebnisseite eines Contests) lassen sich im Browser herunterladen und über „Ergebnisliste importieren“
+  einlesen; das gilt auch für die dort angebotene Gesamtliste `vhf.csv` (Rufzeichen;Locator).
 
 ## Export / Abgabe
 

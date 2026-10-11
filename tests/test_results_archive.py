@@ -1,0 +1,93 @@
+"""Ergebnislisten-Archiv: Auswertung der Formate (DARC UKW/KW, Archiv-Textlisten, OK2KKW) und Import-Ablauf ohne Netz."""
+import time
+import urllib.request
+
+from fastapi.testclient import TestClient
+
+from contestlogger import results_archive as ra
+from contestlogger.app import create_app
+
+KW_PAGE = """<select name="year"  onchange="submit()"><option selected="selected" value="2025">2025<option value="2024">2024</select>
+<h3>Single operator, CW, low power</h3><table><thead><tr><th>Platz</th> <th>Rufzeichen</th> <th>DOK</th> <th>QSOs</th></tr></thead>
+<tbody><tr><td>1&nbsp;</td> <td>DA9AAA</td> <td>F15</td> <td>1 272</td></tr></tbody>
+<tbody><tr><td>2&nbsp;</td> <td>DA9BBB</td> <td>U08</td> <td>1 391</td></tr></tbody>
+<tbody><tr><td>3&nbsp;</td> <td>OK9ZZZ</td> <td>-</td> <td>900</td></tr></tbody></table>"""
+KW_EDITIONS = KW_PAGE.replace("</select>", """</select><select name="edition"  onchange="submit()"><option selected="selected" value="feb">feb<option value="mai">mai</select>""")
+KW_MAI = """<table><tr><th>Platz</th><th>Rufzeichen</th><th>DOK</th></tr><tr><td>1</td><td>DK2OY</td><td>M15</td></tr></table>"""
+UKW_ALT = """Wertungsgruppe 01: 145 MHz, Einmann
+  Pl. Call         DOK     Loc.   QSOs  Points  ODX          Loc.-ODX  ODX-Pt.  Power
+   1. DL6IAK       A36     JN48IX  597  194493  G3CKR/P      IO93AD     877       750
+   2. DK0BN        40BN    JN39VV  815  277269  HA6W         KN08FB     884       600
+"""
+OK2_1990 = """  poo.  call     body     qso   loc      DX-km    m.ASL   TX-W  ANT
+  1. OK1TDH/P   66794    267   JN98GU     724      901   200   4X 13el Y
+  11. OK1AR      22003      25. OK2WDC     11154      39. OK1DAM      5515"""
+
+
+def test_parse_kw_tables():
+    rows = ra.parse_html_tables(KW_PAGE)
+    assert rows == [("DA9AAA", "", "F15"), ("DA9BBB", "", "U08"), ("OK9ZZZ", "", "")]
+
+
+def test_parse_text_pairs_with_odx_and_special_dok():
+    rows = ra.parse_text_pairs(UKW_ALT)
+    assert ("DL6IAK", "JN48IX", "A36") in rows and ("G3CKR/P", "IO93AD", "") in rows
+    assert ("DK0BN", "JN39VV", "40BN") in rows and not any(r[0] == "40BN" for r in rows)  # Sonder-DOK ist kein Rufzeichen
+    assert ra.parse_text_pairs(OK2_1990) == [("OK1TDH/P", "JN98GU", "")]  # Locator erst nach Punkten/QSOs; Zeilen ohne Locator zählen nicht
+
+
+def test_kw_editions_and_listing():
+    pages = {ra.kw_url("ft4log", 2025): KW_EDITIONS, ra.kw_url("ft4log", 2025, "mai"): KW_MAI,
+             f"{ra.HUB}/~ft4log/arch_res.cgi?form=referat&lang=de": KW_PAGE}
+    fetch = lambda u: pages[u].encode()  # noqa: E731
+    entries = ra.list_darc_kw(fetch, ["ft4log"])
+    assert [e.id for e in entries] == ["darc-kw:ft4log:2025", "darc-kw:ft4log:2024"]
+    parsed = ra.parse_entry(fetch, entries[0])
+    assert parsed.pages == 2 and ("DK2OY", "", "M15") in parsed.rows
+
+
+def test_ok2kkw_listing_years():
+    idx = """<a href="contests/90/1subr1990.htm">1. subregional</a> <a href="https://www.ok2kkw.com/00003016/vhf024/vhf_c-test_eu_fin.htm">IARU EU</a>
+    <a href="contests/05/vhf05_iaru.htm">IARU 2005</a> <a href="winn.htm">Hall of fame</a> <a href="http://example.com/x.htm">fremd</a>"""
+    entries = ra.list_ok2kkw(lambda u: idx.encode("cp1250"))
+    assert sorted(e.year for e in entries) == [1990, 2005, 2024]
+    assert all(e.url.startswith(ra.OK2KKW) for e in entries)
+
+
+def test_archive_import_job(tmp_path, monkeypatch):
+    monkeypatch.setenv("BEAMLOG_MAINTAINER", "1")
+    pages = {f"{ra.HUB}/~waglog/arch_res.cgi?form=referat&lang=de": KW_PAGE, ra.kw_url("waglog", 2025): KW_PAGE, ra.kw_url("waglog", 2024): KW_PAGE}
+
+    class Resp:
+        def __init__(self, data): self.data = data
+        def read(self): return self.data
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: Resp(pages[req.full_url].encode()))
+    monkeypatch.setattr(ra, "DARC_KW", {"waglog": "WAG"})
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        H = {"X-Admin-Token": c.post("/api/setup", json={"password": "admin1"}).json()["token"]}
+        c.post("/api/callbook", json={"call": "DA9BBB", "locator": "JN58SE"}, headers=H)  # bekannt, ohne DOK
+        lst = c.post("/api/results/list", json={"source": "darc-kw"}, headers=H).json()
+        assert [e["id"] for e in lst["entries"]] == ["darc-kw:waglog:2025", "darc-kw:waglog:2024"]
+        r = c.post("/api/results/import", json={"ids": ["darc-kw:waglog:2025"]}, headers=H)
+        assert r.status_code == 200
+        for _ in range(50):
+            j = c.get("/api/results/job", headers=H).json()
+            if not j["running"]:
+                break
+            time.sleep(0.1)
+        assert j["done"] == 1 and j["dok"] == 1 and j["new"] == 0 and j["skipped"] == 2  # nur DOK bei der bekannten Station ergänzt
+        assert c.get("/api/callbook?q=DA9BBB", headers=H).json()["rows"][0]["dok"] == "U08"
+        assert not any(r["call"] == "DA9AAA" for r in c.get("/api/callbook?q=DA9AAA", headers=H).json()["rows"])
+        assert c.get("/api/results/sources", headers=H).json()["done"]["darc-kw:waglog:2025"]["n"] == 1
+        # mit „ohne Locator aufnehmen“ kommen die übrigen Stationen dazu
+        c.post("/api/results/import", json={"ids": ["darc-kw:waglog:2024"], "without_locator": True}, headers=H)
+        for _ in range(50):
+            j = c.get("/api/results/job", headers=H).json()
+            if not j["running"]:
+                break
+            time.sleep(0.1)
+        assert j["new"] == 2

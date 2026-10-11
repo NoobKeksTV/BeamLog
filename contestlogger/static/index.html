@@ -268,17 +268,27 @@
           <div class="row hidden" id="res-actions"><button type="button" id="btn-res-commit" class="primary">Ausgewählte übernehmen</button><label class="row small"><input type="checkbox" id="res-only-new" checked> nur neue / geänderte</label></div>
         </form>
       </div>
-      <div class="card maint-only">
-        <h3>DARC-Contest-Hub: Ergebnisse direkt laden <span class="tag">Betreuer</span></h3>
-        <p class="muted small">Lädt die offiziellen Ergebnislisten (result.csv) vom DARC-Contest-Hub <code>dxhf2.darc.de</code> – alle Teilnehmer mit Locator, dazu die ODX-Gegenstationen. Pro Contest 500–900 Rufzeichen. Braucht Internet auf dem Server.</p>
+      <div class="card maint-only wide-card" id="archive-card">
+        <h3>Ergebnislisten-Archiv: alle Conteste, alle Jahre <span class="tag">Betreuer</span></h3>
+        <p class="muted small">Lädt die veröffentlichten Ergebnislisten direkt von den Veranstaltern und übernimmt Rufzeichen, Locator und DOK in die Stationsdatenbank:
+          <b>DARC UKW</b> (Contest-Hub ab 2017, Archiv 2008–2016), <b>DARC KW</b> (WAG, WAE, 10 m, Fieldday, Oster-, Weihnachts-, Ausbildungs-, FT4-, RTTY-, Hell-Contest ab 2014 – nur Rufzeichen und DOK)
+          und die <b>IARU-Region-1-UKW-Conteste</b> (Archiv OK2KKW ab 1985). Neuere Angaben gewinnen; ältere Locatoren bleiben als Alternative erhalten.
+          Den IARU-Contest-Robot (iaru.oevsv.at) bitte nicht automatisch abrufen – dessen CSV-Dateien von Hand laden und oben über „Ergebnisliste importieren“ einlesen.</p>
         <div class="row">
-          <select id="darc-year"></select>
-          <button type="button" id="btn-darc-list" class="ghost">Liste laden</button>
-          <button type="button" id="btn-darc-all" class="primary">Alle Jahre importieren (2017–heute)</button>
-          <span id="darc-summary" class="muted small"></span>
+          <button type="button" id="btn-arch-scan" class="ghost">Verfügbare Listen suchen</button>
+          <span id="arch-summary" class="muted small"></span>
         </div>
-        <div class="table-wrap hidden" id="darc-wrap" style="max-height:220px"><table id="darc-table" class="compact"><tbody></tbody></table></div>
-        <div class="row hidden" id="darc-actions"><button type="button" id="btn-darc-import" class="primary">Ausgewählte importieren</button></div>
+        <div id="arch-tree" class="arch-tree hidden"></div>
+        <div class="row hidden" id="arch-actions">
+          <label class="row small"><input type="checkbox" id="arch-only-new" checked> nur noch nicht importierte</label>
+          <label class="row small" title="KW-Listen haben keinen Locator. Aus: nur den DOK bereits bekannter Stationen ergänzen."><input type="checkbox" id="arch-bare"> Stationen ohne Locator neu aufnehmen (KW)</label>
+          <span class="grow"></span>
+          <button type="button" id="btn-arch-import" class="primary">Ausgewählte importieren</button>
+        </div>
+        <div id="arch-job" class="hidden">
+          <div class="progress"><div id="arch-bar"></div></div>
+          <div class="row"><span id="arch-status" class="small grow"></span><button type="button" id="btn-arch-cancel" class="ghost small">Abbrechen</button></div>
+        </div>
       </div>
       </div>
       <div class="admin-grid admin-sec hidden" data-asec="server">
