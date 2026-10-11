@@ -3,7 +3,7 @@
 Das GitHub-Wiki liest nichts aus dem Hauptrepo – egal wie der Ordner heißt. Quelle bleibt docs/wiki/ (versioniert,
 im Repo und in den Release-Paketen lesbar); dieses Skript macht daraus die Wiki-Seiten:
 - Seiten-Links „Installation.md#abschnitt“ → „Installation#abschnitt“ (Wiki-Seiten haben keine Endung)
-- Bilder (img/) werden mitkopiert, entfernte Seiten/Bilder im Wiki gelöscht
+- Bilder (img/) werden mitkopiert und als feste Adresse eingebunden, entfernte Seiten/Bilder im Wiki gelöscht
 - _Sidebar.md (Inhaltsverzeichnis aus der Tabelle in Home.md) und _Footer.md werden erzeugt
 
 Aufruf: python build_tools/wiki_sync.py docs/wiki <ausgecheckter-wiki-ordner>
@@ -16,19 +16,23 @@ import sys
 from pathlib import Path
 
 REPO = "https://github.com/NoobKeksTV/BeamLog"
+RAW = "https://raw.githubusercontent.com/wiki/NoobKeksTV/BeamLog"  # Dateien im Wiki-Repo (Bilder)
 LINK = re.compile(r"\]\((?!https?:|mailto:|#)([^)#\s]+)\.md(#[^)\s]*)?\)")
 
 
 def convert(text: str) -> str:
-    """Relative Links auf andere Wiki-Seiten ohne .md (GitHub-Wiki-Schreibweise)."""
-    return LINK.sub(lambda m: f"]({m.group(1)}{m.group(2) or ''})", text)
+    """Relative Links auf andere Wiki-Seiten ohne .md (GitHub-Wiki-Schreibweise); Bilder (img/…) als feste Adresse auf
+    die Datei im Wiki-Repo – relative Pfade in HTML-<img> zeigt das Wiki sonst nicht an."""
+    text = LINK.sub(lambda m: f"]({m.group(1)}{m.group(2) or ''})", text)
+    return re.sub(r'(\]\(|src=")(?:\./)?img/', lambda m: f"{m.group(1)}{RAW}/img/", text)
 
 
 def sidebar(home: str) -> str:
     """Inhaltsverzeichnis aus den Seiten-Links der Tabelle in Home.md (Reihenfolge bleibt)."""
     pages = re.findall(r"^\|\s*\[([^\]]+)\]\(([^)#\s]+)\.md\)", home, re.M)
     lines = ["**[BeamLog-Wiki](Home)**", ""] + [f"- [{title}]({page})" for title, page in pages]
-    lines += ["", f"[⬇ Download]({REPO}/releases/latest) · [Quellcode]({REPO})"]
+    lines += ["", f"[⬇ Download]({REPO}/releases/latest) · [Quellcode]({REPO})",
+              "", "[▶ Video (YouTube)](https://youtu.be/yvYb6FNvjzA) · [🧪 Live-Demo](https://beamlogdemo.lhprinting.de/)"]
     return "\n".join(lines) + "\n"
 
 
