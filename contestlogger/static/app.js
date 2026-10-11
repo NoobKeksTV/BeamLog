@@ -177,6 +177,7 @@
     // Fußzeile mit Lizenz und Link zum Quellcode (GNU AGPLv3, Abschnitt 13: Quellcode für Nutzer über das Netz)
     $("#footer-text").replaceChildren(`${S.info.app} ${S.info.version} · ${S.info.copyright} · ${S.info.license} · `,
       el("a", { href: S.info.source_url, target: "_blank", rel: "noopener" }, t("Quellcode")));
+    if (S.info.demo) setupDemo();
     if (!S.info.admin_configured) await askSetup();
     if (!S.nick) await askNick();
     $("#nick-badge").textContent = S.nick;
@@ -187,6 +188,29 @@
     $("#f-call").focus();
     checkUpdateBadge(); whatsNew();
   }
+  // ------------------------------------------------------------ Demo-Instanz (BEAMLOG_DEMO=1)
+  function setupDemo() {
+    const d = S.info.demo;
+    const left = () => {
+      const min = Math.max(0, Math.round((Date.parse(d.next_reset_utc) - Date.now()) / 60000));
+      return min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
+    };
+    const when = el("span");
+    const upd = () => { when.textContent = t("noch {t}", { t: left() }); };
+    upd(); setInterval(upd, 60000);
+    const bar = el("div", { id: "demo-banner", class: "demo-banner" },
+      el("b", {}, "🧪 " + t("Demo-Instanz")), " · ",
+      t("Admin- und Stations-Passwort:"), " ", el("code", {}, d.admin_password), " · ",
+      t("alles wird täglich um {at} Uhr zurückgesetzt", { at: d.reset_at }), " (", when, ") · ",
+      t("bitte keine echten Zugangsdaten eintragen"), " · ",
+      el("a", { href: S.info.source_url + "/releases/latest", target: "_blank", rel: "noopener" }, t("BeamLog herunterladen")));
+    $("header.topbar").after(bar);
+    $("#admin-pw").value = d.admin_password;
+    $("#admin-login-text").textContent = t("Demo: Das Admin-Passwort ist „{pw}“ – einfach auf Anmelden klicken.", { pw: d.admin_password });
+    $("#admin-pw-form")?.closest(".card")?.querySelector("form")?.classList.add("hidden");
+    $("#backup-info")?.closest(".card")?.classList.add("hidden");  // Demo: keine Backups
+  }
+
   // ------------------------------------------------------------ Updates / Was ist neu
   async function checkUpdateBadge() {
     try { const u = await GET("/api/update/status"); S.update = u; const b = $("#update-badge"); b.classList.toggle("hidden", !u.available); if (u.available) b.textContent = `⬆ v${u.latest}`; } catch (_) { /* */ }
@@ -415,6 +439,7 @@
     if (!st.has_password) return autoUnlock(st);
     const box = modal(fromTpl("tpl-unlock"));
     box.querySelector(".st-name").textContent = `${st.call} (${st.band})`;
+    if (S.info.demo) box.querySelector("#unlock-pw").value = S.info.demo.station_password;
     box.querySelector("#unlock-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       try {
@@ -1191,6 +1216,12 @@
       else if (m.type === "presence") renderPresence(m.users);
       else if (m.type === "opnote") { if (m.station_id === S.stationId && m.by !== S.nick) $("#opnote").value = m.text; }
       else if (m.type === "update_available") { const b = $("#update-badge"); b.textContent = `⬆ v${m.version}`; b.classList.remove("hidden"); toast(t("Neue Version {v} verfügbar – Verwaltung → Updates", { v: m.version })); }
+      else if (m.type === "demo_reset") {
+        toast(t("Die Demo wurde zurückgesetzt – die Seite lädt neu …"));
+        S.contestId = null; S.stationId = null; S.stationTokens = {};
+        ["cl.contest", "cl.station"].forEach((k) => localStorage.removeItem(k)); save();
+        setTimeout(() => location.reload(), 4000);
+      }
       else if (m.type === "restarting") { toast(t("Server startet neu (Version {v}) …", { v: m.version })); setTimeout(() => location.reload(), 8000); }
       else if (m.type === "typing") { /* nur für das Operator-Fenster */ }
       else if (m.type === "update") {

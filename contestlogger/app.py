@@ -17,7 +17,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __license__, __source_url__, __version__, env, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, results_archive, tiles, updater
+from . import __app_name__, __copyright__, __license__, __source_url__, __version__, env, adsb, audit, demo, exporters, geo, importers, kst, logcheck, lookup, prefixes, results_archive, tiles, updater
 from .db import Database, normalize_dok, utcnow as utcnow_iso
 
 STATIC = Path(__file__).parent / "static"
@@ -27,6 +27,9 @@ SEED = Path(__file__).parent / "seed" / "stationsdatenbank.csv"
 def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: float | None = None, public_url: str = "") -> FastAPI:
     db = Database(db_path or env("DB", "data/beamlog.db"))
     interval = backup_interval_min if backup_interval_min is not None else float(env("BACKUP_MIN", "15"))
+    DEMO = demo.enabled()  # öffentliche Vorführ-Instanz: feste Zugangsdaten, Sperren, tägliches Zurücksetzen (demo.py)
+    if DEMO:
+        interval = 0  # Backups der Beispieldaten braucht niemand
 
     async def backup_loop():
         while True:
@@ -54,8 +57,25 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         db.set_setting("seeded", "1")
         return len(res.callbook)
 
+    def demo_reset() -> None:
+        demo.reset(db, seed_callbook)
+        rig.clear()
+        cw_queue.clear()
+        print(f"Demo-Modus: Beispieldaten angelegt, nächstes Zurücksetzen {demo.next_reset():%d.%m.%Y %H:%M}.")
+
+    async def demo_loop():
+        while True:
+            await asyncio.sleep(max(30.0, (demo.next_reset() - datetime.now().astimezone()).total_seconds()))
+            for c in list(kst_state.values()):
+                await c.stop()
+            kst_state.clear()
+            await asyncio.to_thread(demo_reset)
+            await hub.broadcast({"type": "demo_reset"})
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        if DEMO:
+            await asyncio.to_thread(demo_reset)
         n = seed_callbook()
         if n:
             print(f"Stationsdatenbank: {n} Rufzeichen aus der mitgelieferten Startdatei geladen.")
@@ -63,6 +83,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         db.prune_audit()
         task = asyncio.create_task(backup_loop()) if interval > 0 else None
         update_task = asyncio.create_task(update_loop())
+        demo_task = asyncio.create_task(demo_loop()) if DEMO else None
         for st in db.rows("SELECT id FROM stations WHERE kst_autostart=1 AND kst_user<>'' AND kst_pass<>''"):
             try:
                 await kst_start(st["id"])
@@ -75,8 +96,11 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if task:
             task.cancel()
         update_task.cancel()
+        if demo_task:
+            demo_task.cancel()
         try:
-            db.create_backup("shutdown")
+            if not DEMO:
+                db.create_backup("shutdown")
         except Exception:  # noqa: BLE001
             pass
         db.close()
@@ -197,6 +221,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     def is_maintainer() -> bool:
         """Betreuer-Modus (MAINTAINER=1 in beamlog.env): Quellen-Importe für die zentrale Stationsdatenbank."""
         on = ("1", "true", "yes", "ja", "on")
+        if DEMO:
+            return False
         return env("MAINTAINER").strip().lower() in on or env("DEV").strip().lower() in on
 
     def require_maintainer(x_admin_token: str | None = Header(default=None)) -> None:
@@ -217,6 +243,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return (x_nick or "").strip()[:24]
 
     app.add_middleware(audit.AuditMiddleware, record=db.add_audit, is_admin=is_admin)
+    if DEMO:
+        app.add_middleware(demo.DemoGuard, protected=lambda: demo.protected_ids(db))
 
     @app.get("/api/audit", dependencies=[Depends(require_admin)])
     def audit_list(limit: int = 200, q: str = ""):
@@ -241,6 +269,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
             "mdbtools": True,  # MDB-Import rein in Python eingebaut
             "maintainer": is_maintainer(),
+            "demo": demo.info() if DEMO else None,
         }
 
     @app.get("/api/qr.svg")
@@ -478,6 +507,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.get("/api/backups", dependencies=[Depends(require_admin)])
     def backups():
+        if DEMO:
+            return {"dir": "", "interval_min": 0, "backups": [], "demo": True}
         return {"dir": str(db.backup_dir), "interval_min": interval, "backups": db.list_backups()[:60]}
 
     @app.post("/api/backups", dependencies=[Depends(require_admin)])

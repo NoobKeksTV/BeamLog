@@ -642,5 +642,12 @@
  "Ergebnislisten importiert": "Result lists imported",
  "Suche Listen in {n} Quellen gleichzeitig …": "Searching lists in {n} sources at once …",
  "Suche Listen … noch {n} Quellen": "Searching lists … {n} sources left",
- "Listen fertig": "lists done"
+ "Listen fertig": "lists done",
+ "Demo-Instanz": "Demo instance",
+ "Admin- und Stations-Passwort:": "Admin and station password:",
+ "alles wird täglich um {at} Uhr zurückgesetzt": "everything is reset daily at {at}",
+ "bitte keine echten Zugangsdaten eintragen": "please don't enter real credentials",
+ "BeamLog herunterladen": "Download BeamLog",
+ "Demo: Das Admin-Passwort ist „{pw}“ – einfach auf Anmelden klicken.": "Demo: the admin password is “{pw}” – just click Log in.",
+ "Die Demo wurde zurückgesetzt – die Seite lädt neu …": "The demo has been reset – reloading …"
 }

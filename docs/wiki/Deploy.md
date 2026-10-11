@@ -75,6 +75,7 @@ PUBLIC_URL=http://contest.local/                # Adresse im QR-Code und in Link
 #KST_PORT=23000
 #GITHUB_TOKEN=                                  # nur für ein privates Repo (Updates, Stationsdatenbank)
 #MAINTAINER=1                                   # Betreuer-Modus: Quellen-Importe für die zentrale Stationsdatenbank
+#DEMO=1                                         # öffentliche Demo-Instanz (siehe unten) – löscht täglich alles!
 ```
 
 Nach Änderungen `sudo systemctl restart beamlog`. `install.sh` legt die Datei beim ersten Lauf aus `deploy/beamlog.env` an und lässt sie bei `--update` unverändert; `--url` trägt nur `PUBLIC_URL` ein. Reihenfolge der Quellen: Kommandozeile überstimmt Umgebungsvariablen `BEAMLOG_<KEY>`, diese überstimmen die Datei.
@@ -131,6 +132,39 @@ Wiederherstellen: Dienst stoppen, Sicherung nach `beamlog.db` kopieren, Dienst s
 ## Quellcode-Variante auf dem Server
 
 Wer lieber aus dem Repo installiert (Python-venv statt Binary), nutzt `deploy/install.sh` aus dem Quellcode-Checkout; dort entsteht `/opt/beamlog/.venv`. Auch diese Unit liest alle Einstellungen aus `/etc/beamlog/beamlog.env` (`run.py --config …`), das Skript legt die Datei beim ersten Lauf an und `--url` setzt die öffentliche Adresse. Updates dann mit `git pull` und `sudo bash deploy/install.sh --update`.
+
+## Öffentliche Demo-Instanz
+
+Für eine Vorführ-Instanz im Internet (wie [beamlogdemo.lhprinting.de](https://beamlogdemo.lhprinting.de/)) gibt es den
+Demo-Modus. In `/etc/beamlog/beamlog.env`:
+
+```ini
+DEMO=1
+DEMO_RESET=03:00                                # tägliches Zurücksetzen (Serverzeit)
+DB=/var/lib/beamlog/beamlog-demo.db             # eigene, leere Datenbank
+PUBLIC_URL=https://beamlogdemo.lhprinting.de/
+```
+
+Was der Demo-Modus macht:
+
+- **Beispieldaten:** Beim Start und jeden Tag um `DEMO_RESET` wird **alles gelöscht** und neu angelegt: ein laufender
+  „Demo-Contest UKW“ mit `DN0DEMO/P` (JO51DT, Brocken) auf 2 m, 70 cm und 23 cm, rund 95 QSOs aus der
+  Stationsdatenbank, zwei Begrüßungen im Team-Chat und die mitgelieferte Stationsdatenbank. Offene Browser laden danach
+  von selbst neu.
+- **Feste Zugangsdaten:** Admin- und Stations-Passwort sind `demo`. Eine Leiste unter der Kopfzeile nennt sie, die
+  Uhrzeit des Zurücksetzens und bittet, keine echten Zugangsdaten einzutragen; Anmelde- und Freischalt-Feld sind
+  vorausgefüllt.
+- **Gesperrt** (Meldung „In der Demo-Instanz gesperrt …“): Admin-Passwort ändern, Server-Einstellungen, Updates
+  einspielen, ON4KST-Verbindungen und KST-Zugangsdaten, Kacheln vorab laden, Rufzeichen-Abfrage (HamQTH/QRZ), Backups,
+  CW über das Funkgerät, Übersetzungen speichern, Betreuer-Importe, Importe über 5 MB. Der Beispiel-Contest, seine
+  Stationen und die globale Station lassen sich nicht löschen, ihr Rufzeichen und Passwort nicht ändern.
+- **Erlaubt:** loggen, bearbeiten, Karte, Flugzeug-Scatter, Statistik, Operator-Fenster, Team-Chat, eigene Contests und
+  Stationen anlegen und löschen, Dateien importieren, EDI/Cabrillo/ADIF exportieren, Log-Prüfung.
+- Keine automatischen Backups; das Aktionsprotokoll beginnt mit jedem Zurücksetzen neu.
+
+**Sicherung gegen Versehen:** Enthält die Datenbank bereits Contests, die nicht aus der Demo stammen, startet BeamLog
+im Demo-Modus nicht („Demo-Modus verweigert …“). Trotzdem: `DEMO=1` nie auf einer echten Contest-Installation setzen.
+Updates der Demo spielt der Betreiber wie gewohnt mit `sudo bash deploy/install.sh --update` ein.
 
 ## Umstieg von ContestLogger 0.9 (Server)
 

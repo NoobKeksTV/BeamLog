@@ -32,6 +32,8 @@ PUBLIC_URL=http://contest.local/                # Adresse im QR-Code und in Link
 #KST_PORT=23000
 #GITHUB_TOKEN=                                  # nur für ein privates Repo
 #MAINTAINER=1                                   # Betreuer-Modus (Quellen-Importe der Stationsdatenbank)
+#DEMO=1                                         # öffentliche Demo-Instanz (löscht täglich alles, siehe Wiki „Server-Deploy“)
+#DEMO_RESET=03:00                               # Uhrzeit des täglichen Zurücksetzens
 ```
 
 Nach Änderungen `sudo systemctl restart beamlog`. Die Datei bleibt bei `--update` unverändert; Umgebungsvariablen

@@ -57,7 +57,8 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 
 Ohne Installation ausprobieren: **[beamlogdemo.lhprinting.de](https://beamlogdemo.lhprinting.de/)** – eine öffentliche BeamLog-Instanz mit
 Beispiel-Contest zum Herumklicken (Loggen, Karte, Statistik, Operator-Fenster). Alles, was du dort einträgst, ist für
-andere Besucher sichtbar und wird regelmäßig zurückgesetzt – bitte keine echten Logs oder Passwörter verwenden.
+andere Besucher sichtbar und wird täglich zurückgesetzt – bitte keine echten Logs oder Passwörter verwenden.
+Admin- und Stations-Passwort: `demo`. Eine eigene Demo-Instanz einrichten: [Wiki › Server-Deploy](docs/wiki/Deploy.md#öffentliche-demo-instanz).
 
 ## Schnellstart
 

@@ -84,7 +84,7 @@ def check_port(host: str, port: int) -> None:
                  f"  Welches Programm ihn belegt:  sudo ss -ltnp 'sport = :{port}'  (z. B. nginx oder ein zweites BeamLog)")
 
 
-CONFIG_KEYS = ("HOST", "PORT", "DB", "BACKUP_MIN", "PUBLIC_URL", "OPEN_BROWSER", "KST_HOST", "KST_PORT", "GITHUB_TOKEN", "MAINTAINER", "DEV")
+CONFIG_KEYS = ("HOST", "PORT", "DB", "BACKUP_MIN", "PUBLIC_URL", "OPEN_BROWSER", "KST_HOST", "KST_PORT", "GITHUB_TOKEN", "MAINTAINER", "DEV", "DEMO", "DEMO_RESET")
 
 
 def load_env_file(path: Path) -> dict[str, str]:
@@ -132,7 +132,7 @@ def main() -> None:
     for k in CONFIG_KEYS:
         if env(k):
             cfg[k] = env(k)
-    for k in ("KST_HOST", "KST_PORT", "GITHUB_TOKEN", "MAINTAINER", "DEV"):  # werden von den Modulen direkt aus der Umgebung gelesen
+    for k in ("KST_HOST", "KST_PORT", "GITHUB_TOKEN", "MAINTAINER", "DEV", "DEMO", "DEMO_RESET"):  # werden von den Modulen direkt aus der Umgebung gelesen
         if cfg.get(k):
             os.environ[f"BEAMLOG_{k}"] = cfg[k]
     p = argparse.ArgumentParser(description=f"{__app_name__} {__version__}  –  Einstellungen auch über beamlog.env (siehe beamlog.env.example)")
@@ -152,7 +152,8 @@ def main() -> None:
     print(f"\n  {__app_name__} {__version__}  {__copyright__}")
     print(f"  Lokal:    http://localhost:{a.port}")
     print(f"  Im LAN:   {url}")
-    print(f"  Daten:    {a.db}  (Backups alle {a.backup_min:g} min in backup/)\n")
+    demo_on = cfg.get("DEMO", "").strip().lower() in ("1", "true", "yes", "ja", "on")
+    print(f"  Daten:    {a.db}  " + ("(DEMO-MODUS: keine Backups, täglich zurückgesetzt)\n" if demo_on else f"(Backups alle {a.backup_min:g} min in backup/)\n"))
     if getattr(sys, "frozen", False) and os.name == "nt" and env("NO_BROWSER") != "1":
         import threading
         import webbrowser
