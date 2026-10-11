@@ -269,7 +269,7 @@ def test_contest_exchange_api(client):
     assert q["exch_rcvd"] == "B21"
     assert client.get(f"/api/stations/{sid}/qsos?q=B21").json()[0]["call"] == "DL8NAS"
     # Callbuch: DOK anzeigen, bearbeiten, exportieren, Repo-Format
-    assert client.get("/api/callbook?q=B21").json()["rows"][0]["call"] == "DL8NAS"
+    assert "DL8NAS" in [r["call"] for r in client.get("/api/callbook?q=B21").json()["rows"]]  # Startdatenbank kennt weitere B21-Stationen
     client.post("/api/callbook", json={"call": "DL8NAS", "locator": "JN59LE", "dok": "b22"}, headers=H)
     assert client.get("/api/callbook?q=DL8NAS").json()["rows"][0]["dok"] == "B22"
     assert "DL8NAS;JN59LE;2" in client.get("/api/callbook/export_seed.csv").text.replace("\r", "") and ";B22\n" in client.get("/api/callbook/export_seed.csv").text
