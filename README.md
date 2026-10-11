@@ -14,17 +14,18 @@ Integrierter **ON4KST-Chat** (je Station, DMs, Rundruf) · **Aircraft-Scatter** 
 [![Letzter Commit](https://img.shields.io/github/last-commit/NoobKeksTV/BeamLog?label=Letzter%20Commit)](https://github.com/NoobKeksTV/BeamLog/commits/main)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Plattformen](https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-portable-8b98a8)](https://github.com/NoobKeksTV/BeamLog/releases/latest)
+[![Live-Demo](https://img.shields.io/badge/Live--Demo-ausprobieren-ff8c1a)](https://beamlogdemo.lhprinting.de/)
+[![Video](https://img.shields.io/badge/Video-YouTube-ff0000?logo=youtube&logoColor=white)](https://youtu.be/yvYb6FNvjzA)
 [![Lizenz: GNU AGPLv3](https://img.shields.io/badge/Lizenz-GNU%20AGPLv3-a32d2a)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/NoobKeksTV/BeamLog?style=social)](https://github.com/NoobKeksTV/BeamLog/stargazers)
 
-[**Download**](https://github.com/NoobKeksTV/BeamLog/releases/latest) · [**Wiki**](docs/wiki/Home.md) · [Installation](docs/wiki/Installation.md) · [Server-Deploy](docs/wiki/Deploy.md) · [Tastenkürzel](docs/wiki/Tastenkuerzel.md) · [Fehlersuche](docs/wiki/Fehlersuche.md)
+[**Download**](https://github.com/NoobKeksTV/BeamLog/releases/latest) · [**Live-Demo**](https://beamlogdemo.lhprinting.de/) · [**Wiki**](https://github.com/NoobKeksTV/BeamLog/wiki) · [Installation](https://github.com/NoobKeksTV/BeamLog/wiki/Installation) · [Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy) · [Tastenkürzel](https://github.com/NoobKeksTV/BeamLog/wiki/Tastenkuerzel) · [Fehlersuche](https://github.com/NoobKeksTV/BeamLog/wiki/Fehlersuche)
 
 <br>
 
-<!-- YOUTUBE: sobald das Video online ist, das Bild verlinken: <a href="https://youtu.be/XXXX"><img …></a> -->
-<img src="docs/video-vorschau.jpg" width="760" alt="BeamLog im Video (1:42)">
+<a href="https://youtu.be/yvYb6FNvjzA"><img src="docs/video-vorschau.jpg" width="760" alt="BeamLog im Video (1:42) – auf YouTube ansehen"></a>
 
-<sub>🎬 Das Video „BeamLog in 1:42 Minuten“ erscheint in Kürze auf YouTube.</sub>
+<sub>🎬 <a href="https://youtu.be/yvYb6FNvjzA">Video „BeamLog in 1:42 Minuten“ auf YouTube ansehen</a></sub>
 
 </div>
 
@@ -52,6 +53,13 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 | **CAT / CW** | Frequenz vom Funkgerät (Hamlib, flrig), Sprachbausteine F2–F8 als CW |
 | **Betrieb** | Backups auf dem Server (crash-sicher), Aktionsprotokoll, Update-Prüfung mit Selbst-Aktualisierung, „Was ist neu“, mehrsprachig, hell/dunkel, Hilfe mit F1 |
 
+## Live-Demo
+
+Ohne Installation ausprobieren: **[beamlogdemo.lhprinting.de](https://beamlogdemo.lhprinting.de/)** – eine öffentliche BeamLog-Instanz mit
+Beispiel-Contest zum Herumklicken (Loggen, Karte, Statistik, Operator-Fenster). Alles, was du dort einträgst, ist für
+andere Besucher sichtbar und wird täglich zurückgesetzt – bitte keine echten Logs oder Passwörter verwenden.
+Admin- und Stations-Passwort: `demo`. Eine eigene Demo-Instanz einrichten: [Wiki › Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy#öffentliche-demo-instanz).
+
 ## Schnellstart
 
 1. [ZIP für dein System laden](https://github.com/NoobKeksTV/BeamLog/releases/latest) und entpacken.
@@ -59,11 +67,27 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 3. Admin-Passwort festlegen, unter **Verwaltung** die Stationen anlegen und den ersten Contest erstellen.
 4. Im Reiter **Loggen** Station wählen und loslegen. F1 zeigt alle Tastenkürzel.
 
-> **Umstieg von ContestLogger 0.9.x:** BeamLog hieß bis Version 0.9 „ContestLogger“. Version 1.0 einmal von Hand laden und entpacken – liegt der neue Ordner `BeamLog` neben dem alten Ordner `ContestLogger` (oder darin), übernimmt BeamLog beim ersten Start automatisch eine Kopie von `data/` und `contestlogger.env` (die Datenbank heißt danach `beamlog.db`, die Einstellungen `beamlog.env`). Ab 1.0 aktualisiert sich BeamLog wieder selbst; alte Links auf das GitHub-Projekt leiten weiter.
+> **Umstieg von ContestLogger 0.9.x:** BeamLog hieß bis Version 0.9 „ContestLogger“. Version 1.0 einmal von Hand laden und entpacken – liegt der neue Ordner `BeamLog` neben dem alten Ordner `ContestLogger` (oder darin), übernimmt BeamLog beim ersten Start automatisch eine Kopie von `data/` und `contestlogger.env` (die Datenbank heißt danach `beamlog.db`, die Einstellungen `.env`). Ab 1.0 aktualisiert sich BeamLog wieder selbst; alte Links auf das GitHub-Projekt leiten weiter.
 
-Dauerhafte Einstellungen (Port, Datenbank, Adresse für den QR-Code …) stehen in `beamlog.env` neben dem Programm (Vorlage `beamlog.env.example`). Für einen dauerhaft laufenden Server (Debian, nginx, systemd): im Linux-ZIP liegt `deploy/`, Einstellungen dann in `/etc/beamlog/beamlog.env`, Anleitung im [Wiki](docs/wiki/Deploy.md).
+Dauerhafte Einstellungen (Port, Datenbank, Adresse für den QR-Code …) stehen in `.env` neben dem Programm (Vorlage `.env.example`).
 
-Aus dem Quellcode: `pip install -r requirements.txt && python run.py` (Python 3.11+).
+**Als Dienst auf einem Debian-/Ubuntu-Server oder Raspberry Pi** (systemd, nginx auf Port 80, tägliches Backup) – im entpackten Linux-ZIP:
+
+```bash
+sudo bash deploy/install.sh --url http://contest.local/   # Erstinstallation
+sudo bash deploy/install.sh --update                      # später: neue Version einspielen
+```
+
+Teile lassen sich weglassen, auch mehrere gleichzeitig: `--no-nginx` (eigener Reverse-Proxy oder `PORT=80` direkt),
+`--no-service` (ohne systemd-Dienst), `--no-backup` (ohne Backup-Cron); die Wahl wird für spätere Updates gemerkt,
+`--with-…` schaltet wieder ein, `--help` zeigt alles.
+
+Mit Dienst kopiert das Skript BeamLog nach `/opt/beamlog` (Einstellungen in `/opt/beamlog/.env`) und sagt das
+deutlich. Ohne Dienst wird nichts kopiert, BeamLog bleibt im aktuellen Ordner: `--deps-only` installiert nur Python & Co.,
+`--here` bleibt im Ordner und richtet trotzdem Dienst, nginx und Backup ein. Anleitung im
+[Wiki › Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy) (dort auch die [öffentliche Demo-Instanz](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy#öffentliche-demo-instanz) mit `DEMO=1`).
+
+Aus dem Quellcode (Python 3.11+): `./start.sh` (Linux/macOS/Raspberry Pi) bzw. `start.bat` (Windows) – legt beim ersten Mal die virtuelle Umgebung `.venv` an, installiert die Pakete und hält sie nach `git pull` aktuell. Danach startet auch `python run.py` (nimmt `.venv` automatisch).
 
 ## Bilder
 
@@ -86,13 +110,50 @@ Aus dem Quellcode: `pip install -r requirements.txt && python run.py` (Python 3.
 
 ## Dokumentation
 
-Das [Wiki](docs/wiki/Home.md) erklärt alles ausführlich: [Installation](docs/wiki/Installation.md), [Server-Deploy](docs/wiki/Deploy.md), [Erste Schritte](docs/wiki/Erste-Schritte.md), [Loggen](docs/wiki/Loggen.md), [Tastenkürzel](docs/wiki/Tastenkuerzel.md), [Chat/KST/DM](docs/wiki/Chat-KST.md), [Operator-Fenster](docs/wiki/Operator-Fenster.md), [Statistik](docs/wiki/Statistik.md), [Import/Export](docs/wiki/Import-Export.md), [Log-Prüfung](docs/wiki/Log-Pruefung.md), [Stationsdatenbank](docs/wiki/Stationsdatenbank.md), [Flugzeug-Scatter](docs/wiki/Flugzeug-Scatter.md), [CAT/CW](docs/wiki/CAT.md), [Verwaltung](docs/wiki/Verwaltung.md), [Updates](docs/wiki/Updates.md), [Fehlersuche](docs/wiki/Fehlersuche.md).
+Das [Wiki](https://github.com/NoobKeksTV/BeamLog/wiki) erklärt alles ausführlich: [Installation](https://github.com/NoobKeksTV/BeamLog/wiki/Installation), [Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy), [Erste Schritte](https://github.com/NoobKeksTV/BeamLog/wiki/Erste-Schritte), [Loggen](https://github.com/NoobKeksTV/BeamLog/wiki/Loggen), [Tastenkürzel](https://github.com/NoobKeksTV/BeamLog/wiki/Tastenkuerzel), [Chat/KST/DM](https://github.com/NoobKeksTV/BeamLog/wiki/Chat-KST), [Operator-Fenster](https://github.com/NoobKeksTV/BeamLog/wiki/Operator-Fenster), [Statistik](https://github.com/NoobKeksTV/BeamLog/wiki/Statistik), [Import/Export](https://github.com/NoobKeksTV/BeamLog/wiki/Import-Export), [Log-Prüfung](https://github.com/NoobKeksTV/BeamLog/wiki/Log-Pruefung), [Stationsdatenbank](https://github.com/NoobKeksTV/BeamLog/wiki/Stationsdatenbank), [Flugzeug-Scatter](https://github.com/NoobKeksTV/BeamLog/wiki/Flugzeug-Scatter), [CAT/CW](https://github.com/NoobKeksTV/BeamLog/wiki/CAT), [Verwaltung](https://github.com/NoobKeksTV/BeamLog/wiki/Verwaltung), [Updates](https://github.com/NoobKeksTV/BeamLog/wiki/Updates), [Fehlersuche](https://github.com/NoobKeksTV/BeamLog/wiki/Fehlersuche).
 
 ## Technik
 
 Python 3.11, FastAPI + uvicorn, SQLite (WAL, synchron), WebSockets, Vanilla JS/HTML/CSS, Leaflet (lokal gebündelt), PyInstaller-Builds über GitHub Actions. Tests: `python -m pytest -q`. Portable Pakete: `python build_tools/build.py`.
 
 Datenquellen: Flugzeuge von [adsb.fi](https://adsb.fi) (nicht-kommerziell) oder einem eigenen ADS-B-Empfänger; Karten von [OpenStreetMap](https://www.openstreetmap.org); Ergebnislisten vom [DARC-Contest-Hub](https://dxhf2.darc.de).
+
+## Zubehör von LH Printing
+
+<sub>Eigenwerbung – BeamLog bleibt kostenlos und frei. Wer das Projekt unterstützen möchte: Lars Hölker (DN2LH) betreibt
+mit **[LH Printing](https://lhprinting.de/?utm_source=github&utm_medium=readme&utm_campaign=beamlog)** eine kleine 3D-Druckerei, unter anderem mit Zubehör für Funkamateure.</sub>
+
+<table>
+<tr>
+<td align="center" width="25%">
+<a href="https://lhprinting.de/produkte/SX-4S6S-FOXA?utm_source=github&utm_medium=readme&utm_campaign=beamlog"><img src="docs/lh-printing/mastschelle.jpg" width="180" alt="Mastschelle 35 mm am Mast"></a><br>
+<b>Mastschellen 35 mm</b><br>
+<sub>Für Masten und Antennen, mit V2A-Edelstahlschrauben M6, wetterfest – ideal für Portabel- und Fieldday-Aufbauten</sub><br>
+<a href="https://lhprinting.de/produkte/SX-4S6S-FOXA?utm_source=github&utm_medium=readme&utm_campaign=beamlog">Zum Shop →</a>
+</td>
+<td align="center" width="25%">
+<a href="https://lhprinting.de/produkte/4D-JN23-QASW?utm_source=github&utm_medium=readme&utm_campaign=beamlog"><img src="docs/lh-printing/wetterschutzgehaeuse.jpg" width="180" alt="Wetterschutzgehäuse"></a><br>
+<b>Wetterschutzgehäuse</b><br>
+<sub>Outdoor-Gehäuse für Kamera, Außensteckdose oder Sensor – hält Regen ab, 137 × 104 × 90 mm</sub><br>
+<a href="https://lhprinting.de/produkte/4D-JN23-QASW?utm_source=github&utm_medium=readme&utm_campaign=beamlog">Zum Shop →</a>
+</td>
+<td align="center" width="25%">
+<a href="https://lhprinting.de/produkte/ordner/fld_1778880175338?v=3D-KAB-SCH&utm_source=github&utm_medium=readme&utm_campaign=beamlog"><img src="docs/lh-printing/messleitungshalter.jpg" width="180" alt="Messleitungshalter"></a><br>
+<b>Messleitungshalter</b><br>
+<sub>Ordnung im Shack, Labor und in der Werkstatt: Wandhalter für Messleitungen und Kabel 4–10 mm, 2 Stück</sub><br>
+<a href="https://lhprinting.de/produkte/ordner/fld_1778880175338?v=3D-KAB-SCH&utm_source=github&utm_medium=readme&utm_campaign=beamlog">Zum Shop →</a>
+</td>
+<td align="center" width="25%">
+<a href="https://lhprinting.de/produkte/KS-H30M-N5P6?utm_source=github&utm_medium=readme&utm_campaign=beamlog"><img src="docs/lh-printing/qsl-ablage.jpg" width="180" alt="QSL-Kartenablage"></a><br>
+<b>QSL-Kartenablage</b><br>
+<sub>Stapelbare Ablage für QSL-Karten und Postkarten – damit nach dem Contest nichts liegen bleibt</sub><br>
+<a href="https://lhprinting.de/produkte/KS-H30M-N5P6?utm_source=github&utm_medium=readme&utm_campaign=beamlog">Zum Shop →</a>
+</td>
+</tr>
+</table>
+
+Alle Amateurfunk-Artikel: **[lhprinting.de › Amateurfunk](https://lhprinting.de/produkte?kategorie=Amateurfunk&utm_source=github&utm_medium=readme&utm_campaign=beamlog)** · Sonderwünsche (eigene Halter,
+Gehäuse, Adapter) über die [Anfrage](https://lhprinting.de/anfragen?utm_source=github&utm_medium=readme&utm_campaign=beamlog).
 
 ## Lizenz und Copyright
 

@@ -1,0 +1,48 @@
+# Überträgt docs/wiki/ ins GitHub-Wiki (Reiter „Wiki“). Das Wiki ist ein eigenes Repo (BeamLog.wiki.git) und liest
+# nichts aus dem Hauptrepo – deshalb dieser Abgleich. Läuft nur für main (veröffentlichter Stand) oder von Hand.
+# Einmalig vorher: Settings → Features → Wikis an, dann im Reiter „Wiki“ die erste Seite anlegen (wird überschrieben).
+name: Wiki
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/wiki/**", "build_tools/wiki_sync.py", ".github/workflows/wiki.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wiki-Repo holen
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! git clone "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki; then
+            echo "::error::Wiki-Repo nicht gefunden. Einmalig: Settings → Features → Wikis aktivieren und im Reiter „Wiki“ die erste Seite speichern."
+            exit 1
+          fi
+
+      - name: docs/wiki übertragen
+        run: python3 build_tools/wiki_sync.py docs/wiki wiki
+
+      - name: Veröffentlichen
+        run: |
+          cd wiki
+          git config user.name "NoobKeksTV"
+          git config user.email "zockerboyshd@outlook.de"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Wiki ist bereits aktuell."
+          else
+            git commit -m "Wiki aus docs/wiki (${GITHUB_SHA::7})"
+            git push
+          fi

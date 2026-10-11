@@ -11,7 +11,7 @@ Die Stationsdatenbank ordnet Rufzeichen einem Locator, ggf. einem Namen und dem 
 | Startdatenbank | Beim ersten Start wird `contestlogger/seed/stationsdatenbank.csv` geladen. |
 | Eigene QSOs | Jedes geloggte QSO (auch importierte Logs); bei DOK-Contests auch der empfangene DOK. |
 | KST-Nutzerliste | Alle 10 Minuten je Verbindung; jeder Nutzer mit Locator. |
-| Ergebnislisten / DARC-Hub | Nur im **Betreuer-Modus** (`MAINTAINER=1` in `beamlog.env`): Importe in der Verwaltung; enthält die Liste eine DOK-Spalte (DARC-Hub `result.csv`) oder einen DOK wie `G01` in der Zeile, wird er übernommen. |
+| Ergebnislisten / Archiv | Nur im **Betreuer-Modus** (`MAINTAINER=1` in `.env`): einzelne Listen oder das ganze Ergebnislisten-Archiv (DARC UKW/KW, IARU, siehe [Import](Import-Export.md#ergebnislisten-archiv-alle-conteste-alle-jahre)); enthält die Liste eine DOK-Spalte (DARC-Hub `result.csv`) oder einen DOK wie `G01` in der Zeile, wird er übernommen. |
 | Stationslisten anderer Nutzer | Nur im Betreuer-Modus: der CSV-Export einer anderen Installation wird mit „Stationsliste einpflegen“ in die zentrale Liste übernommen. |
 | HamQTH / QRZ | Online-Abfrage beim Loggen und in der Log-Prüfung (Ergebnis wird gespeichert). |
 | Von Hand | Formular unter der Tabelle in der Verwaltung. |
@@ -28,8 +28,8 @@ Regeln: Der neueste DOK gewinnt (ein Rufzeichen kann den OV wechseln). Der neues
 
 Die Liste wird **zentral** gepflegt, damit alle dieselben, geprüften Daten haben:
 
-- **Normale Installation**: bekommt die Liste über „Nach neuen suchen (Repo)“ (Verwaltung → Updates). Die Quellen-Importe (Ergebnislisten, DARC-Contest-Hub) sind ausgeblendet. Eigene Funde (neue Rufzeichen, Locator, DOKs aus den Logs) gibt man weiter: „Stationsdatenbank exportieren (CSV)“ und die Datei an den Betreuer schicken.
-- **Betreuer** (`MAINTAINER=1` oder `DEV=true` in `beamlog.env`, dann Server neu starten): sieht zusätzlich die Importkarten und unter der Stationsdatenbank „Stationsliste einpflegen“ für die eingeschickten CSV-Dateien (DOK, Name und „zuletzt gesehen“ werden übernommen, der neuere Stand gewinnt). Danach „Export im Repo-Format“ und die Datei als `contestlogger/seed/stationsdatenbank.csv` ins Repo einchecken – beim nächsten „Nach neuen suchen“ haben alle den Stand.
+- **Normale Installation**: bekommt die Liste über „Nach neuen suchen (Repo)“ (Verwaltung → Updates). Die Quellen-Importe (Ergebnislisten, Ergebnislisten-Archiv) sind ausgeblendet. Eigene Funde (neue Rufzeichen, Locator, DOKs aus den Logs) gibt man weiter: „Stationsdatenbank exportieren (CSV)“ und die Datei an den Betreuer schicken.
+- **Betreuer** (`MAINTAINER=1` oder `DEV=true` in `.env`, dann Server neu starten): sieht zusätzlich die Importkarten und unter der Stationsdatenbank „Stationsliste einpflegen“ für die eingeschickten CSV-Dateien (DOK, Name und „zuletzt gesehen“ werden übernommen, der neuere Stand gewinnt). Danach „Export im Repo-Format“ und die Datei als `contestlogger/seed/stationsdatenbank.csv` ins Repo einchecken – beim nächsten „Nach neuen suchen“ haben alle den Stand.
 
 ## Abgleich mit dem Repo
 
@@ -39,4 +39,4 @@ Ablauf für ein Team mit mehreren Installationen:
 2. Die Datei als `contestlogger/seed/stationsdatenbank.csv` ins Repo einchecken.
 3. Auf den anderen Installationen „Nach neuen suchen (Repo)“ klicken: der Server lädt die Datei über die GitHub-API und übernimmt neue Rufzeichen und geänderte Locator. Das Ergebnis („324 Einträge im Repo: 12 neu, 3 Locator aktualisiert“) erscheint daneben und im Aktionsprotokoll.
 
-Die URL lässt sich ändern, z. B. auf einen eigenen Webserver. Das Repo ist öffentlich; nur für einen privaten Fork wird ein GitHub-Token mit Lesezugriff gebraucht, das als `GITHUB_TOKEN` in `beamlog.env` steht (nicht in der Oberfläche).
+Die URL lässt sich ändern, z. B. auf einen eigenen Webserver. Das Repo ist öffentlich; nur für einen privaten Fork wird ein GitHub-Token mit Lesezugriff gebraucht, das als `GITHUB_TOKEN` in `.env` steht (nicht in der Oberfläche).

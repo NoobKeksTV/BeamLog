@@ -28,15 +28,34 @@ Hinweise: Beim automatischen Import braucht die Datei den eigenen Locator im Kop
 
 ## Ergebnislisten (DARC / IARU / UKW-Contest-Club)
 
-Nur im Betreuer-Modus sichtbar (`MAINTAINER=1` in `beamlog.env`), siehe [Stationsdatenbank](Stationsdatenbank.md#zentrale-pflege-wer-importiert-was).
+Nur im Betreuer-Modus sichtbar (`MAINTAINER=1` in `.env`), siehe [Stationsdatenbank](Stationsdatenbank.md#zentrale-pflege-wer-importiert-was).
 
 Veröffentlichte Ergebnislisten enthalten Rufzeichen und Locator aller Teilnehmer. Datei (HTML, PDF, TXT, CSV), eingefügter Text oder die URL der Ergebnisseite; vor der Übernahme gibt es eine Vorschau.
 
-## DARC-Contest-Hub direkt laden
+## Ergebnislisten-Archiv: alle Conteste, alle Jahre
 
-Nur im Betreuer-Modus sichtbar.
+*Nur im Betreuer-Modus (Verwaltung → Stationsdatenbank & Import).* „Verfügbare Listen suchen“ fragt alle Quellen ab und zeigt
+jede veröffentlichte Ergebnisliste zum Anhaken – einzeln, je Contest/Jahrgang oder je Quelle:
 
-Lädt die offiziellen `result.csv`-Dateien vom DARC-Contest-Hub (`dxhf2.darc.de`) für ein Jahr oder alle Jahre seit 2017 – pro Contest 500–900 Rufzeichen mit Locator, dazu die ODX-Gegenstationen. Braucht Internet auf dem Server.
+| Quelle | Zeitraum | Inhalt |
+|---|---|---|
+| DARC UKW-Conteste, Contest-Hub `dxhf2.darc.de` | ab 2017 | Rufzeichen, Locator, DOK, ODX-Station (`result.csv`) |
+| DARC UKW-Conteste, Archiv auf darc.de | 2008–2016 | Rufzeichen, DOK, Locator, ODX-Station (Textlisten) |
+| DARC-KW-Conteste (WAG, WAE CW/SSB/RTTY, 10 m, Fieldday CW/SSB, Oster-, Weihnachts-, Ausbildungs-, FT4-, RTTY-/Hell-Kurzcontest) | ab 2014 | nur Rufzeichen und DOK – Kurzwelle tauscht keinen Locator aus |
+| DARC-KW-Conteste: **Einzel-Logs** („Open Log“ des Contest-Hubs, je Teilnehmer das Cabrillo-Log) | ab 2017 | eigene Station mit Locator und DOK, dazu die DOKs aller deutschen QSO-Partner |
+| IARU-Region-1-UKW-Conteste (September, Oktober UHF, Marconi, Subregionals, Mikrowelle) und OK-Conteste, Archiv OK2KKW | ab 1985 | Rufzeichen und Locator |
+| IARU-Region-1-UKW-Conteste, Contest-Robot `iaru.oevsv.at` (Ergebnis-CSV je Contest, dazu die Gesamtliste `vhf.csv`) | ab 2019 | Rufzeichen und Locator |
+| IARU-Contest-Robot: **Einzel-Logs** aller Teilnehmer (je Teilnehmer alle QSOs) | ab 2019 | Rufzeichen und Locator aller QSO-Partner – auch Stationen ohne eigenes Log; als „unique“ (vermutlich verhört) oder ungültig markierte QSOs werden ausgelassen. Dauert 10–30 Minuten je Contest. |
+
+Zusammen rund 950 Listen (davon rund 170 mit Einzel-Logs). Die Suche fragt alle Quellen gleichzeitig ab. Der Import läuft im Hintergrund (Fortschrittsbalken, abbrechbar, läuft auch nach dem
+Neuladen der Seite weiter) und lädt bis zu sechs Listen gleichzeitig – je Server höchstens vier Abrufe zugleich, um die Veranstalter
+zu schonen. Die Anzeige zeigt jede gerade laufende Liste mit ihrem Fortschritt.
+Bereits importierte Listen sind markiert und werden mit „nur noch nicht importierte“ übersprungen.
+
+- Neuere Angaben gewinnen (das Datum der Liste zählt); ein älterer Locator bleibt als Alternative erhalten.
+- KW-Listen ergänzen standardmäßig nur den **DOK** bereits bekannter Stationen. Mit „Stationen ohne Locator neu aufnehmen“
+  kommen auch alle übrigen KW-Teilnehmer dazu (nur Rufzeichen und DOK – ohne Entfernung/Richtung).
+- Der IARU-Contest-Robot wird mit Erlaubnis des Betreibers abgerufen.
 
 ## Export / Abgabe
 
