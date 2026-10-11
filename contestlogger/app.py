@@ -995,30 +995,43 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     # ------------------------------------------------------------ Ergebnislisten-Archiv (DARC, IARU …) – Betreuer
     archive = {"entries": {}, "job": None}  # id -> Entry; laufender Import
     ARCHIVE_LISTS_PARALLEL = 6  # so viele Listen werden gleichzeitig geladen (verschiedene Quellen und Conteste)
-    ARCHIVE_PER_HOST = 4  # höchstens so viele gleichzeitige Abrufe je Server – schont die Veranstalter
+    # Je Server höchstens 8 gleichzeitige Abrufe: gemessen schaffen DARC-Hub (~10 Seiten/s) und IARU-Robot (~6 Seiten/s) damit
+    # ihr Maximum, bei 12 und mehr werden sie nicht schneller bzw. langsamer (überlastet) – mehr belastet nur die Veranstalter.
+    # Laufen mehrere Listen desselben Servers, teilen sie sich diese Plätze der Reihe nach (FairSlots).
+    ARCHIVE_PER_HOST = 8
     import threading as _threading
-    host_slots: dict[str, _threading.BoundedSemaphore] = {}
+    host_slots: dict[str, results_archive.FairSlots] = {}
     host_lock = _threading.Lock()
+    http_client: dict = {}
+
+    def archive_client():
+        """Ein gemeinsamer HTTP-Client mit wiederverwendeten Verbindungen (keep-alive) – spart je Seite den TLS-Aufbau (~0,4 s)."""
+        import httpx
+        with host_lock:
+            if "c" not in http_client:
+                http_client["c"] = httpx.Client(headers={"User-Agent": f"Mozilla/5.0 (compatible; BeamLog/{__version__}; +{__source_url__})"},
+                                                timeout=60, follow_redirects=True,
+                                                limits=httpx.Limits(max_connections=64, max_keepalive_connections=64))
+            return http_client["c"]
 
     def archive_fetch(url: str) -> bytes:
         """Eine Seite laden – je Server höchstens ARCHIVE_PER_HOST gleichzeitig; bei kurzen Verbindungsabbrüchen bis zu zweimal neu."""
-        import urllib.error
-        import urllib.parse
-        import urllib.request
-        host = urllib.parse.urlsplit(url).netloc.lower()
+        import httpx
+        host = httpx.URL(url).host.lower()
         with host_lock:
-            slot = host_slots.setdefault(host, _threading.BoundedSemaphore(ARCHIVE_PER_HOST))
-        req = urllib.request.Request(url, headers={"User-Agent": f"Mozilla/5.0 (compatible; BeamLog/{__version__}; +{__source_url__})"})
+            slot = host_slots.setdefault(host, results_archive.FairSlots(ARCHIVE_PER_HOST))
+        client = archive_client()
         for attempt in range(3):
             try:
-                with slot, urllib.request.urlopen(req, timeout=60) as r:  # noqa: S310
-                    return r.read()
-            except urllib.error.HTTPError:
-                raise  # 404 & Co.: Wiederholen hilft nicht
-            except OSError:
+                with slot:
+                    r = client.get(url)
+                if r.status_code >= 400:
+                    raise RuntimeError(f"HTTP {r.status_code}: {url}")  # 404 & Co.: Wiederholen hilft nicht
+                return r.content
+            except httpx.TransportError:
                 if attempt == 2:
                     raise
-                time.sleep(2 + 3 * attempt)
+                time.sleep(1 + 2 * attempt)
         return b""
 
     def archive_done() -> dict:
@@ -1100,7 +1113,6 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                     def progress(n: int, total: int, i: str = i, label: str = e.label) -> bool:
                         active[i] = f"{label} · {n}/{total}"
                         show()
-                        time.sleep(0.1)
                         return not job["cancel"]
                     try:
                         parsed = await asyncio.to_thread(results_archive.parse_entry, archive_fetch, e, progress)
@@ -1120,7 +1132,6 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                     job["done_ids"].append(i)
                     active.pop(i, None)
                     show()
-                    await asyncio.sleep(0.2)
 
             try:
                 await asyncio.gather(*(worker() for _ in range(min(ARCHIVE_LISTS_PARALLEL, len(ids)))))

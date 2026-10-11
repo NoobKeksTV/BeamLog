@@ -24,6 +24,31 @@ OK2_1990 = """  poo.  call     body     qso   loc      DX-km    m.ASL   TX-W  AN
   11. OK1AR      22003      25. OK2WDC     11154      39. OK1DAM      5515"""
 
 
+def fake_http(monkeypatch, answer):
+    """Abrufe des Archivs (httpx) auf Testdaten umbiegen – der TestClient selbst (auch httpx) bleibt unberührt."""
+    import httpx
+    orig = httpx.Client.get
+
+    class Resp:
+        def __init__(self, data): self.content, self.status_code = data, 200
+
+    def get(self, url, *a, **k):
+        if isinstance(self, TestClient):
+            return orig(self, url, *a, **k)
+        return Resp(answer(str(url)))
+    monkeypatch.setattr(httpx.Client, "get", get)
+
+
+def wait_job(c, H, budget: float = 30):
+    """Auf das Ende des Hintergrund-Imports warten – großzügig, damit ausgelastete CI-Rechner nicht zu falschen Fehlern führen."""
+    end = time.time() + budget
+    while True:
+        j = c.get("/api/results/job", headers=H).json()
+        if not j["running"] or time.time() > end:
+            return j
+        time.sleep(0.05)
+
+
 def test_parse_kw_tables():
     rows = ra.parse_html_tables(KW_PAGE)
     assert rows == [("DA9AAA", "", "F15"), ("DA9BBB", "", "U08"), ("OK9ZZZ", "", "")]
@@ -58,13 +83,7 @@ def test_archive_import_job(tmp_path, monkeypatch):
     monkeypatch.setenv("BEAMLOG_MAINTAINER", "1")
     pages = {f"{ra.HUB}/~waglog/arch_res.cgi?form=referat&lang=de": KW_PAGE, ra.kw_url("waglog", 2025): KW_PAGE, ra.kw_url("waglog", 2024): KW_PAGE}
 
-    class Resp:
-        def __init__(self, data): self.data = data
-        def read(self): return self.data
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-
-    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: Resp(pages[req.full_url].encode()))
+    fake_http(monkeypatch, lambda url: pages[url].encode())
     monkeypatch.setattr(ra, "DARC_KW", {"waglog": "WAG"})
     app = create_app(tmp_path / "t.db", backup_interval_min=0)
     with TestClient(app) as c:
@@ -74,22 +93,14 @@ def test_archive_import_job(tmp_path, monkeypatch):
         assert [e["id"] for e in lst["entries"]] == ["darc-kw:waglog:2025", "darc-kw:waglog:2024"]
         r = c.post("/api/results/import", json={"ids": ["darc-kw:waglog:2025"]}, headers=H)
         assert r.status_code == 200
-        for _ in range(50):
-            j = c.get("/api/results/job", headers=H).json()
-            if not j["running"]:
-                break
-            time.sleep(0.1)
+        j = wait_job(c, H)
         assert j["done"] == 1 and j["dok"] == 1 and j["new"] == 0 and j["skipped"] == 2  # nur DOK bei der bekannten Station ergänzt
         assert c.get("/api/callbook?q=DA9BBB", headers=H).json()["rows"][0]["dok"] == "U08"
         assert not any(r["call"] == "DA9AAA" for r in c.get("/api/callbook?q=DA9AAA", headers=H).json()["rows"])
         assert c.get("/api/results/sources", headers=H).json()["done"]["darc-kw:waglog:2025"]["n"] == 1
         # mit „ohne Locator aufnehmen“ kommen die übrigen Stationen dazu
         c.post("/api/results/import", json={"ids": ["darc-kw:waglog:2024"], "without_locator": True}, headers=H)
-        for _ in range(50):
-            j = c.get("/api/results/job", headers=H).json()
-            if not j["running"]:
-                break
-            time.sleep(0.1)
+        j = wait_job(c, H)
         assert j["new"] == 2
 
 
@@ -181,19 +192,14 @@ def test_archive_job_runs_lists_in_parallel(tmp_path, monkeypatch):
     state = {"now": 0, "max": 0}
     lock = threading.Lock()
 
-    class Resp:
-        def __init__(self, data): self.data = data
-        def read(self):
-            with lock:
-                state["now"] += 1; state["max"] = max(state["max"], state["now"])
-            time.sleep(0.05)
-            with lock:
-                state["now"] -= 1
-            return self.data
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-
-    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: Resp(pages[req.full_url].encode()))
+    def slow(url):
+        with lock:
+            state["now"] += 1; state["max"] = max(state["max"], state["now"])
+        time.sleep(0.05)
+        with lock:
+            state["now"] -= 1
+        return pages[url].encode()
+    fake_http(monkeypatch, slow)
     monkeypatch.setattr(ra, "DARC_KW", keys)
     app = create_app(tmp_path / "t.db", backup_interval_min=0)
     with TestClient(app) as c:
@@ -201,10 +207,39 @@ def test_archive_job_runs_lists_in_parallel(tmp_path, monkeypatch):
         ids = [e["id"] for e in c.post("/api/results/list", json={"source": "darc-kw"}, headers=H).json()["entries"]]
         assert len(ids) == 10
         c.post("/api/results/import", json={"ids": ids, "without_locator": True}, headers=H)
-        for _ in range(100):
-            j = c.get("/api/results/job", headers=H).json()
-            if not j["running"]:
-                break
-            time.sleep(0.1)
+        j = wait_job(c, H)
         assert j["done"] == 10 and sorted(j["done_ids"]) == sorted(ids) and not j["errors"]
         assert state["max"] > 1  # tatsächlich gleichzeitig geladen
+
+
+def test_fair_slots_limit_and_order():
+    import threading
+    slots = ra.FairSlots(2)
+    state, order, lock = {"now": 0, "max": 0}, [], threading.Lock()
+    gate = threading.Event()
+
+    def hold():
+        with slots:
+            with lock:
+                state["now"] += 1; state["max"] = max(state["max"], state["now"])
+            gate.wait(2)
+            with lock:
+                state["now"] -= 1
+
+    holders = [threading.Thread(target=hold) for _ in range(2)]
+    for t in holders:
+        t.start()
+    time.sleep(0.1)
+
+    def wait(i):
+        with slots:
+            order.append(i)
+    waiters = []
+    for i in range(5):  # stellen sich nacheinander an, während beide Plätze belegt sind
+        waiters.append(threading.Thread(target=wait, args=(i,)))
+        waiters[-1].start()
+        time.sleep(0.05)
+    gate.set()
+    for t in holders + waiters:
+        t.join(3)
+    assert state["max"] == 2 and order == [0, 1, 2, 3, 4]

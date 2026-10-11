@@ -59,7 +59,7 @@ class Cancelled(Exception):
     """Import einer Liste abgebrochen (über den Fortschritts-Rückruf)."""
 
 
-PAGE_WORKERS = 3  # gleichzeitige Abrufe von Einzelseiten innerhalb einer Liste
+PAGE_WORKERS = 8  # gleichzeitige Abrufe von Einzelseiten innerhalb einer Liste (je Server begrenzt der Abrufer zusätzlich)
 IARU_ROBOT = "https://iaru.oevsv.at"
 OK2KKW = "https://www.ok2kkw.com/"
 OK2KKW_INDEX = OK2KKW + "contesting_en.htm"
@@ -243,6 +243,31 @@ def parse_iaru_qsos(page: str) -> list[tuple[str, str, str]]:
         if importers._CALL_TOKEN.fullmatch(call) and prefixes.is_plausible_call(call) and geo.is_valid_locator(loc) and len(loc) >= 6:  # noqa: SLF001
             out.append((call, loc, ""))
     return out
+
+
+class FairSlots:
+    """Wie ein Semaphor, aber der Reihe nach (FIFO): Laufen mehrere Listen gegen denselben Server, kommt jede gleichmäßig dran –
+    ein normaler Semaphor lässt einzelne Seiten minutenlang warten, während andere Threads ständig wieder zugreifen."""
+
+    def __init__(self, n: int):
+        import collections
+        import threading
+        self.free, self.queue, self.cv = n, collections.deque(), threading.Condition()
+
+    def __enter__(self):
+        me = object()
+        with self.cv:
+            self.queue.append(me)
+            while self.queue[0] is not me or not self.free:
+                self.cv.wait()
+            self.queue.popleft()
+            self.free -= 1
+            self.cv.notify_all()  # der Nächste in der Schlange darf prüfen, ob noch ein Platz frei ist
+
+    def __exit__(self, *exc):
+        with self.cv:
+            self.free += 1
+            self.cv.notify_all()
 
 
 def fetch_many(fetch: Fetch, urls: list[str], progress=None, workers: int = 0) -> list[str]:
