@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import socket
 import sys
@@ -68,6 +69,20 @@ def adopt_legacy_names(base: Path) -> None:
         print(f"  Datenbank umbenannt: {old.name} -> {new.name}")
 
 
+def check_port(host: str, port: int) -> None:
+    """Port vorab prüfen und bei Problemen verständlich erklären, statt mit einer knappen uvicorn-Meldung zu enden."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((host if host not in ("", "localhost") else "127.0.0.1", port))
+    except PermissionError:
+        sys.exit(f"  Port {port} darf von diesem Benutzer nicht geöffnet werden (Ports unter 1024 brauchen Sonderrechte).\n"
+                 f"  Server-Dienst: sudo bash deploy/install.sh --update (die Unit erlaubt Port 80), sonst einen Port ab 1024 wählen.")
+    except OSError as e:
+        sys.exit(f"  Port {port} ist belegt oder nicht verfügbar ({e.strerror}).\n"
+                 f"  Welches Programm ihn belegt:  sudo ss -ltnp 'sport = :{port}'  (z. B. nginx oder ein zweites BeamLog)")
+
+
 CONFIG_KEYS = ("HOST", "PORT", "DB", "BACKUP_MIN", "PUBLIC_URL", "OPEN_BROWSER", "KST_HOST", "KST_PORT", "GITHUB_TOKEN", "MAINTAINER", "DEV")
 
 
@@ -82,7 +97,7 @@ def load_env_file(path: Path) -> dict[str, str]:
             continue
         k, v = line.split("=", 1)
         k = k.strip().upper().removeprefix("BEAMLOG_").removeprefix("CONTESTLOGGER_")
-        v = v.strip().strip('"').strip("'")
+        v = re.sub(r"\s+#.*$", "", v).strip().strip('"').strip("'")  # Kommentar hinter dem Wert („PORT=80   # direkt“)
         if k in CONFIG_KEYS:
             out[k] = v
     return out
@@ -141,6 +156,7 @@ def main() -> None:
         import threading
         import webbrowser
         threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{a.port}")).start()
+    check_port(a.host, a.port)
     uvicorn.run(app, host=a.host, port=a.port, log_level="warning")
 
 

@@ -16,7 +16,6 @@ Danach läuft der Logger unter `http://<server-ip>/`. Enthalten:
 | `install.sh` | Kopiert das Programm nach `/opt/beamlog`, legt den Nutzer `beamlog` an, installiert Dienst, nginx-Site und Backup-Cron. `--update` spielt eine neue Version ein, `--url` setzt die öffentliche Adresse (QR-Code). |
 | `beamlog.env` | Vorlage für `/etc/beamlog/beamlog.env` – **alle Server-Einstellungen** (Host, Port, Datenbank, Backup-Takt, öffentliche Adresse, KST-Server, GitHub-Token). |
 | `beamlog.service` | systemd-Dienst: liest `/etc/beamlog/beamlog.env`, Neustart bei Absturz, gehärtet (PrivateTmp, ProtectSystem). |
-| `beamlog-port80.service` | Alternative Unit ohne nginx: Dienst direkt auf Port 80 (`CAP_NET_BIND_SERVICE`). |
 | `nginx-beamlog.conf` | nginx-Site auf Port 80 mit WebSocket-Weiterleitung. |
 | `backup.sh` | Tägliche gepackte Sicherung nach `/var/lib/beamlog/backup-daily/` (30 Tage). |
 
@@ -75,17 +74,18 @@ unverändert; `--url` trägt nur `PUBLIC_URL` ein. Umgebungsvariablen `BEAMLOG_<
 
 ## Ohne nginx: Dienst direkt auf Port 80
 
-Ein normaler Nutzer darf Port 80 nicht öffnen (`[Errno 13] permission denied`). Die Unit `beamlog-port80.service`
-gibt dem Dienst über `AmbientCapabilities=CAP_NET_BIND_SERVICE` genau diese Berechtigung und lauscht auf `0.0.0.0:80`:
+Port und Adresse stehen nur in `/etc/beamlog/beamlog.env` – das Install-Skript richtet sich danach:
+
+- **`PORT=80`** (mit `HOST=0.0.0.0`): BeamLog ist direkt erreichbar, **ohne nginx**. Das Skript schaltet nginx dann ab
+  (es würde Port 80 belegen); der Dienst darf Port 80 öffnen (`CAP_NET_BIND_SERVICE` in der Unit).
+- **jeder andere Port** (Standard `8000`, `HOST=127.0.0.1`): nginx nimmt Port 80 an und leitet an diesen Port weiter.
 
 ```bash
-sudo systemctl disable --now nginx            # falls nginx Port 80 belegt
-sudo cp /opt/beamlog/deploy/beamlog-port80.service /etc/systemd/system/beamlog.service
-sudo systemctl daemon-reload
-sudo systemctl restart beamlog
+sudo nano /etc/beamlog/beamlog.env            # PORT=80 und HOST=0.0.0.0 eintragen
+sudo bash deploy/install.sh --update          # im entpackten BeamLog-Ordner: stellt nginx und Dienst passend ein
 ```
 
-Mit nginx dagegen bleibt der Dienst auf `127.0.0.1:8000` (Standard-Unit), nginx übernimmt Port 80.
+Nur `sudo systemctl restart beamlog` reicht beim Wechsel zwischen den beiden Varianten nicht, weil dann nginx weiter Port 80 belegt.
 
 ## Dienst bedienen
 

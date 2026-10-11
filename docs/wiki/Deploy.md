@@ -94,14 +94,18 @@ ReadWritePaths=/var/lib/beamlog
 
 ## Ohne nginx: direkt auf Port 80
 
-Ein normaler Nutzer darf Port 80 nicht öffnen (`[Errno 13] permission denied`). Die Unit `deploy/beamlog-port80.service` gibt dem Dienst über `AmbientCapabilities=CAP_NET_BIND_SERVICE` genau diese Berechtigung und setzt `0.0.0.0:80` fest (alle anderen Werte kommen weiter aus `beamlog.env`):
+Port und Adresse stehen nur in `/etc/beamlog/beamlog.env` – das Install-Skript richtet sich danach:
+
+- **`PORT=80`** (mit `HOST=0.0.0.0`): BeamLog ist direkt erreichbar, **ohne nginx**. Das Skript schaltet nginx dann ab
+  (es würde Port 80 belegen); der Dienst darf Port 80 öffnen (`CAP_NET_BIND_SERVICE` in der Unit).
+- **jeder andere Port** (Standard `8000`, `HOST=127.0.0.1`): nginx nimmt Port 80 an und leitet an diesen Port weiter.
 
 ```bash
-sudo systemctl disable --now nginx            # falls nginx Port 80 belegt
-sudo cp /opt/beamlog/deploy/beamlog-port80.service /etc/systemd/system/beamlog.service
-sudo systemctl daemon-reload
-sudo systemctl restart beamlog
+sudo nano /etc/beamlog/beamlog.env            # PORT=80 und HOST=0.0.0.0 eintragen
+sudo bash deploy/install.sh --update          # im entpackten BeamLog-Ordner: stellt nginx und Dienst passend ein
 ```
+
+Nur `sudo systemctl restart beamlog` reicht beim Wechsel zwischen den beiden Varianten nicht, weil dann nginx weiter Port 80 belegt.
 
 ## nginx-Site
 

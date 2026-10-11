@@ -16,6 +16,10 @@ ExecStart=/opt/beamlog/.venv/bin/python run.py --config /etc/beamlog/beamlog.env
 Restart=always
 RestartSec=3
 
+# Port aus beamlog.env – auch Port 80 ohne nginx (PORT=80): der Dienst darf Ports < 1024 öffnen, sonst keine Rechte
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
 # Härtung
 NoNewPrivileges=true
 PrivateTmp=true

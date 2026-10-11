@@ -30,10 +30,26 @@ done
 if [ "$(id -u)" -ne 0 ]; then echo "Bitte mit sudo ausführen."; exit 1; fi
 if [ ! -x "$SRC_DIR/BeamLog" ]; then echo "BeamLog-Binary nicht gefunden in $SRC_DIR – bitte aus dem entpackten ZIP-Ordner aufrufen."; exit 1; fi
 
+# Wert aus der env-Datei lesen (letzte Zeile gewinnt, Kommentare/Anführungszeichen entfernt)
+conf_get() { { grep -E "^[[:space:]]*$1=" "$CONF" 2>/dev/null || true; } | tail -1 | cut -d= -f2- | sed -e 's/[[:space:]]#.*$//' -e "s/^[[:space:]\"']*//" -e "s/[[:space:]\"']*\$//"; }
+conf_set() { if grep -qE "^[[:space:]]*#?[[:space:]]*$1=" "$CONF"; then sed -i -E "s|^[[:space:]]*#?[[:space:]]*$1=.*|$1=$2|" "$CONF"; else echo "$1=$2" >> "$CONF"; fi; }
+# Optionen --port/--host/--public-url aus einer (alten) Dienst-Unit in die env-Datei übernehmen – die neue Unit hat keine
+adopt_unit_options() {
+  local unit=$1 opt key val
+  [ -f "$unit" ] && [ -f "$CONF" ] || return 0
+  for opt in port host public-url; do
+    val=$({ grep -o -- "--$opt [^ ]*" "$unit" || true; } | awk '{print $2}' | tail -1)
+    key=$(echo "$opt" | tr 'a-z-' 'A-Z_')
+    if [ -n "$val" ] && [ "$(conf_get "$key")" != "$val" ]; then conf_set "$key" "$val"; echo "   $key=$val aus $(basename "$unit") übernommen"; fi
+  done
+}
+
 # Server aus Version 0.9 (hieß „ContestLogger“): Dienst, Nutzer, Pfade und Dateien auf BeamLog umstellen.
 # Die alten Daten in /var/lib/contestlogger bleiben als Sicherung liegen (kopiert, nicht verschoben).
 MIGRATED=0
 NGINX_FAILED=0
+SERVICE_FAILED=0
+DIRECT=0
 migrate_from_contestlogger() {
   [ -e /etc/systemd/system/contestlogger.service ] || [ -d /etc/contestlogger ] || return 0
   echo "== Umstellung von ContestLogger auf BeamLog"
@@ -54,12 +70,9 @@ migrate_from_contestlogger() {
         -e 's/CONTESTLOGGER_/BEAMLOG_/g' /etc/contestlogger/contestlogger.env > "$CONF"
     echo "   Einstellungen: /etc/contestlogger/contestlogger.env -> $CONF"
   fi
-  # ganz alte Unit mit --public-url in ExecStart: Adresse in die env-Datei übernehmen
+  # Port/Adresse aus der alten Unit übernehmen (z. B. die Port-80-Variante mit --host 0.0.0.0 --port 80)
   local unit=/etc/systemd/system/contestlogger.service
-  if [ -f "$unit" ] && [ -f "$CONF" ] && grep -q -- '--public-url' "$unit"; then
-    local url; url=$(grep -o -- '--public-url [^ ]*' "$unit" | awk '{print $2}')
-    if [ -n "$url" ]; then sed -i "s#^\#\?PUBLIC_URL=.*#PUBLIC_URL=$url#" "$CONF"; fi
-  fi
+  adopt_unit_options "$unit"
   rm -f "$unit"
   if [ -f /etc/nginx/sites-available/contestlogger ]; then   # eigene Anpassungen (z. B. HTTPS) bleiben erhalten
     sed -e 's#/opt/contestlogger/#/opt/beamlog/#g' \
@@ -105,17 +118,32 @@ if [ -n "$PUBLIC_URL" ]; then
 fi
 chmod 640 "$CONF"; chown root:beamlog "$CONF"
 
-echo "== systemd-Dienst"
-cp "$APP_DIR/deploy/beamlog.service" /etc/systemd/system/beamlog.service
-systemctl daemon-reload
-systemctl enable beamlog >/dev/null
-systemctl restart beamlog
+# Port und Adresse kommen aus der env-Datei. PORT=80: BeamLog direkt erreichbar, ohne nginx davor.
+# Jeder andere Port: nginx auf Port 80 leitet an 127.0.0.1:<PORT> weiter.
+adopt_unit_options /etc/systemd/system/beamlog.service   # von Hand eingespielte Unit mit --port 80 o. ä.
+CONF_PORT=$(conf_get PORT); CONF_PORT=${CONF_PORT:-8000}
+CONF_HOST=$(conf_get HOST); CONF_HOST=${CONF_HOST:-0.0.0.0}
+if [ "$CONF_PORT" = 80 ]; then
+  DIRECT=1
+  if [ "$CONF_HOST" = 127.0.0.1 ] || [ "$CONF_HOST" = localhost ]; then
+    conf_set HOST 0.0.0.0; CONF_HOST=0.0.0.0
+    echo "   PORT=80 ohne nginx: HOST auf 0.0.0.0 gesetzt (sonst wäre BeamLog nur am Server selbst erreichbar)"
+  fi
+fi
 
-if [ "$MODE" = install ] || [ "$MIGRATED" = 1 ]; then
-  echo "== nginx (Port 80 -> Dienst auf 127.0.0.1:8000)"
+if [ "$DIRECT" = 1 ]; then
+  echo "== nginx: nicht nötig, BeamLog läuft direkt auf Port 80"
+  rm -f /etc/nginx/sites-enabled/beamlog
+  if systemctl is-active --quiet nginx 2>/dev/null; then
+    echo "   nginx belegt Port 80 und wird angehalten (wieder einschalten: sudo systemctl enable --now nginx)"
+    systemctl disable --now nginx >/dev/null 2>&1 || true
+  fi
+elif [ "$MODE" = install ] || [ "$MIGRATED" = 1 ] || [ ! -e /etc/nginx/sites-enabled/beamlog ]; then
+  echo "== nginx (Port 80 -> Dienst auf 127.0.0.1:$CONF_PORT)"
   if [ "$MODE" = install ] || [ ! -f /etc/nginx/sites-available/beamlog ]; then
     cp "$APP_DIR/deploy/nginx-beamlog.conf" /etc/nginx/sites-available/beamlog
   fi
+  sed -i -E "s#proxy_pass http://127\.0\.0\.1:[0-9]+#proxy_pass http://127.0.0.1:$CONF_PORT#g" /etc/nginx/sites-available/beamlog
   ln -sf /etc/nginx/sites-available/beamlog /etc/nginx/sites-enabled/beamlog
   rm -f /etc/nginx/sites-enabled/default
   # nginx starten, falls es (noch) nicht läuft – ein reines „reload“ scheitert bei gestopptem nginx
@@ -125,7 +153,21 @@ if [ "$MODE" = install ] || [ "$MIGRATED" = 1 ]; then
   else
     NGINX_FAILED=1
   fi
+else
+  # nginx-Site vorhanden: nur den Zielport nachziehen, falls PORT geändert wurde
+  if ! grep -q "proxy_pass http://127.0.0.1:$CONF_PORT" /etc/nginx/sites-available/beamlog 2>/dev/null; then
+    sed -i -E "s#proxy_pass http://127\.0\.0\.1:[0-9]+#proxy_pass http://127.0.0.1:$CONF_PORT#g" /etc/nginx/sites-available/beamlog
+    if nginx -t >/dev/null 2>&1; then systemctl reload-or-restart nginx || NGINX_FAILED=1; else NGINX_FAILED=1; fi
+  fi
 fi
+
+echo "== systemd-Dienst"
+cp "$APP_DIR/deploy/beamlog.service" /etc/systemd/system/beamlog.service
+systemctl daemon-reload
+systemctl enable beamlog >/dev/null
+systemctl restart beamlog || true
+sleep 2
+systemctl is-active --quiet beamlog || SERVICE_FAILED=1
 
 # Tägliches Backup – bei jedem Lauf einrichten (fehlt sonst, falls ein früherer Lauf abgebrochen ist)
 echo "== Tägliches Backup (03:15 Uhr) nach $DATA_DIR/backup-daily (30 Tage)"
@@ -136,15 +178,21 @@ echo "15 3 * * * root /usr/local/bin/beamlog-backup" > /etc/cron.d/beamlog-backu
 sleep 1
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 echo
-echo "Fertig. BeamLog läuft: http://${IP:-<server-ip>}/   (Status: systemctl status beamlog)"
+echo "Fertig. BeamLog: http://${IP:-<server-ip>}/   (Status: systemctl status beamlog)"
 echo "Datenbank: $DATA_DIR/beamlog.db   Logs: journalctl -u beamlog -f"
 echo "Einstellungen: $CONF   (danach: sudo systemctl restart beamlog)"
 echo "Update später: neues ZIP entpacken und dort  sudo bash deploy/install.sh --update"
 if [ "$MIGRATED" = 1 ]; then echo "Umgestellt von ContestLogger – die alten Daten liegen noch in /var/lib/contestlogger und können gelöscht werden."; fi
+if [ "$SERVICE_FAILED" = 1 ]; then
+  echo
+  echo "!! Der Dienst beamlog läuft nicht. Ursache ansehen:  sudo journalctl -u beamlog -n 40 --no-pager"
+  if [ "$DIRECT" = 1 ]; then echo "   Port 80 belegt?  sudo ss -ltnp 'sport = :80'"; fi
+fi
 if [ "$NGINX_FAILED" = 1 ]; then
   echo
-  echo "!! nginx läuft nicht – BeamLog selbst läuft (127.0.0.1:8000), ist aber über Port 80 noch nicht erreichbar."
+  echo "!! nginx läuft nicht – BeamLog selbst läuft (127.0.0.1:$CONF_PORT), ist aber über Port 80 noch nicht erreichbar."
   echo "   Ursache ansehen:   sudo journalctl -u nginx -n 30 --no-pager"
   echo "   Port 80 belegt?    sudo ss -ltnp 'sport = :80'   (z. B. apache2: sudo systemctl disable --now apache2)"
   echo "   Danach:            sudo systemctl enable --now nginx"
+  echo "   Ohne nginx:        in $CONF  PORT=80  eintragen und  sudo bash deploy/install.sh --update"
 fi

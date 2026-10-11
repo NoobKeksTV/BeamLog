@@ -126,3 +126,19 @@ def test_changelog_and_update_api(tmp_path, monkeypatch):
         assert r["available"] and r["frozen"] is False
         assert c.get("/api/update/status").json()["available"] is True
         assert c.post("/api/update/apply", headers=H).status_code == 400  # Quellcode-Installation
+
+
+def test_env_file_inline_comments_and_port_check(tmp_path):
+    import socket
+
+    import pytest
+
+    import run
+    f = tmp_path / "beamlog.env"
+    f.write_text('PORT=80   # direkt ohne nginx\nHOST="0.0.0.0" # alle\nPUBLIC_URL=http://contest.local/#x\n')
+    assert run.load_env_file(f) == {"PORT": "80", "HOST": "0.0.0.0", "PUBLIC_URL": "http://contest.local/#x"}
+    with socket.socket() as busy:  # belegter Port -> verständliche Meldung statt Absturz
+        busy.bind(("127.0.0.1", 0)); busy.listen()
+        with pytest.raises(SystemExit) as e:
+            run.check_port("127.0.0.1", busy.getsockname()[1])
+    assert "belegt" in str(e.value)
