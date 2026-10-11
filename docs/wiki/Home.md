@@ -1,8 +1,28 @@
+<div align="center">
+
+<img src="img/logo.png" width="96" alt="BeamLog-Logo">
+
 # BeamLog – Wiki
 
-BeamLog (früher „ContestLogger“) ist ein lokaler, webbasierter Contest-Logger für UKW-Contests (DARC/IARU Region 1), basierend auf DD3KU WinContest. Ein kleiner Server im LAN ist der zentrale Speicher; geloggt wird von beliebig vielen Rechnern, Tablets oder Handys im Browser. Keine Accounts, nur ein Nickname.
+**Lokaler, webbasierter Contest-Logger für UKW-Contests (DARC / IARU Region 1)**
 
-**Video:** [BeamLog in 1:42 Minuten auf YouTube](https://youtu.be/yvYb6FNvjzA) · **Ausprobieren ohne Installation:** [Live-Demo auf beamlogdemo.lhprinting.de](https://beamlogdemo.lhprinting.de/) (öffentlich, wird regelmäßig zurückgesetzt).
+[![Download](https://img.shields.io/github/v/release/NoobKeksTV/BeamLog?label=Download&color=3fb3ff)](https://github.com/NoobKeksTV/BeamLog/releases/latest)
+[![Live-Demo](https://img.shields.io/badge/Live--Demo-ausprobieren-ff8c1a)](https://beamlogdemo.lhprinting.de/)
+[![Video](https://img.shields.io/badge/Video-YouTube-ff0000?logo=youtube&logoColor=white)](https://youtu.be/yvYb6FNvjzA)
+[![Lizenz: GNU AGPLv3](https://img.shields.io/badge/Lizenz-GNU%20AGPLv3-a32d2a)](https://github.com/NoobKeksTV/BeamLog/blob/main/LICENSE)
+
+<a href="https://youtu.be/yvYb6FNvjzA"><img src="img/video-vorschau.jpg" width="720" alt="BeamLog in 1:42 Minuten – Video auf YouTube ansehen"></a>
+
+<sub>🎬 <a href="https://youtu.be/yvYb6FNvjzA">Video „BeamLog in 1:42 Minuten“ auf YouTube ansehen</a></sub>
+
+</div>
+
+BeamLog (früher „ContestLogger“) basiert auf DD3KU WinContest. Ein kleiner Server im LAN ist der zentrale Speicher; geloggt wird von beliebig vielen Rechnern, Tablets oder Handys im Browser. Keine Accounts, nur ein Nickname.
+
+> **🧪 Live-Demo – ohne Installation ausprobieren:** **[beamlogdemo.lhprinting.de](https://beamlogdemo.lhprinting.de/)**
+>
+> Admin- und Stations-Passwort: `demo` · Beispiel-Contest mit drei Stationen und QSOs · wird täglich zurückgesetzt.
+> Alles ist für andere Besucher sichtbar – bitte keine echten Logs oder Zugangsdaten eintragen.
 
 ![Loggen](img/loggen.png)
 
