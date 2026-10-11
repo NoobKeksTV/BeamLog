@@ -9,7 +9,8 @@ spec.loader.exec_module(ws)
 def test_links_lose_md_extension():
     src = "Siehe [Installation](Installation.md), [Port 80](Deploy.md#ohne-nginx-direkt-auf-port-80), [extern](https://x.de/a.md), ![Bild](img/a.png), [oben](#start)"
     assert ws.convert(src) == ("Siehe [Installation](Installation), [Port 80](Deploy#ohne-nginx-direkt-auf-port-80), [extern](https://x.de/a.md), "
-                               "![Bild](img/a.png), [oben](#start)")
+                               f"![Bild]({ws.RAW}/img/a.png), [oben](#start)")
+    assert ws.convert('<a href="x"><img src="img/v.jpg" width="9"></a>') == f'<a href="x"><img src="{ws.RAW}/img/v.jpg" width="9"></a>'
 
 
 def test_sync_real_wiki(tmp_path):
