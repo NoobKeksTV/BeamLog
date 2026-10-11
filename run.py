@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Startet den BeamLog-Server.
 
-    python run.py                 # Port 8000, erreichbar im ganzen LAN
+Empfohlen: ./start.sh (Linux/macOS/Raspberry Pi) bzw. start.bat (Windows) – legt beim ersten Mal die virtuelle
+Umgebung .venv an und hält die Pakete aktuell. Danach geht auch direkt:
+
+    python run.py                 # Port 8000, erreichbar im ganzen LAN (nutzt automatisch .venv, falls vorhanden)
     python run.py --port 8080
     python run.py --db /pfad/zur/datei.db
 """
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import re
 import shutil
@@ -15,10 +19,39 @@ import socket
 import sys
 from pathlib import Path
 
-import uvicorn
+# Pakete aus requirements.txt (Importname). Fehlen sie im aufrufenden Python (z. B. „python run.py“ mit dem System-Python),
+# wird automatisch die virtuelle Umgebung .venv neben run.py genommen, die start.sh/start.bat bzw. install.sh anlegen.
+REQUIRED = ("fastapi", "uvicorn", "multipart", "qrcode", "pypdf", "construct", "tabulate", "httpx")
 
-from contestlogger import __app_name__, __copyright__, __version__, env
-from contestlogger.app import create_app
+
+def ensure_packages() -> None:
+    if getattr(sys, "frozen", False):
+        return
+    missing = [m for m in REQUIRED if importlib.util.find_spec(m) is None]
+    if not missing:
+        return
+    venv = Path(__file__).resolve().parent / ".venv"
+    py = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    if py.exists() and Path(sys.prefix).resolve() != venv.resolve() and not os.environ.get("BEAMLOG_VENV_REEXEC"):
+        os.environ["BEAMLOG_VENV_REEXEC"] = "1"
+        args = [str(py), str(Path(__file__).resolve()), *sys.argv[1:]]
+        if os.name == "nt":  # execv ersetzt unter Windows den Prozess nicht sauber – als Kindprozess starten
+            import subprocess
+            sys.exit(subprocess.call(args))
+        os.execv(str(py), args)
+    starter = "start.bat" if os.name == "nt" else "./start.sh"
+    where = "in .venv " if Path(sys.prefix).resolve() == venv.resolve() else ""
+    sys.exit(f"BeamLog: Python-Pakete fehlen {where}({', '.join(missing)}).\n"
+             f"  Am einfachsten mit {starter} starten – richtet .venv ein und installiert/aktualisiert alles.\n"
+             f"  Oder von Hand: {sys.executable} -m pip install -r requirements.txt")
+
+
+ensure_packages()
+
+import uvicorn  # noqa: E402
+
+from contestlogger import __app_name__, __copyright__, __version__, env  # noqa: E402
+from contestlogger.app import create_app  # noqa: E402
 
 
 def lan_ip() -> str:

@@ -119,7 +119,7 @@ eine manuelle Sicherung an derselben Stelle an.
 
 ## Ohne nginx
 
-Für den schnellen Einsatz reicht auch `python run.py` (lauscht auf 0.0.0.0:8000) – nginx
+Für den schnellen Einsatz reicht auch `./start.sh` im Repo-Ordner (richtet `.venv` ein, lauscht auf 0.0.0.0:8000) – nginx
 bringt nur Port 80, HTTPS-Option und das Ausliefern statischer Dateien.
 
 ## Umstieg von ContestLogger 0.9 (Server)

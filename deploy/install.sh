@@ -172,6 +172,7 @@ echo "== Python-Umgebung $APP_DIR/.venv"
 [ -d "$APP_DIR/.venv" ] || as_run python3 -m venv "$APP_DIR/.venv"
 as_run "$APP_DIR/.venv/bin/pip" install -q --upgrade pip
 as_run "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/requirements.txt"
+as_run cp "$APP_DIR/requirements.txt" "$APP_DIR/.venv/.requirements.installed"   # start.sh installiert dann nicht erneut
 if [ "$HERE" = 0 ]; then chown -R beamlog:beamlog "$APP_DIR" "$DATA_DIR"; fi
 
 echo "== Konfiguration $CONF"
@@ -284,7 +285,7 @@ fi
 
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 START_CMD="sudo -u beamlog sh -c 'cd $APP_DIR && .venv/bin/python run.py --config $CONF'"
-[ "$HERE" = 1 ] && START_CMD="cd $APP_DIR && .venv/bin/python run.py"
+[ "$HERE" = 1 ] && START_CMD="cd $APP_DIR && ./start.sh"
 echo
 if [ "$HERE" = 0 ]; then
   echo ">>> Installiert nach $APP_DIR (kopiert wegen des systemd-Dienstes) – Daten: $DATA_DIR, Einstellungen: $CONF"

@@ -87,7 +87,7 @@ deutlich. Ohne Dienst wird nichts kopiert, BeamLog bleibt im aktuellen Ordner: `
 `--here` bleibt im Ordner und richtet trotzdem Dienst, nginx und Backup ein. Anleitung im
 [Wiki › Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy) (dort auch die [öffentliche Demo-Instanz](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy#öffentliche-demo-instanz) mit `DEMO=1`).
 
-Aus dem Quellcode: `pip install -r requirements.txt && python run.py` (Python 3.11+).
+Aus dem Quellcode (Python 3.11+): `./start.sh` (Linux/macOS/Raspberry Pi) bzw. `start.bat` (Windows) – legt beim ersten Mal die virtuelle Umgebung `.venv` an, installiert die Pakete und hält sie nach `git pull` aktuell. Danach startet auch `python run.py` (nimmt `.venv` automatisch).
 
 ## Bilder
 

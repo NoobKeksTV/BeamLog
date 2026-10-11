@@ -72,9 +72,21 @@ Beim ersten Start blockiert Gatekeeper eventuell das Programm: Rechtsklick → �
 ```bash
 git clone https://github.com/NoobKeksTV/BeamLog.git
 cd BeamLog
-python3 -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python run.py                                      # http://localhost:8000
+./start.sh                                         # Windows: start.bat – http://localhost:8000
+```
+
+`start.sh`/`start.bat` legen beim ersten Mal die virtuelle Umgebung `.venv` an und installieren die Pakete aus
+`requirements.txt`; ändert sich die Datei (z. B. nach `git pull`), wird beim nächsten Start nachinstalliert. Optionen
+gehen durch, z. B. `./start.sh --port 8080`. Danach funktioniert auch `python run.py` – fehlen dem aufrufenden Python
+die Pakete, nimmt `run.py` automatisch `.venv`. Fehlt `python3-venv` (Debian/Ubuntu): `sudo apt install python3-venv`
+oder `sudo bash deploy/install.sh --deps-only` (installiert Systempakete und `.venv`, bleibt im Ordner).
+
+Von Hand ohne Startskript:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt      # Windows: .venv\Scripts\python -m pip …
+.venv/bin/python run.py
 ```
 
 Voraussetzung: Python 3.11 oder neuer. Tests: `python -m pytest -q`. Portable Pakete selbst bauen: `python build_tools/build.py` (erzeugt `dist/BeamLog-<version>-<os>-<arch>.zip`).
