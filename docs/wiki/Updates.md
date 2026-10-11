@@ -6,7 +6,7 @@
 
 Der Server prüft stündlich die GitHub-Releases (Verwaltung → Updates → „automatisch prüfen“). Liegt eine neuere Version vor, erscheint bei allen Nutzern im Kopf der grüne Knopf **⬆ v0.9.28** und ein kurzer Hinweis; der Knopf führt zur Verwaltung. „Nach Updates suchen“ prüft sofort und zeigt die Release-Notes.
 
-Das Repo ist öffentlich, ein Token ist nicht nötig. (Nur für ein privates Fork: `GITHUB_TOKEN` in `beamlog.env` setzen.)
+Das Repo ist öffentlich, ein Token ist nicht nötig. (Nur für ein privates Fork: `GITHUB_TOKEN` in `.env` setzen.)
 
 ## Stationsdatenbank aktualisieren
 

@@ -8,6 +8,7 @@ venv/
 build/
 dist/
 *.spec
+/.env
 /beamlog.env
 /.install.options
 /contestlogger.env

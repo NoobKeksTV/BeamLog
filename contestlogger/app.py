@@ -219,7 +219,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             raise HTTPException(403, "Admin-Anmeldung erforderlich")
 
     def is_maintainer() -> bool:
-        """Betreuer-Modus (MAINTAINER=1 in beamlog.env): Quellen-Importe für die zentrale Stationsdatenbank."""
+        """Betreuer-Modus (MAINTAINER=1 in .env): Quellen-Importe für die zentrale Stationsdatenbank."""
         on = ("1", "true", "yes", "ja", "on")
         if DEMO:
             return False
@@ -229,7 +229,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if not is_admin(x_admin_token):
             raise HTTPException(403, "Admin-Anmeldung erforderlich")
         if not is_maintainer():
-            raise HTTPException(403, "Nur im Betreuer-Modus (MAINTAINER=1 in beamlog.env). Normale Installationen holen die Liste über „Nach neuen suchen (Repo)“.")
+            raise HTTPException(403, "Nur im Betreuer-Modus (MAINTAINER=1 in .env). Normale Installationen holen die Liste über „Nach neuen suchen (Repo)“.")
 
     def require_station(sid: int, token: str | None, admin: str | None) -> dict:
         station = db.get_station(sid)

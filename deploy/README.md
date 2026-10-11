@@ -14,14 +14,14 @@ sudo bash deploy/install.sh
 ```
 
 Das Skript installiert Python, nginx und mdbtools, kopiert den Code nach `/opt/beamlog`,
-legt den Systembenutzer `beamlog` an, schreibt die Konfiguration `/etc/beamlog/beamlog.env`,
+legt den Systembenutzer `beamlog` an, schreibt die Konfiguration `/etc/beamlog/.env`,
 richtet den systemd-Dienst und die nginx-Site ein und aktiviert ein tägliches Backup nach
 `/var/lib/beamlog/backup/` (30 Tage Aufbewahrung). `--url http://contest.local/` setzt die öffentliche Adresse.
 
 ### Teile weglassen und im Ordner bleiben
 
 **Wohin installiert wird:** Mit Dienst kopiert das Skript BeamLog nach `/opt/beamlog` (Daten in `/var/lib/beamlog`,
-Einstellungen in `/etc/beamlog/beamlog.env`): Der Dienst läuft dort als eigener Systemnutzer `beamlog` mit gehärteter
+Einstellungen in `/etc/beamlog/.env`): Der Dienst läuft dort als eigener Systemnutzer `beamlog` mit gehärteter
 Unit, die keinen Zugriff auf `/home` hat, und ein neu entpacktes ZIP lässt sich per `--update` einfach darüberspielen.
 Das Skript kündigt das Kopieren deutlich an. **Ohne Dienst (`--no-service`) wird nichts kopiert** – BeamLog bleibt
 automatisch im aktuellen Ordner. Mit `--here` bleibt es auch mit Dienst dort (die Unit läuft dann als dein Nutzer).
@@ -34,7 +34,7 @@ Beliebig kombinierbar; die Wahl wird in `/etc/beamlog/install.options` gemerkt u
 | `--no-service` | kein systemd-Dienst – das Skript zeigt den Startbefehl; ein früherer Dienst `beamlog` wird angehalten und entfernt |
 | `--no-backup` | kein täglicher Backup-Cron (ein vorhandener wird entfernt) |
 | `--with-nginx` / `--with-service` / `--with-backup` | wieder einrichten |
-| `--here` | Nicht kopieren: BeamLog bleibt im aktuellen Ordner und läuft als der aufrufende Nutzer; Daten in `./data`, Einstellungen in `./beamlog.env`. Dienst, nginx und Backup-Cron zeigen auf diesen Ordner. |
+| `--here` | Nicht kopieren: BeamLog bleibt im aktuellen Ordner und läuft als der aufrufende Nutzer; Daten in `./data`, Einstellungen in `./.env`. Dienst, nginx und Backup-Cron zeigen auf diesen Ordner. |
 | `--deps-only` | Nur die Voraussetzungen installieren (Systempakete, beim Quellcode zusätzlich `./.venv`) – wie `--here --no-nginx --no-service --no-backup`; danach selbst starten. |
 | `--system` | Gemerkte `--here`-Wahl aufheben und wieder nach `/opt/beamlog` installieren. |
 
@@ -48,7 +48,7 @@ sudo bash deploy/install.sh --update --with-nginx      # einen Teil später wied
 sudo bash deploy/install.sh --help                     # alle Optionen
 ```
 
-## Einstellungen: /etc/beamlog/beamlog.env
+## Einstellungen: /etc/beamlog/.env
 
 Alle Server-Einstellungen stehen in dieser Datei (`.env`-Format), die Unit selbst enthält keine Optionen:
 
@@ -80,8 +80,8 @@ sudo bash deploy/install.sh --update
 
 | Datei | Zweck |
 |---|---|
-| `beamlog.service` | systemd-Dienst, läuft als Benutzer `beamlog`, liest `/etc/beamlog/beamlog.env` (Standard: nur 127.0.0.1:8000) |
-| `portable/` | Dateien für die portable Version (Binary statt venv) inkl. `beamlog.env`-Vorlage und Port-80-Unit |
+| `beamlog.service` | systemd-Dienst, läuft als Benutzer `beamlog`, liest `/etc/beamlog/.env` (Standard: nur 127.0.0.1:8000) |
+| `portable/` | Dateien für die portable Version (Binary statt venv) inkl. `.env`-Vorlage und Port-80-Unit |
 | `nginx-beamlog.conf` | nginx-Site auf Port 80, Reverse-Proxy inkl. WebSocket, statische Dateien direkt |
 | `nginx-beamlog-ssl.conf` | optionale HTTPS-Variante mit selbstsigniertem Zertifikat |
 | `install.sh` | Installation / Update in einem Rutsch; `--no-nginx`, `--no-service`, `--no-backup` lassen Teile weg (kombinierbar) |
@@ -130,7 +130,7 @@ automatisch um:
 
 - Dienst `contestlogger` wird gestoppt und entfernt, `beamlog` eingerichtet und gestartet,
 - Daten werden von `/var/lib/contestlogger/` nach `/var/lib/beamlog/` **kopiert** (Datenbank heißt dann `beamlog.db`),
-- `/etc/contestlogger/contestlogger.env` wird zu `/etc/beamlog/beamlog.env` (Pfade darin werden angepasst),
+- `/etc/contestlogger/contestlogger.env` wird zu `/etc/beamlog/.env` (Pfade darin werden angepasst),
 - die nginx-Site (auch eine eigene HTTPS-Anpassung) und das tägliche Backup werden übernommen.
 
 Die alten Daten bleiben in `/var/lib/contestlogger/` als Sicherung liegen und können danach gelöscht werden.

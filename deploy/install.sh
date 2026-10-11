@@ -16,20 +16,21 @@
 # Mit Dienst wird BeamLog nach /opt/beamlog kopiert (fester Ort, eigener Systemnutzer, gehärtete Unit) – das Skript
 # sagt das deutlich. Im aktuellen Ordner lassen statt zu kopieren:
 #   --here         BeamLog bleibt, wo es liegt (dieser Ordner), läuft als der aufrufende Nutzer; Daten in ./data,
-#                  Einstellungen in ./beamlog.env. Dienst, nginx und Backup-Cron zeigen dann auf diesen Ordner.
+#                  Einstellungen in ./.env. Dienst, nginx und Backup-Cron zeigen dann auf diesen Ordner.
 #   --deps-only    nur die Voraussetzungen installieren (Systempakete und Python-Umgebung ./.venv) –
 #                  wie --here --no-nginx --no-service --no-backup; danach selbst starten
 #   --system       gemerkte --here-Wahl aufheben und wieder nach /opt/beamlog installieren
 #   Beispiel:  sudo bash deploy/install.sh --deps-only        bzw.   sudo bash deploy/install.sh --here --no-nginx
 #   Beispiel:  sudo bash deploy/install.sh --no-nginx --no-backup
 #
-# Alle Server-Einstellungen stehen in /etc/beamlog/beamlog.env (wird beim ersten Lauf angelegt).
+# Alle Server-Einstellungen stehen in /etc/beamlog/.env (wird beim ersten Lauf angelegt; eine vorhandene
+# beamlog.env aus älteren Versionen wird dabei in .env umbenannt).
 # Ein Server aus Version 0.9 (Dienst „contestlogger“) wird dabei automatisch auf BeamLog umgestellt.
 set -euo pipefail
 
 APP_DIR=/opt/beamlog
 DATA_DIR=/var/lib/beamlog
-CONF=/etc/beamlog/beamlog.env
+CONF=/etc/beamlog/.env
 SRC_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MODE=install
 PUBLIC_URL=""
@@ -64,7 +65,7 @@ RUN_USER=beamlog; RUN_GROUP=beamlog
 OPTS=/etc/beamlog/install.options
 if [ "$HERE" = 1 ]; then
   case "$SRC_DIR" in *[[:space:]]*) echo "--here: Der Ordnerpfad enthält Leerzeichen ($SRC_DIR) – bitte in einen Ordner ohne Leerzeichen legen."; exit 1 ;; esac
-  APP_DIR="$SRC_DIR"; DATA_DIR="$SRC_DIR/data"; CONF="$SRC_DIR/beamlog.env"; OPTS="$SRC_DIR/.install.options"
+  APP_DIR="$SRC_DIR"; DATA_DIR="$SRC_DIR/data"; CONF="$SRC_DIR/.env"; OPTS="$SRC_DIR/.install.options"
   RUN_USER="${SUDO_USER:-root}"; RUN_GROUP="$(id -gn "$RUN_USER")"
 fi
 # Welche Teile eingerichtet werden (1 = ja): gemerkte Wahl laden, Kommandozeile überstimmt sie
@@ -80,6 +81,17 @@ fi
 as_run() { if [ "$HERE" = 1 ] && [ "$RUN_USER" != root ]; then runuser -u "$RUN_USER" -- "$@"; else "$@"; fi; }
 
 if [ "$(id -u)" -ne 0 ]; then echo "Bitte mit sudo ausführen."; exit 1; fi
+
+# Die Einstellungsdatei heißt jetzt „.env“: eine vorhandene beamlog.env (bzw. contestlogger.env) daneben umbenennen,
+# damit beim Update nichts verloren geht. Die Dienst-Unit wird weiter unten passend neu geschrieben.
+for OLD_CONF in "$(dirname "$CONF")/beamlog.env" "$(dirname "$CONF")/contestlogger.env"; do
+  if [ -f "$OLD_CONF" ] && [ ! -f "$CONF" ]; then
+    mv "$OLD_CONF" "$CONF"
+    echo "== Einstellungen umbenannt: $OLD_CONF -> $CONF"
+  elif [ -f "$OLD_CONF" ]; then
+    echo "== Hinweis: $OLD_CONF wird nicht mehr gelesen (es gilt $CONF) – bitte prüfen und löschen."
+  fi
+done
 
 # Wert aus der env-Datei lesen (letzte Zeile gewinnt, Kommentare/Anführungszeichen entfernt)
 conf_get() { { grep -E "^[[:space:]]*$1=" "$CONF" 2>/dev/null || true; } | tail -1 | cut -d= -f2- | sed -e 's/[[:space:]]#.*$//' -e "s/^[[:space:]\"']*//" -e "s/[[:space:]\"']*\$//"; }
@@ -178,7 +190,7 @@ if [ "$HERE" = 0 ]; then chown -R beamlog:beamlog "$APP_DIR" "$DATA_DIR"; fi
 echo "== Konfiguration $CONF"
 mkdir -p "$(dirname "$CONF")"
 if [ ! -f "$CONF" ]; then
-  TEMPLATE="$APP_DIR/deploy/portable/beamlog.env"; [ "$HERE" = 1 ] && TEMPLATE="$APP_DIR/beamlog.env.example"
+  TEMPLATE="$APP_DIR/deploy/portable/server.env"; [ "$HERE" = 1 ] && TEMPLATE="$APP_DIR/.env.example"
   cp "$TEMPLATE" "$CONF"
   echo "   neu angelegt (Vorlage ${TEMPLATE#"$APP_DIR"/})"
 else
@@ -251,7 +263,7 @@ fi
 if [ "$WANT_SERVICE" = 1 ]; then
   echo "== systemd-Dienst"
   if [ "$HERE" = 1 ]; then
-    sed -e "s#/opt/beamlog#$APP_DIR#g" -e "s#/etc/beamlog/beamlog.env#$CONF#g" -e "s#^User=.*#User=$RUN_USER#" -e "s#^Group=.*#Group=$RUN_GROUP#" \
+    sed -e "s#/opt/beamlog#$APP_DIR#g" -e "s#/etc/beamlog/\.env#$CONF#g" -e "s#^User=.*#User=$RUN_USER#" -e "s#^Group=.*#Group=$RUN_GROUP#" \
         -e "s#^ReadWritePaths=.*#ReadWritePaths=$APP_DIR#" -e "s#^ProtectHome=.*#ProtectHome=false#" \
         "$APP_DIR/deploy/beamlog.service" > /etc/systemd/system/beamlog.service
   else

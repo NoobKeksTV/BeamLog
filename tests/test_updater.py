@@ -68,7 +68,7 @@ def test_migrate_from_contestlogger(tmp_path):
     (old / "ContestLogger.exe").write_bytes(b"x"); (old / "data" / "contestlogger.db").write_text("DB"); (old / "contestlogger.env").write_text("PORT=8080")
     new = tmp_path / "BeamLog"; (new / "data" / "lang").mkdir(parents=True)
     run.migrate_from_contestlogger(new)
-    assert (new / "data" / "contestlogger.db").read_text() == "DB" and (new / "data" / "backup").is_dir() and (new / "beamlog.env").read_text() == "PORT=8080"
+    assert (new / "data" / "contestlogger.db").read_text() == "DB" and (new / "data" / "backup").is_dir() and (new / ".env").read_text() == "PORT=8080"
     assert (old / "data" / "contestlogger.db").exists()  # Original bleibt
     run.adopt_legacy_names(new)  # danach heißt die Datenbank beamlog.db
     assert (new / "data" / "beamlog.db").read_text() == "DB" and not (new / "data" / "contestlogger.db").exists()
@@ -86,11 +86,27 @@ def test_adopt_legacy_names(tmp_path):
     for suf, txt in (("", "DB"), ("-wal", "WAL"), ("-shm", "SHM")):
         (tmp_path / "data" / f"contestlogger.db{suf}").write_text(txt)
     run.adopt_legacy_names(tmp_path)
-    assert (tmp_path / "beamlog.env").read_text() == "A=1" and not (tmp_path / "contestlogger.env").exists()
+    assert (tmp_path / ".env").read_text() == "A=1" and not (tmp_path / "contestlogger.env").exists()
     assert [(tmp_path / "data" / f"beamlog.db{s}").read_text() for s in ("", "-wal", "-shm")] == ["DB", "WAL", "SHM"]
     (tmp_path / "data" / "contestlogger.db").write_text("ALT")  # gibt es beamlog.db schon, bleibt alles unangetastet
     run.adopt_legacy_names(tmp_path)
     assert (tmp_path / "data" / "beamlog.db").read_text() == "DB" and (tmp_path / "data" / "contestlogger.db").exists()
+
+
+def test_beamlog_env_renamed_to_dotenv(tmp_path, monkeypatch):
+    """Ab jetzt heißt die Einstellungsdatei .env – eine vorhandene beamlog.env wird beim Start umbenannt, eine Unit mit
+    --config …/beamlog.env findet danach die .env daneben."""
+    import run
+    (tmp_path / "beamlog.env").write_text("PORT=8123")
+    run.adopt_legacy_names(tmp_path)
+    assert (tmp_path / ".env").read_text() == "PORT=8123" and not (tmp_path / "beamlog.env").exists()
+    (tmp_path / "beamlog.env").write_text("ALT")  # gibt es .env schon, bleibt die alte Datei liegen (nur Hinweis)
+    run.adopt_legacy_names(tmp_path)
+    assert (tmp_path / ".env").read_text() == "PORT=8123" and (tmp_path / "beamlog.env").exists()
+    (tmp_path / "beamlog.env").unlink()
+    monkeypatch.chdir(tmp_path); monkeypatch.delenv("BEAMLOG_CONFIG", raising=False); monkeypatch.delenv("CONTESTLOGGER_CONFIG", raising=False)
+    assert run.find_config(str(tmp_path / "beamlog.env")) == tmp_path / ".env"
+    assert run.find_config(None) == tmp_path / ".env"
 
 
 def test_env_and_config_names(tmp_path, monkeypatch):

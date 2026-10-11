@@ -14,7 +14,7 @@ Das Script
 
 - installiert `nginx`, `sqlite3` und `rsync`,
 - kopiert das Programm nach `/opt/beamlog` und legt den Systemnutzer `beamlog` an,
-- legt die Konfiguration `/etc/beamlog/beamlog.env` an (Dienst auf `127.0.0.1:8000`, Datenbank in `/var/lib/beamlog/`, Backups alle 15 Minuten),
+- legt die Konfiguration `/etc/beamlog/.env` an (Dienst auf `127.0.0.1:8000`, Datenbank in `/var/lib/beamlog/`, Backups alle 15 Minuten),
 - richtet den Dienst `beamlog` ein (liest die Konfiguration, Neustart bei Absturz),
 - legt die nginx-Site auf Port 80 mit WebSocket-Weiterleitung an,
 - richtet ein tägliches gepacktes Backup (03:15 Uhr, 30 Tage) ein.
@@ -31,7 +31,7 @@ Jeder Teil lässt sich abschalten, die Optionen sind beliebig kombinierbar:
 | `--no-service` | Kein systemd-Dienst – BeamLog startest du selbst (eigene Unit, Container, Supervisor …); das Skript zeigt am Ende den Startbefehl. Ein früher angelegter Dienst `beamlog` wird angehalten und entfernt. |
 | `--no-backup` | Kein täglicher Backup-Cron (ein vorhandener wird entfernt). Die Sicherungen des Servers selbst (`BACKUP_MIN`) laufen weiter. |
 | `--with-nginx`, `--with-service`, `--with-backup` | Schalten den jeweiligen Teil wieder ein. |
-| `--here` | Nicht kopieren: BeamLog bleibt im aktuellen Ordner und läuft als der aufrufende Nutzer; Daten in `./data`, Einstellungen in `./beamlog.env`. Dienst, nginx und Backup-Cron zeigen auf diesen Ordner. |
+| `--here` | Nicht kopieren: BeamLog bleibt im aktuellen Ordner und läuft als der aufrufende Nutzer; Daten in `./data`, Einstellungen in `./.env`. Dienst, nginx und Backup-Cron zeigen auf diesen Ordner. |
 | `--deps-only` | Nur die Voraussetzungen installieren (Systempakete, beim Quellcode zusätzlich `./.venv`) – wie `--here --no-nginx --no-service --no-backup`; danach selbst starten. |
 | `--system` | Gemerkte `--here`-Wahl aufheben und wieder nach `/opt/beamlog` installieren. |
 
@@ -46,10 +46,10 @@ sudo bash deploy/install.sh --help                     # alle Optionen
 
 Die Wahl wird in `/etc/beamlog/install.options` gemerkt – ein späteres `--update` hält sich daran, ohne dass die
 Optionen erneut angegeben werden müssen. Ohne nginx und mit dem Standard `HOST=127.0.0.1` ist BeamLog nur am Server
-selbst erreichbar (richtig für einen eigenen Reverse-Proxy); direkt im LAN: `HOST=0.0.0.0` in `beamlog.env`.
+selbst erreichbar (richtig für einen eigenen Reverse-Proxy); direkt im LAN: `HOST=0.0.0.0` in `.env`.
 
 **Wohin installiert wird:** Mit Dienst kopiert das Skript BeamLog nach `/opt/beamlog` (Daten in `/var/lib/beamlog`,
-Einstellungen in `/etc/beamlog/beamlog.env`): Der Dienst läuft dort als eigener Systemnutzer `beamlog` mit gehärteter
+Einstellungen in `/etc/beamlog/.env`): Der Dienst läuft dort als eigener Systemnutzer `beamlog` mit gehärteter
 Unit, die keinen Zugriff auf `/home` hat, und ein neu entpacktes ZIP lässt sich per `--update` einfach darüberspielen.
 Das Skript kündigt das Kopieren deutlich an. **Ohne Dienst (`--no-service`) wird nichts kopiert** – BeamLog bleibt
 automatisch im aktuellen Ordner. Mit `--here` bleibt es auch mit Dienst dort (die Unit läuft dann als dein Nutzer).
@@ -70,10 +70,10 @@ sudo useradd --system --home /opt/beamlog --shell /usr/sbin/nologin beamlog
 sudo chown -R beamlog:beamlog /opt/beamlog /var/lib/beamlog
 sudo chmod +x /opt/beamlog/BeamLog*
 
-# 2. Konfiguration anlegen (Werte bei Bedarf anpassen: nano /etc/beamlog/beamlog.env)
+# 2. Konfiguration anlegen (Werte bei Bedarf anpassen: nano /etc/beamlog/.env)
 sudo mkdir -p /etc/beamlog
-sudo cp /opt/beamlog/deploy/beamlog.env /etc/beamlog/beamlog.env
-sudo chown root:beamlog /etc/beamlog/beamlog.env && sudo chmod 640 /etc/beamlog/beamlog.env
+sudo cp /opt/beamlog/deploy/server.env /etc/beamlog/.env
+sudo chown root:beamlog /etc/beamlog/.env && sudo chmod 640 /etc/beamlog/.env
 
 # 3. systemd-Dienst kopieren, aktivieren und starten
 sudo cp /opt/beamlog/deploy/beamlog.service /etc/systemd/system/beamlog.service
@@ -94,7 +94,7 @@ sudo chmod +x /usr/local/bin/beamlog-backup
 echo "15 3 * * * root /usr/local/bin/beamlog-backup" | sudo tee /etc/cron.d/beamlog-backup
 ```
 
-## Einstellungen: `/etc/beamlog/beamlog.env`
+## Einstellungen: `/etc/beamlog/.env`
 
 Alle Server-Einstellungen stehen in einer Datei im `.env`-Format; die Unit selbst enthält keine Optionen mehr:
 
@@ -111,7 +111,7 @@ PUBLIC_URL=http://contest.local/                # Adresse im QR-Code und in Link
 #DEMO=1                                         # öffentliche Demo-Instanz (siehe unten) – löscht täglich alles!
 ```
 
-Nach Änderungen `sudo systemctl restart beamlog`. `install.sh` legt die Datei beim ersten Lauf aus `deploy/beamlog.env` an und lässt sie bei `--update` unverändert; `--url` trägt nur `PUBLIC_URL` ein. Reihenfolge der Quellen: Kommandozeile überstimmt Umgebungsvariablen `BEAMLOG_<KEY>`, diese überstimmen die Datei.
+Nach Änderungen `sudo systemctl restart beamlog`. `install.sh` legt die Datei beim ersten Lauf aus `deploy/server.env` an und lässt sie bei `--update` unverändert; `--url` trägt nur `PUBLIC_URL` ein. Reihenfolge der Quellen: Kommandozeile überstimmt Umgebungsvariablen `BEAMLOG_<KEY>`, diese überstimmen die Datei.
 
 Die Unit `deploy/beamlog.service` (Auszug):
 
@@ -119,7 +119,7 @@ Die Unit `deploy/beamlog.service` (Auszug):
 [Service]
 User=beamlog
 WorkingDirectory=/opt/beamlog
-ExecStart=/opt/beamlog/BeamLog --config /etc/beamlog/beamlog.env
+ExecStart=/opt/beamlog/BeamLog --config /etc/beamlog/.env
 Restart=always
 PrivateTmp=true
 ProtectSystem=strict
@@ -128,14 +128,14 @@ ReadWritePaths=/var/lib/beamlog
 
 ## Ohne nginx: direkt auf Port 80
 
-Port und Adresse stehen nur in `/etc/beamlog/beamlog.env` – das Install-Skript richtet sich danach:
+Port und Adresse stehen nur in `/etc/beamlog/.env` – das Install-Skript richtet sich danach:
 
 - **`PORT=80`** (mit `HOST=0.0.0.0`): BeamLog ist direkt erreichbar, **ohne nginx**. Das Skript schaltet nginx dann ab
   (es würde Port 80 belegen); der Dienst darf Port 80 öffnen (`CAP_NET_BIND_SERVICE` in der Unit).
 - **jeder andere Port** (Standard `8000`, `HOST=127.0.0.1`): nginx nimmt Port 80 an und leitet an diesen Port weiter.
 
 ```bash
-sudo nano /etc/beamlog/beamlog.env            # PORT=80 und HOST=0.0.0.0 eintragen
+sudo nano /etc/beamlog/.env            # PORT=80 und HOST=0.0.0.0 eintragen
 sudo bash deploy/install.sh --update          # im entpackten BeamLog-Ordner: stellt nginx und Dienst passend ein
 ```
 
@@ -164,12 +164,12 @@ Wiederherstellen: Dienst stoppen, Sicherung nach `beamlog.db` kopieren, Dienst s
 
 ## Quellcode-Variante auf dem Server
 
-Wer lieber aus dem Repo installiert (Python-venv statt Binary), nutzt `deploy/install.sh` aus dem Quellcode-Checkout; dort entsteht `/opt/beamlog/.venv`. Auch diese Unit liest alle Einstellungen aus `/etc/beamlog/beamlog.env` (`run.py --config …`), das Skript legt die Datei beim ersten Lauf an und `--url` setzt die öffentliche Adresse. Updates dann mit `git pull` und `sudo bash deploy/install.sh --update`.
+Wer lieber aus dem Repo installiert (Python-venv statt Binary), nutzt `deploy/install.sh` aus dem Quellcode-Checkout; dort entsteht `/opt/beamlog/.venv`. Auch diese Unit liest alle Einstellungen aus `/etc/beamlog/.env` (`run.py --config …`), das Skript legt die Datei beim ersten Lauf an und `--url` setzt die öffentliche Adresse. Updates dann mit `git pull` und `sudo bash deploy/install.sh --update`.
 
 ## Öffentliche Demo-Instanz
 
 Für eine Vorführ-Instanz im Internet (wie [beamlogdemo.lhprinting.de](https://beamlogdemo.lhprinting.de/)) gibt es den
-Demo-Modus. In `/etc/beamlog/beamlog.env`:
+Demo-Modus. In `/etc/beamlog/.env`:
 
 ```ini
 DEMO=1
@@ -207,7 +207,7 @@ automatisch um:
 
 - Dienst `contestlogger` wird gestoppt und entfernt, `beamlog` eingerichtet und gestartet,
 - Daten werden von `/var/lib/contestlogger/` nach `/var/lib/beamlog/` **kopiert** (Datenbank heißt dann `beamlog.db`),
-- `/etc/contestlogger/contestlogger.env` wird zu `/etc/beamlog/beamlog.env` (Pfade darin werden angepasst),
+- `/etc/contestlogger/contestlogger.env` wird zu `/etc/beamlog/.env` (Pfade darin werden angepasst),
 - die nginx-Site (auch eine eigene HTTPS-Anpassung) und das tägliche Backup werden übernommen.
 
 Die alten Daten bleiben in `/var/lib/contestlogger/` als Sicherung liegen und können danach gelöscht werden.

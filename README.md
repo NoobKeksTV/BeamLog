@@ -67,9 +67,9 @@ Admin- und Stations-Passwort: `demo`. Eine eigene Demo-Instanz einrichten: [Wiki
 3. Admin-Passwort festlegen, unter **Verwaltung** die Stationen anlegen und den ersten Contest erstellen.
 4. Im Reiter **Loggen** Station wählen und loslegen. F1 zeigt alle Tastenkürzel.
 
-> **Umstieg von ContestLogger 0.9.x:** BeamLog hieß bis Version 0.9 „ContestLogger“. Version 1.0 einmal von Hand laden und entpacken – liegt der neue Ordner `BeamLog` neben dem alten Ordner `ContestLogger` (oder darin), übernimmt BeamLog beim ersten Start automatisch eine Kopie von `data/` und `contestlogger.env` (die Datenbank heißt danach `beamlog.db`, die Einstellungen `beamlog.env`). Ab 1.0 aktualisiert sich BeamLog wieder selbst; alte Links auf das GitHub-Projekt leiten weiter.
+> **Umstieg von ContestLogger 0.9.x:** BeamLog hieß bis Version 0.9 „ContestLogger“. Version 1.0 einmal von Hand laden und entpacken – liegt der neue Ordner `BeamLog` neben dem alten Ordner `ContestLogger` (oder darin), übernimmt BeamLog beim ersten Start automatisch eine Kopie von `data/` und `contestlogger.env` (die Datenbank heißt danach `beamlog.db`, die Einstellungen `.env`). Ab 1.0 aktualisiert sich BeamLog wieder selbst; alte Links auf das GitHub-Projekt leiten weiter.
 
-Dauerhafte Einstellungen (Port, Datenbank, Adresse für den QR-Code …) stehen in `beamlog.env` neben dem Programm (Vorlage `beamlog.env.example`).
+Dauerhafte Einstellungen (Port, Datenbank, Adresse für den QR-Code …) stehen in `.env` neben dem Programm (Vorlage `.env.example`).
 
 **Als Dienst auf einem Debian-/Ubuntu-Server oder Raspberry Pi** (systemd, nginx auf Port 80, tägliches Backup) – im entpackten Linux-ZIP:
 
@@ -82,7 +82,7 @@ Teile lassen sich weglassen, auch mehrere gleichzeitig: `--no-nginx` (eigener Re
 `--no-service` (ohne systemd-Dienst), `--no-backup` (ohne Backup-Cron); die Wahl wird für spätere Updates gemerkt,
 `--with-…` schaltet wieder ein, `--help` zeigt alles.
 
-Mit Dienst kopiert das Skript BeamLog nach `/opt/beamlog` (Einstellungen in `/etc/beamlog/beamlog.env`) und sagt das
+Mit Dienst kopiert das Skript BeamLog nach `/opt/beamlog` (Einstellungen in `/etc/beamlog/.env`) und sagt das
 deutlich. Ohne Dienst wird nichts kopiert, BeamLog bleibt im aktuellen Ordner: `--deps-only` installiert nur Python & Co.,
 `--here` bleibt im Ordner und richtet trotzdem Dienst, nginx und Backup ein. Anleitung im
 [Wiki › Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy) (dort auch die [öffentliche Demo-Instanz](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy#öffentliche-demo-instanz) mit `DEMO=1`).

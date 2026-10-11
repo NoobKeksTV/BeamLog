@@ -21,6 +21,9 @@ from pathlib import Path
 
 # Pakete aus requirements.txt (Importname). Fehlen sie im aufrufenden Python (z. B. „python run.py“ mit dem System-Python),
 # wird automatisch die virtuelle Umgebung .venv neben run.py genommen, die start.sh/start.bat bzw. install.sh anlegen.
+CONFIG_NAME = ".env"  # Einstellungen neben dem Programm bzw. /etc/beamlog/.env
+LEGACY_CONFIG_NAMES = ("beamlog.env", "contestlogger.env")  # werden beim Start bzw. von install.sh umbenannt
+
 REQUIRED = ("fastapi", "uvicorn", "multipart", "qrcode", "pypdf", "construct", "tabulate", "httpx")
 
 
@@ -83,17 +86,22 @@ def migrate_from_contestlogger(base: Path) -> None:
         if not any((old / n).is_file() for n in ("ContestLogger.exe", "ContestLogger")):
             continue
         shutil.copytree(old / "data", base / "data", dirs_exist_ok=True)
-        if (old / "contestlogger.env").exists() and not (base / "beamlog.env").exists():
-            shutil.copy2(old / "contestlogger.env", base / "beamlog.env")
+        if (old / "contestlogger.env").exists() and not any((base / n).exists() for n in (CONFIG_NAME, *LEGACY_CONFIG_NAMES)):
+            shutil.copy2(old / "contestlogger.env", base / CONFIG_NAME)
         print(f"  Daten aus der bisherigen Installation übernommen: {old / 'data'}  (Original bleibt unverändert)")
         return
 
 
 def adopt_legacy_names(base: Path) -> None:
-    """Dateinamen bis 0.9 auf BeamLog umstellen: contestlogger.env -> beamlog.env, data/contestlogger.db -> data/beamlog.db
-    (samt -wal/-shm). Nur wenn es die neue Datei noch nicht gibt; schlägt das Umbenennen fehl, bleibt alles wie es war."""
-    if (base / "contestlogger.env").exists() and not (base / "beamlog.env").exists():
-        os.replace(base / "contestlogger.env", base / "beamlog.env")
+    """Alte Dateinamen umstellen: Einstellungen beamlog.env (bis 1.0.3) bzw. contestlogger.env (bis 0.9) -> .env,
+    data/contestlogger.db -> data/beamlog.db (samt -wal/-shm). Nur wenn es die neue Datei noch nicht gibt; schlägt das
+    Umbenennen fehl, bleibt alles wie es war."""
+    for name in LEGACY_CONFIG_NAMES:
+        if (base / name).is_file() and not (base / CONFIG_NAME).exists():
+            os.replace(base / name, base / CONFIG_NAME)
+            print(f"  Einstellungen umbenannt: {name} -> {CONFIG_NAME}")
+        elif (base / name).is_file():
+            print(f"  Hinweis: {name} wird nicht mehr gelesen, es gilt {CONFIG_NAME} – alte Datei bitte löschen.")
     old, new = base / "data" / "contestlogger.db", base / "data" / "beamlog.db"
     if old.exists() and not new.exists():
         for suffix in ("-wal", "-shm", ""):
@@ -138,14 +146,21 @@ def load_env_file(path: Path) -> dict[str, str]:
 
 
 def find_config(explicit: str | None) -> Path | None:
-    """Reihenfolge: --config, BEAMLOG_CONFIG, beamlog.env neben dem Programm, /etc/beamlog/beamlog.env
-    (dazu die alten Namen contestlogger.env und /etc/contestlogger/contestlogger.env aus 0.9)."""
+    """Reihenfolge: --config, BEAMLOG_CONFIG, .env neben dem Programm, /etc/beamlog/.env – dazu die alten Namen
+    beamlog.env (bis 1.0.3) und contestlogger.env (bis 0.9). Zeigt --config auf eine alte, inzwischen umbenannte Datei
+    (z. B. eine eigene Dienst-Unit mit …/beamlog.env), wird die .env daneben genommen."""
     base = portable_base()
-    cands = [explicit, env("CONFIG"), str(base / "beamlog.env"), str(base / "contestlogger.env"),
-             "/etc/beamlog/beamlog.env", "/etc/contestlogger/contestlogger.env"]
-    for c in cands:
-        if c and Path(c).exists():
+    given = [c for c in (explicit, env("CONFIG")) if c]
+    for c in given:
+        if Path(c).exists():
             return Path(c)
+        if Path(c).name in LEGACY_CONFIG_NAMES and (Path(c).parent / CONFIG_NAME).exists():
+            return Path(c).parent / CONFIG_NAME
+    cands = [base / n for n in (CONFIG_NAME, *LEGACY_CONFIG_NAMES)]
+    cands += [Path("/etc/beamlog") / CONFIG_NAME, Path("/etc/beamlog/beamlog.env"), Path("/etc/contestlogger/contestlogger.env")]
+    for c in cands:
+        if c.is_file():
+            return c
     return None
 
 
@@ -168,7 +183,7 @@ def main() -> None:
     for k in ("KST_HOST", "KST_PORT", "GITHUB_TOKEN", "MAINTAINER", "DEV", "DEMO", "DEMO_RESET"):  # werden von den Modulen direkt aus der Umgebung gelesen
         if cfg.get(k):
             os.environ[f"BEAMLOG_{k}"] = cfg[k]
-    p = argparse.ArgumentParser(description=f"{__app_name__} {__version__}  –  Einstellungen auch über beamlog.env (siehe beamlog.env.example)")
+    p = argparse.ArgumentParser(description=f"{__app_name__} {__version__}  –  Einstellungen auch über .env (siehe .env.example)")
     p.add_argument("--config", help="Pfad zur Konfigurationsdatei (KEY=VALUE)")
     p.add_argument("--host", default=cfg.get("HOST") or "0.0.0.0")
     p.add_argument("--port", type=int, default=int(cfg.get("PORT") or 8000))

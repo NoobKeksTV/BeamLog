@@ -11,12 +11,12 @@ User=beamlog
 Group=beamlog
 WorkingDirectory=/opt/beamlog
 # Alle Einstellungen (Host, Port, Datenbank, Backup-Takt, öffentliche Adresse …) stehen in
-# /etc/beamlog/beamlog.env – nach Änderungen:  sudo systemctl restart beamlog
-ExecStart=/opt/beamlog/BeamLog --config /etc/beamlog/beamlog.env
+# /etc/beamlog/.env – nach Änderungen:  sudo systemctl restart beamlog
+ExecStart=/opt/beamlog/BeamLog --config /etc/beamlog/.env
 Restart=always
 RestartSec=3
 
-# Port aus beamlog.env – auch Port 80 ohne nginx (PORT=80): der Dienst darf Ports < 1024 öffnen, sonst keine Rechte
+# Port aus .env – auch Port 80 ohne nginx (PORT=80): der Dienst darf Ports < 1024 öffnen, sonst keine Rechte
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 

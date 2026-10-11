@@ -28,7 +28,7 @@ Hinweise: Beim automatischen Import braucht die Datei den eigenen Locator im Kop
 
 ## Ergebnislisten (DARC / IARU / UKW-Contest-Club)
 
-Nur im Betreuer-Modus sichtbar (`MAINTAINER=1` in `beamlog.env`), siehe [Stationsdatenbank](Stationsdatenbank.md#zentrale-pflege-wer-importiert-was).
+Nur im Betreuer-Modus sichtbar (`MAINTAINER=1` in `.env`), siehe [Stationsdatenbank](Stationsdatenbank.md#zentrale-pflege-wer-importiert-was).
 
 Veröffentlichte Ergebnislisten enthalten Rufzeichen und Locator aller Teilnehmer. Datei (HTML, PDF, TXT, CSV), eingefügter Text oder die URL der Ergebnisseite; vor der Übernahme gibt es eine Vorschau.
 
