@@ -15,7 +15,15 @@ Wie AirScout zeigt BeamLog Flugzeuge zwischen dir und dem Partner und bewertet, 
 - Liste unter der Karte: zuerst die Flugzeuge im Korridor (Abstand, Pfad-km, Reserve), dann die, die bald kreuzen (Minuten, km, UTC-Zeit, Reserve am Kreuzungspunkt). Hover auf einen Eintrag zeigt dieselben Details.
 ![Flugzeugliste und Höhenprofil](img/hoehenprofil.png)
 
-- **Profil**: Seitenansicht des Pfads wie in AirScout – rote Kurve = Mindesthöhe entlang des Pfads (Funkhorizont beider Stationen), grüner Balken = Zone bei Reiseflughöhe, Punkte = Flugzeuge in ihrer Höhe. Über die Punkte hovern zeigt die Details; der Knopf „Profil“ blendet die Ansicht aus.
+- **Profil**: Seitenansicht des Pfads wie in AirScout, mit Legende darunter:
+  - **waagerecht** = der Pfad von der eigenen Station (links) zur Gegenstation (rechts) in km, **senkrecht** = Flughöhe (FL100 ≈ 3 km … FL400 ≈ 12 km).
+  - **rote Kurve** = Mindesthöhe: erst darüber sehen beide Stationen ein Flugzeug an dieser Stelle (Funkhorizont). In der Mitte ist sie am niedrigsten.
+  - **grüner Balken** unten = Zone gemeinsamer Sichtbarkeit bei Reiseflughöhe – nur dort kann ein Flugzeug als Reflektor dienen.
+  - **Punkte** = Flugzeuge, eingezeichnet an der Stelle des Pfads, auf deren Höhe sie gerade sind (seitlicher Abstand zählt hier nicht), und in ihrer Flughöhe.
+    Sie **wandern nach links oder rechts**, weil sich ihre Position entlang des Pfads ändert, während sie fliegen (Aktualisierung alle 5 s).
+  - **Farben** wie auf der Karte: orange = im Korridor und beidseitig sichtbar (jetzt nutzbar), gelb = kreuzt bald den Pfad,
+    **hellblau = beidseitig sichtbar, aber seitlich neben dem Korridor** (meist kein brauchbarer Scatter), braun = zu tief, grau = außer Reichweite.
+    Große Punkte sind schwere Flugzeuge. Über die Punkte hovern zeigt die Details; der Knopf „Profil“ blendet die Ansicht aus.
 - Ohne Partner-Locator: Flugzeuge im Umkreis von 150 km um die eigene Station.
 
 Flugzeuge am Boden und unter 1500 m werden ignoriert.
