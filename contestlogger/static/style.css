@@ -416,3 +416,20 @@ kbd { display: inline-block; padding: 1px 6px; margin-right: 3px; border: 1px so
 .plane-legend i.line { width: 14px; height: 2px; background: #ff6b6b; }
 .plane-legend i.bar { width: 14px; height: 4px; background: #3ddc84; opacity: .8; }
 .plane-legend i.dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid rgba(0,0,0,.5); }
+.admin-grid > .card.wide-card { column-span: all; }
+.arch-tree { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin: 8px 0; }
+.arch-src-box { padding: 4px 0; border-bottom: 1px solid var(--line); } .arch-src-box:last-child { border-bottom: 0; }
+.arch-src-box > summary { cursor: pointer; padding: 3px 0; }
+.arch-group { margin: 6px 0 6px 18px; }
+.arch-tree label, #arch-actions label { display: inline-flex; flex-direction: row; gap: 5px; align-items: center; cursor: pointer; margin: 0; font-size: inherit; color: inherit; }
+.arch-tree input[type=checkbox], #arch-actions input[type=checkbox] { width: auto; margin: 0; }
+.arch-gl { font-size: 13px; }
+.arch-items { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 3px 0 0 20px; font-size: 12.5px; }
+.arch-item.done { color: var(--muted); }
+.progress { height: 8px; background: var(--bg2); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin: 8px 0 4px; }
+.progress > div { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+.arch-active { color: var(--muted); margin: 2px 0 4px; font-family: var(--mono); font-size: 11.5px; }
+
+/* Demo-Instanz: Hinweisleiste unter der Kopfzeile */
+.demo-banner { background: rgba(255,179,71,.14); border-bottom: 1px solid var(--warn); color: var(--text); padding: 6px 14px; font-size: 13px; line-height: 1.5; text-align: center; }
+.demo-banner code { background: rgba(255,179,71,.25); padding: 0 5px; border-radius: 4px; font-weight: 700; }

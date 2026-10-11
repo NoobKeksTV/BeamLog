@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT))
 from contestlogger import __version__  # noqa: E402
 
 SEP = ";" if os.name == "nt" else ":"
-HIDDEN = ["uvicorn.logging", "uvicorn.loops", "uvicorn.loops.auto", "uvicorn.loops.asyncio", "uvicorn.protocols",
+HIDDEN = ["httpx", "uvicorn.logging", "uvicorn.loops", "uvicorn.loops.auto", "uvicorn.loops.asyncio", "uvicorn.protocols",
           "uvicorn.protocols.http", "uvicorn.protocols.http.auto", "uvicorn.protocols.http.h11_impl", "uvicorn.protocols.http.httptools_impl",
           "uvicorn.protocols.websockets", "uvicorn.protocols.websockets.auto", "uvicorn.protocols.websockets.websockets_impl",
           "uvicorn.protocols.websockets.wsproto_impl", "uvicorn.lifespan", "uvicorn.lifespan.on", "uvicorn.lifespan.off",
@@ -98,7 +98,8 @@ def main() -> None:
         f"2. Alle Daten liegen im Ordner data/ neben dem Programm (Datenbank, Backups, eigene Sprachen).\n"
         f"   Zum Umziehen auf einen anderen Rechner einfach den ganzen Ordner kopieren.\n"
         f"3. Optionen: BeamLog{exe} --port 8080   --backup-min 5   --public-url http://contest.local/\n"
-        f"   Dauerhaft: beamlog.env.example nach beamlog.env kopieren und Werte eintragen.\n\n"
+        f"   Dauerhaft: .env.example nach .env kopieren und Werte eintragen (Windows: copy .env.example .env).\n"
+        f"   Eine alte beamlog.env wird beim Start automatisch in .env umbenannt.\n\n"
         f"BeamLog-CAT{exe}: Frequenz/CW vom Funkgerät (Hamlib rigctld) an den Server melden, z. B.\n"
         f"   BeamLog-CAT{exe} --server http://192.168.1.10:8000 --station 1 --password 70cm --cw\n"
         f"BeamLog-Import{exe}: alten WinContest-Ordner übernehmen, z. B.\n"
@@ -110,7 +111,7 @@ def main() -> None:
     else:
         (pkg / "start.sh").write_text('#!/usr/bin/env bash\ncd "$(dirname "$0")"\n./BeamLog "$@"\n')
         os.chmod(pkg / "start.sh", 0o755)
-    shutil.copy(ROOT / "beamlog.env.example", pkg / "beamlog.env.example")
+    shutil.copy(ROOT / ".env.example", pkg / ".env.example")
     if platform.system() == "Linux":
         # Deploy-Paket für Debian-Server (nginx + systemd) liegt im Linux-ZIP immer bei
         shutil.copytree(ROOT / "deploy" / "portable", pkg / "deploy")

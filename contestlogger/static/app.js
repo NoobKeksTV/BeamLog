@@ -173,9 +173,11 @@
     renderLangSelect();
     $("#version").textContent = "v" + S.info.version;
     $$(".maint-only").forEach((e) => e.classList.toggle("hidden", !S.info.maintainer)); $$(".maint-hide").forEach((e) => e.classList.toggle("hidden", !!S.info.maintainer));
+    if (S.info.maintainer && S.adminToken) archPoll(true);  // läuft noch ein Archiv-Import (z. B. nach Neuladen der Seite)?
     // Fußzeile mit Lizenz und Link zum Quellcode (GNU AGPLv3, Abschnitt 13: Quellcode für Nutzer über das Netz)
     $("#footer-text").replaceChildren(`${S.info.app} ${S.info.version} · ${S.info.copyright} · ${S.info.license} · `,
       el("a", { href: S.info.source_url, target: "_blank", rel: "noopener" }, t("Quellcode")));
+    if (S.info.demo) setupDemo();
     if (!S.info.admin_configured) await askSetup();
     if (!S.nick) await askNick();
     $("#nick-badge").textContent = S.nick;
@@ -186,6 +188,29 @@
     $("#f-call").focus();
     checkUpdateBadge(); whatsNew();
   }
+  // ------------------------------------------------------------ Demo-Instanz (BEAMLOG_DEMO=1)
+  function setupDemo() {
+    const d = S.info.demo;
+    const left = () => {
+      const min = Math.max(0, Math.round((Date.parse(d.next_reset_utc) - Date.now()) / 60000));
+      return min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
+    };
+    const when = el("span");
+    const upd = () => { when.textContent = t("noch {t}", { t: left() }); };
+    upd(); setInterval(upd, 60000);
+    const bar = el("div", { id: "demo-banner", class: "demo-banner" },
+      el("b", {}, "🧪 " + t("Demo-Instanz")), " · ",
+      t("Admin- und Stations-Passwort:"), " ", el("code", {}, d.admin_password), " · ",
+      t("alles wird täglich um {at} Uhr zurückgesetzt", { at: d.reset_at }), " (", when, ") · ",
+      t("bitte keine echten Zugangsdaten eintragen"), " · ",
+      el("a", { href: S.info.source_url + "/releases/latest", target: "_blank", rel: "noopener" }, t("BeamLog herunterladen")));
+    $("header.topbar").after(bar);
+    $("#admin-pw").value = d.admin_password;
+    $("#admin-login-text").textContent = t("Demo: Das Admin-Passwort ist „{pw}“ – einfach auf Anmelden klicken.", { pw: d.admin_password });
+    $("#admin-pw-form")?.closest(".card")?.querySelector("form")?.classList.add("hidden");
+    $("#backup-info")?.closest(".card")?.classList.add("hidden");  // Demo: keine Backups
+  }
+
   // ------------------------------------------------------------ Updates / Was ist neu
   async function checkUpdateBadge() {
     try { const u = await GET("/api/update/status"); S.update = u; const b = $("#update-badge"); b.classList.toggle("hidden", !u.available); if (u.available) b.textContent = `⬆ v${u.latest}`; } catch (_) { /* */ }
@@ -414,6 +439,7 @@
     if (!st.has_password) return autoUnlock(st);
     const box = modal(fromTpl("tpl-unlock"));
     box.querySelector(".st-name").textContent = `${st.call} (${st.band})`;
+    if (S.info.demo) box.querySelector("#unlock-pw").value = S.info.demo.station_password;
     box.querySelector("#unlock-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       try {
@@ -1190,6 +1216,12 @@
       else if (m.type === "presence") renderPresence(m.users);
       else if (m.type === "opnote") { if (m.station_id === S.stationId && m.by !== S.nick) $("#opnote").value = m.text; }
       else if (m.type === "update_available") { const b = $("#update-badge"); b.textContent = `⬆ v${m.version}`; b.classList.remove("hidden"); toast(t("Neue Version {v} verfügbar – Verwaltung → Updates", { v: m.version })); }
+      else if (m.type === "demo_reset") {
+        toast(t("Die Demo wurde zurückgesetzt – die Seite lädt neu …"));
+        S.contestId = null; S.stationId = null; S.stationTokens = {};
+        ["cl.contest", "cl.station"].forEach((k) => localStorage.removeItem(k)); save();
+        setTimeout(() => location.reload(), 4000);
+      }
       else if (m.type === "restarting") { toast(t("Server startet neu (Version {v}) …", { v: m.version })); setTimeout(() => location.reload(), 8000); }
       else if (m.type === "typing") { /* nur für das Operator-Fenster */ }
       else if (m.type === "update") {
@@ -1489,30 +1521,79 @@
     });
     loadCands();
   }
-  // Verwaltung: DARC-Contest-Hub
-  let darcList = [];
-  (function initDarcYears() { const sel = $("#darc-year"); const y = new Date().getUTCFullYear(); for (let i = y; i >= 2017; i--) sel.append(el("option", { value: i }, i)); })();
-  $("#btn-darc-list")?.addEventListener("click", async () => {
-    $("#darc-summary").textContent = "…";
-    try {
-      darcList = await GET(`/api/darc/contests?year=${$("#darc-year").value}`);
-      const tb = $("#darc-table tbody"); tb.innerHTML = "";
-      for (const c of darcList) tb.append(el("tr", {}, el("td", {}, el("input", { type: "checkbox", class: "darc-sel", "data-csv": c.csv, checked: 1 })), el("td", {}, c.id), el("td", {}, c.name), el("td", { class: "muted small" }, `${c.status} ${c.date}`)));
-      $("#darc-wrap").classList.toggle("hidden", !darcList.length); $("#darc-actions").classList.toggle("hidden", !darcList.length);
-      $("#darc-summary").textContent = `${darcList.length} ${t("Contests")}`;
-    } catch (err) { $("#darc-summary").textContent = err.message; toast(err.message, "err"); }
-  });
-  async function darcImport(body) {
-    $("#darc-summary").textContent = t("Importiere …");
-    try {
-      const r = await api("POST", "/api/darc/import", body);
-      const errs = r.files.filter((f) => f.error);
-      $("#darc-summary").textContent = `${r.total} ${t("Rufzeichen übernommen")} · ${t("Stationsdatenbank")}: ${r.callbook_count}` + (errs.length ? ` · ${errs.length} ${t("Fehler")}: ${errs[0].error}` : "");
-      toast(`${r.total} ${t("Rufzeichen übernommen")}`, "ok"); renderCallbook();
-    } catch (err) { $("#darc-summary").textContent = err.message; toast(err.message, "err"); }
+  // Verwaltung: Ergebnislisten-Archiv – alle Quellen (DARC UKW/KW, IARU über OK2KKW), alle Jahre; Import läuft im Hintergrund
+  const Arch = { entries: {}, timer: null };
+  const archIds = () => { const onlyNew = $("#arch-only-new").checked; return $$(".arch-sel:checked").filter((c) => !(onlyNew && c.dataset.done)).map((c) => c.dataset.id); };
+  const archCount = () => { const n = archIds().length; $("#btn-arch-import").textContent = n ? t("{n} Listen importieren", { n }) : t("Ausgewählte importieren"); $("#btn-arch-import").disabled = !n; };
+  function archSourceBlock(src, entries) {
+    const groups = {}; entries.forEach((e) => (groups[e.group] ||= []).push(e));
+    const years = entries.map((e) => e.year).filter(Boolean);
+    const srcCb = el("input", { type: "checkbox", class: "arch-src" });
+    const done = entries.filter((e) => e.done).length;
+    const box = el("details", { class: "arch-src-box" }, el("summary", {}, srcCb, " ", el("b", {}, src.name),
+      el("span", { class: "muted small" }, ` · ${entries.length} ${t("Listen")}` + (years.length ? ` · ${Math.min(...years)}–${Math.max(...years)}` : "") + (done ? ` · ${done} ${t("schon importiert")}` : ""))));
+    srcCb.addEventListener("click", (ev) => { ev.stopPropagation(); box.querySelectorAll(".arch-sel, .arch-grp").forEach((c) => { c.checked = srcCb.checked; }); archCount(); });
+    for (const [g, list] of Object.entries(groups)) {
+      const gcb = el("input", { type: "checkbox", class: "arch-grp" });
+      const items = el("div", { class: "arch-items" }, list.map((e) => el("label", { class: "arch-item" + (e.done ? " done" : ""), title: e.url },
+        el("input", { type: "checkbox", class: "arch-sel", "data-id": e.id, "data-done": e.done ? "1" : "" }), " ", e.label.startsWith(g) ? e.label.slice(g.length).trim() || e.label : e.label,
+        e.done ? el("span", { class: "muted small" }, ` ✓ ${e.done.at}`) : null)));
+      gcb.addEventListener("change", () => { items.querySelectorAll(".arch-sel").forEach((c) => { c.checked = gcb.checked; }); archCount(); });
+      box.append(el("div", { class: "arch-group" }, el("label", { class: "arch-gl" }, gcb, " ", el("b", {}, g), el("span", { class: "muted small" }, ` (${list.length})`)), items));
+    }
+    box.addEventListener("change", archCount);
+    return box;
   }
-  $("#btn-darc-import")?.addEventListener("click", () => darcImport({ csv_urls: $$(".darc-sel:checked").map((c) => c.dataset.csv) }));
-  $("#btn-darc-all")?.addEventListener("click", () => { const y = new Date().getUTCFullYear(); const years = []; for (let i = 2017; i <= y; i++) years.push(i); if (confirm(t("Alle DARC-Ergebnislisten {a}–{b} laden? Das dauert ein bis zwei Minuten.", { a: 2017, b: y }))) darcImport({ years }); });
+  $("#btn-arch-scan")?.addEventListener("click", async () => {
+    const sum = $("#arch-summary"), tree = $("#arch-tree");
+    try {
+      const r = await GET("/api/results/sources");
+      tree.innerHTML = ""; tree.classList.remove("hidden"); Arch.entries = {};
+      // alle Quellen gleichzeitig abfragen; Anzeige in fester Reihenfolge, sobald eine Quelle fertig ist
+      const slots = r.sources.map((src) => { const d = el("div", { class: "muted small" }, `${src.name} …`); tree.append(d); return d; });
+      let left = r.sources.length;
+      sum.textContent = t("Suche Listen in {n} Quellen gleichzeitig …", { n: left });
+      await Promise.allSettled(r.sources.map(async (src, k) => {
+        try { const res = await api("POST", "/api/results/list", { source: src.key }); Arch.entries[src.key] = res.entries; slots[k].replaceWith(archSourceBlock(src, res.entries)); }
+        catch (err) { slots[k].className = "warn small"; slots[k].textContent = `${src.name}: ${err.message}`; }
+        finally { left -= 1; if (left) sum.textContent = t("Suche Listen … noch {n} Quellen", { n: left }); }
+      }));
+      const all = Object.values(Arch.entries).flat();
+      sum.textContent = t("{n} Listen gefunden, {d} davon schon importiert", { n: all.length, d: all.filter((e) => e.done).length });
+      $("#arch-actions").classList.remove("hidden"); archCount();
+    } catch (err) { sum.textContent = err.message; toast(err.message, "err"); }
+  });
+  $("#arch-only-new")?.addEventListener("change", archCount);
+  $("#btn-arch-import")?.addEventListener("click", async () => {
+    const ids = archIds(); if (!ids.length) return;
+    if (ids.length > 40 && !confirm(t("{n} Listen laden? Das dauert etwa {m} Minuten und läuft im Hintergrund weiter.", { n: ids.length, m: Math.max(1, Math.round(ids.length * 1.5 / 60)) }))) return;
+    try { await api("POST", "/api/results/import", { ids, without_locator: $("#arch-bare").checked }); Arch.lastIds = ids; archPoll(); } catch (err) { toast(err.message, "err"); }
+  });
+  $("#btn-arch-cancel")?.addEventListener("click", () => api("POST", "/api/results/job/cancel", {}).catch(() => {}));
+  async function archPoll(quiet) {
+    clearTimeout(Arch.timer);
+    let j; try { j = await GET("/api/results/job"); } catch { return; }
+    if (!j || (!j.running && (quiet || !j.total))) { if (!quiet && j && !j.running) $("#arch-job").classList.add("hidden"); if (quiet) return; }
+    $("#arch-job").classList.remove("hidden");
+    $("#arch-bar").style.width = `${Math.round(100 * (j.done || 0) / Math.max(1, j.total || 1))}%`;
+    const fmt = (n) => (n || 0).toLocaleString("de");
+    const act = $("#arch-active"); act.innerHTML = ""; (j.running ? j.active || [] : []).forEach((x) => act.append(el("div", {}, "⟳ " + x)));
+    $("#arch-status").textContent = (j.running ? `${j.done}/${j.total} ${t("Listen fertig")} · ` : `${t("Fertig")}: ${j.done}/${j.total} ${t("Listen")} · `) +
+      t("{a} neu, {b} aktualisiert, {c} DOK ergänzt", { a: fmt(j.new), b: fmt(j.known), c: fmt(j.dok) }) + (j.skipped ? ` · ${fmt(j.skipped)} ${t("ohne Locator übersprungen")}` : "") +
+      (j.errors?.length ? ` · ${j.errors.length} ${t("Fehler")} (${j.errors[0].label}: ${j.errors[0].error})` : "") + ` · ${t("Stationsdatenbank")}: ${fmt(j.callbook_count)}`;
+    $("#btn-arch-cancel").classList.toggle("hidden", !j.running);
+    if (j.running) Arch.timer = setTimeout(() => archPoll(), 1200);
+    else if (!quiet) {
+      toast(t("Ergebnislisten importiert"), "ok"); renderCallbook();
+      // erledigte Listen gleich als importiert markieren (abgebrochene/fehlerhafte bleiben offen)
+      const failed = new Set((j.errors || []).map((e) => e.id)); const today = new Date().toISOString().slice(0, 10);
+      (j.done_ids || []).filter((id) => !failed.has(id)).forEach((id) => {
+        const cb = $(`.arch-sel[data-id="${CSS.escape(id)}"]`); if (!cb || cb.dataset.done) return;
+        cb.dataset.done = "1"; cb.checked = false; cb.closest("label").classList.add("done"); cb.closest("label").append(el("span", { class: "muted small" }, ` ✓ ${today}`));
+      });
+      archCount();
+    }
+  }
 
   // ------------------------------------------------------------ Statistik
   async function renderStats() {

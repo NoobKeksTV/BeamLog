@@ -17,8 +17,8 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import __app_name__, __copyright__, __license__, __source_url__, __version__, env, adsb, audit, exporters, geo, importers, kst, logcheck, lookup, prefixes, tiles, updater
-from .db import Database, normalize_dok
+from . import __app_name__, __copyright__, __license__, __source_url__, __version__, env, adsb, audit, demo, exporters, geo, importers, kst, logcheck, lookup, prefixes, results_archive, tiles, updater
+from .db import Database, normalize_dok, utcnow as utcnow_iso
 
 STATIC = Path(__file__).parent / "static"
 SEED = Path(__file__).parent / "seed" / "stationsdatenbank.csv"
@@ -27,6 +27,9 @@ SEED = Path(__file__).parent / "seed" / "stationsdatenbank.csv"
 def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: float | None = None, public_url: str = "") -> FastAPI:
     db = Database(db_path or env("DB", "data/beamlog.db"))
     interval = backup_interval_min if backup_interval_min is not None else float(env("BACKUP_MIN", "15"))
+    DEMO = demo.enabled()  # öffentliche Vorführ-Instanz: feste Zugangsdaten, Sperren, tägliches Zurücksetzen (demo.py)
+    if DEMO:
+        interval = 0  # Backups der Beispieldaten braucht niemand
 
     async def backup_loop():
         while True:
@@ -54,8 +57,25 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         db.set_setting("seeded", "1")
         return len(res.callbook)
 
+    def demo_reset() -> None:
+        demo.reset(db, seed_callbook)
+        rig.clear()
+        cw_queue.clear()
+        print(f"Demo-Modus: Beispieldaten angelegt, nächstes Zurücksetzen {demo.next_reset():%d.%m.%Y %H:%M}.")
+
+    async def demo_loop():
+        while True:
+            await asyncio.sleep(max(30.0, (demo.next_reset() - datetime.now().astimezone()).total_seconds()))
+            for c in list(kst_state.values()):
+                await c.stop()
+            kst_state.clear()
+            await asyncio.to_thread(demo_reset)
+            await hub.broadcast({"type": "demo_reset"})
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        if DEMO:
+            await asyncio.to_thread(demo_reset)
         n = seed_callbook()
         if n:
             print(f"Stationsdatenbank: {n} Rufzeichen aus der mitgelieferten Startdatei geladen.")
@@ -63,6 +83,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         db.prune_audit()
         task = asyncio.create_task(backup_loop()) if interval > 0 else None
         update_task = asyncio.create_task(update_loop())
+        demo_task = asyncio.create_task(demo_loop()) if DEMO else None
         for st in db.rows("SELECT id FROM stations WHERE kst_autostart=1 AND kst_user<>'' AND kst_pass<>''"):
             try:
                 await kst_start(st["id"])
@@ -75,8 +96,11 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if task:
             task.cancel()
         update_task.cancel()
+        if demo_task:
+            demo_task.cancel()
         try:
-            db.create_backup("shutdown")
+            if not DEMO:
+                db.create_backup("shutdown")
         except Exception:  # noqa: BLE001
             pass
         db.close()
@@ -195,15 +219,17 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             raise HTTPException(403, "Admin-Anmeldung erforderlich")
 
     def is_maintainer() -> bool:
-        """Betreuer-Modus (MAINTAINER=1 in beamlog.env): Quellen-Importe für die zentrale Stationsdatenbank."""
+        """Betreuer-Modus (MAINTAINER=1 in .env): Quellen-Importe für die zentrale Stationsdatenbank."""
         on = ("1", "true", "yes", "ja", "on")
+        if DEMO:
+            return False
         return env("MAINTAINER").strip().lower() in on or env("DEV").strip().lower() in on
 
     def require_maintainer(x_admin_token: str | None = Header(default=None)) -> None:
         if not is_admin(x_admin_token):
             raise HTTPException(403, "Admin-Anmeldung erforderlich")
         if not is_maintainer():
-            raise HTTPException(403, "Nur im Betreuer-Modus (MAINTAINER=1 in beamlog.env). Normale Installationen holen die Liste über „Nach neuen suchen (Repo)“.")
+            raise HTTPException(403, "Nur im Betreuer-Modus (MAINTAINER=1 in .env). Normale Installationen holen die Liste über „Nach neuen suchen (Repo)“.")
 
     def require_station(sid: int, token: str | None, admin: str | None) -> dict:
         station = db.get_station(sid)
@@ -217,6 +243,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return (x_nick or "").strip()[:24]
 
     app.add_middleware(audit.AuditMiddleware, record=db.add_audit, is_admin=is_admin)
+    if DEMO:
+        app.add_middleware(demo.DemoGuard, protected=lambda: demo.protected_ids(db))
 
     @app.get("/api/audit", dependencies=[Depends(require_admin)])
     def audit_list(limit: int = 200, q: str = ""):
@@ -241,6 +269,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
             "mdbtools": True,  # MDB-Import rein in Python eingebaut
             "maintainer": is_maintainer(),
+            "demo": demo.info() if DEMO else None,
         }
 
     @app.get("/api/qr.svg")
@@ -478,6 +507,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.get("/api/backups", dependencies=[Depends(require_admin)])
     def backups():
+        if DEMO:
+            return {"dir": "", "interval_min": 0, "backups": [], "demo": True}
         return {"dir": str(db.backup_dir), "interval_min": interval, "backups": db.list_backups()[:60]}
 
     @app.post("/api/backups", dependencies=[Depends(require_admin)])
@@ -991,6 +1022,171 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             total += len(res.callbook)
             report.append({"url": url, "calls": len(res.callbook)})
         return {"total": total, "callbook_count": db.callbook_count(), "files": report}
+
+    # ------------------------------------------------------------ Ergebnislisten-Archiv (DARC, IARU …) – Betreuer
+    archive = {"entries": {}, "job": None}  # id -> Entry; laufender Import
+    ARCHIVE_LISTS_PARALLEL = 6  # so viele Listen werden gleichzeitig geladen (verschiedene Quellen und Conteste)
+    # Je Server höchstens 8 gleichzeitige Abrufe: gemessen schaffen DARC-Hub (~10 Seiten/s) und IARU-Robot (~6 Seiten/s) damit
+    # ihr Maximum, bei 12 und mehr werden sie nicht schneller bzw. langsamer (überlastet) – mehr belastet nur die Veranstalter.
+    # Laufen mehrere Listen desselben Servers, teilen sie sich diese Plätze der Reihe nach (FairSlots).
+    ARCHIVE_PER_HOST = 8
+    import threading as _threading
+    host_slots: dict[str, results_archive.FairSlots] = {}
+    host_lock = _threading.Lock()
+    http_client: dict = {}
+
+    def archive_client():
+        """Ein gemeinsamer HTTP-Client mit wiederverwendeten Verbindungen (keep-alive) – spart je Seite den TLS-Aufbau (~0,4 s)."""
+        import httpx
+        with host_lock:
+            if "c" not in http_client:
+                http_client["c"] = httpx.Client(headers={"User-Agent": f"Mozilla/5.0 (compatible; BeamLog/{__version__}; +{__source_url__})"},
+                                                timeout=60, follow_redirects=True,
+                                                limits=httpx.Limits(max_connections=64, max_keepalive_connections=64))
+            return http_client["c"]
+
+    def archive_fetch(url: str) -> bytes:
+        """Eine Seite laden – je Server höchstens ARCHIVE_PER_HOST gleichzeitig; bei kurzen Verbindungsabbrüchen bis zu zweimal neu."""
+        import httpx
+        host = httpx.URL(url).host.lower()
+        with host_lock:
+            slot = host_slots.setdefault(host, results_archive.FairSlots(ARCHIVE_PER_HOST))
+        client = archive_client()
+        for attempt in range(3):
+            try:
+                with slot:
+                    r = client.get(url)
+                if r.status_code >= 400:
+                    raise RuntimeError(f"HTTP {r.status_code}: {url}")  # 404 & Co.: Wiederholen hilft nicht
+                return r.content
+            except httpx.TransportError:
+                if attempt == 2:
+                    raise
+                time.sleep(1 + 2 * attempt)
+        return b""
+
+    def archive_done() -> dict:
+        try:
+            return json.loads(db.get_setting("results_done", "") or "{}")
+        except ValueError:
+            return {}
+
+    @app.get("/api/results/sources", dependencies=[Depends(require_maintainer)])
+    def results_sources():
+        return {"sources": [{"key": k, **v} for k, v in results_archive.SOURCES.items()], "done": archive_done()}
+
+    @app.post("/api/results/list", dependencies=[Depends(require_maintainer)])
+    async def results_list(body: dict):
+        """Alle verfügbaren Listen einer Quelle aufzählen (lädt nur die Übersichtsseiten)."""
+        source = body.get("source", "")
+        try:
+            entries = await asyncio.to_thread(results_archive.list_entries, archive_fetch, source, datetime.now(timezone.utc).year)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, f"Quelle nicht erreichbar: {e}")
+        archive["entries"].update({e.id: e for e in entries})
+        done = archive_done()
+        return {"source": source, "entries": [{**e.as_dict(), "done": done.get(e.id)} for e in entries]}
+
+    @app.post("/api/results/import", dependencies=[Depends(require_maintainer)])
+    async def results_import(body: dict):
+        """Ausgewählte Listen im Hintergrund laden und übernehmen. without_locator: Stationen ohne Locator (KW) neu aufnehmen –
+        sonst ergänzen KW-Listen nur den DOK bereits bekannter Stationen."""
+        if archive["job"] and archive["job"]["running"]:
+            raise HTTPException(409, "Es läuft bereits ein Import")
+        ids = [i for i in body.get("ids") or [] if i in archive["entries"]]
+        if not ids:
+            raise HTTPException(400, "Keine Listen ausgewählt (vorher „Listen laden“)")
+        job = {"running": True, "cancel": False, "total": len(ids), "done": 0, "current": "", "active": [], "done_ids": [], "new": 0, "known": 0,
+               "dok": 0, "skipped": 0, "rows": 0, "errors": [], "started": utcnow_iso(), "finished": ""}
+        archive["job"] = job
+        add_bare = bool(body.get("without_locator"))
+        active: dict[str, str] = {}  # id -> Anzeige (Name · Fortschritt) der gerade laufenden Listen
+
+        def show() -> None:
+            job["active"] = list(active.values())
+            job["current"] = " | ".join(job["active"])
+
+        def learn(e, parsed) -> int:
+            """Ergebnis einer Liste übernehmen – läuft im Event-Loop, also immer nur eine Liste zugleich in der Datenbank."""
+            when = f"{e.when}T00:00:00Z" if e.when else ""
+            n = 0
+            uniq = list(dict.fromkeys(parsed.rows))  # Einzel-Logs: dieselbe Station steht in Hunderten Logs
+            with db.bulk():
+                for call, loc, dok in uniq:
+                    if not loc and not add_bare and not db.lookup_call(call):
+                        job["skipped"] += 1
+                        continue
+                    before = db.row("SELECT dok FROM callbook WHERE call=?", (prefixes.core_call(call),))
+                    r = db.learn_call(call, loc, source=e.source, when=when, dok=dok)
+                    if r == "new":
+                        job["new"] += 1
+                    elif r == "known":
+                        job["known"] += 1
+                        if dok and before is not None and not before.get("dok"):
+                            job["dok"] += 1
+                    n += 1
+            job["rows"] += len(parsed.rows)
+            return n
+
+        async def run():
+            done = archive_done()
+            queue = list(ids)
+
+            async def worker():
+                while queue and not job["cancel"]:
+                    i = queue.pop(0)
+                    e = archive["entries"][i]
+                    active[i] = e.label
+                    show()
+
+                    def progress(n: int, total: int, i: str = i, label: str = e.label) -> bool:
+                        active[i] = f"{label} · {n}/{total}"
+                        show()
+                        return not job["cancel"]
+                    try:
+                        parsed = await asyncio.to_thread(results_archive.parse_entry, archive_fetch, e, progress)
+                    except results_archive.Cancelled:
+                        active.pop(i, None)
+                        break
+                    except Exception as ex:  # noqa: BLE001
+                        job["errors"].append({"id": i, "label": e.label, "error": str(ex)[:200]})
+                        job["done"] += 1
+                        active.pop(i, None)
+                        show()
+                        continue
+                    n = learn(e, parsed)
+                    done[i] = {"at": utcnow_iso()[:10], "n": n}
+                    db.set_setting("results_done", json.dumps(done))
+                    job["done"] += 1
+                    job["done_ids"].append(i)
+                    active.pop(i, None)
+                    show()
+
+            try:
+                await asyncio.gather(*(worker() for _ in range(min(ARCHIVE_LISTS_PARALLEL, len(ids)))))
+            finally:
+                job["running"] = False
+                active.clear()
+                show()
+                job["finished"] = utcnow_iso()
+                db.add_audit("Ergebnislisten importiert", details=f"{job['done']}/{job['total']} Listen, {job['new']} neu, {job['known']} bekannt, "
+                             f"{job['dok']} DOK ergänzt, {len(job['errors'])} Fehler", nick="Admin", admin=True)
+
+        archive["task"] = asyncio.create_task(run())
+        return {k: v for k, v in job.items() if k != "cancel"}
+
+    @app.get("/api/results/job", dependencies=[Depends(require_maintainer)])
+    def results_job():
+        job = archive["job"]
+        return ({k: v for k, v in job.items() if k != "cancel"} | {"callbook_count": db.callbook_count()}) if job else {"running": False}
+
+    @app.post("/api/results/job/cancel", dependencies=[Depends(require_maintainer)])
+    def results_cancel():
+        if archive["job"]:
+            archive["job"]["cancel"] = True
+        return {"ok": True}
 
     @app.get("/api/callbook/export.csv")
     def callbook_export():

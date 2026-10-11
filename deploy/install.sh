@@ -4,26 +4,99 @@
 #   sudo bash deploy/install.sh --update   # Code aktualisieren und Dienst neu starten
 #   sudo bash deploy/install.sh --url http://contest.local/   # Adresse für QR-Code/Links setzen
 #
-# Alle Server-Einstellungen stehen in /etc/beamlog/beamlog.env (wird beim ersten Lauf angelegt).
+# Teile weglassen (beliebig kombinierbar, die Wahl wird in <ordner>/.install.options gemerkt und gilt auch für --update):
+#   --no-nginx     nginx weder installieren noch einrichten (eigener Reverse-Proxy oder PORT=80 direkt);
+#                  eine früher angelegte BeamLog-Site wird entfernt, nginx selbst und andere Sites bleiben unberührt
+#   --no-service   keinen systemd-Dienst anlegen (BeamLog selbst starten, z. B. eigene Unit oder Container);
+#                  ein früher angelegter Dienst „beamlog“ wird angehalten und entfernt. Ohne Dienst wird nichts nach
+#                  /opt/beamlog kopiert – BeamLog bleibt automatisch in diesem Ordner (wie --here)
+#   --no-backup    keinen täglichen Backup-Cron einrichten (ein vorhandener wird entfernt)
+#   --with-nginx / --with-service / --with-backup   gemerkte Wahl wieder aufheben
+#
+# Mit Dienst wird BeamLog nach /opt/beamlog kopiert (fester Ort, eigener Systemnutzer, gehärtete Unit) – das Skript
+# sagt das deutlich. Im aktuellen Ordner lassen statt zu kopieren:
+#   --here         BeamLog bleibt, wo es liegt (dieser Ordner), läuft als der aufrufende Nutzer; Daten in ./data,
+#                  Einstellungen in ./.env. Dienst, nginx und Backup-Cron zeigen dann auf diesen Ordner.
+#   --deps-only    nur die Voraussetzungen installieren (Systempakete und Python-Umgebung ./.venv) –
+#                  wie --here --no-nginx --no-service --no-backup; danach selbst starten
+#   --system       gemerkte --here-Wahl aufheben und wieder nach /opt/beamlog installieren
+#   Beispiel:  sudo bash deploy/install.sh --deps-only        bzw.   sudo bash deploy/install.sh --here --no-nginx
+#   Beispiel:  sudo bash deploy/install.sh --no-nginx --no-backup
+#
+# Alles liegt in EINEM Ordner: /opt/beamlog (Programm), /opt/beamlog/data (Datenbank, Backups) und /opt/beamlog/.env
+# (Einstellungen, wird beim ersten Lauf angelegt). Ältere Installationen (Daten in /var/lib/beamlog, Einstellungen in
+# /etc/beamlog/.env bzw. beamlog.env) werden beim Update automatisch dorthin geholt.
 # Ein Server aus Version 0.9 (Dienst „contestlogger“) wird dabei automatisch auf BeamLog umgestellt.
 set -euo pipefail
 
 APP_DIR=/opt/beamlog
-DATA_DIR=/var/lib/beamlog
-CONF=/etc/beamlog/beamlog.env
+DATA_DIR=/opt/beamlog/data          # alles in einem Ordner (bis 1.0.0: /var/lib/beamlog und /etc/beamlog)
+CONF=/opt/beamlog/.env
 SRC_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MODE=install
 PUBLIC_URL=""
+CLI_NGINX=""; CLI_SERVICE=""; CLI_BACKUP=""; CLI_HERE=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --update) MODE=update ;;
     --url) PUBLIC_URL="$2"; shift ;;
-    *) echo "Unbekannte Option: $1"; exit 1 ;;
+    --no-nginx) CLI_NGINX=0 ;;
+    --with-nginx) CLI_NGINX=1 ;;
+    --no-service) CLI_SERVICE=0 ;;
+    --with-service) CLI_SERVICE=1 ;;
+    --no-backup) CLI_BACKUP=0 ;;
+    --with-backup) CLI_BACKUP=1 ;;
+    --here|--in-place) CLI_HERE=1 ;;
+    --system) CLI_HERE=0 ;;
+    --deps-only) CLI_HERE=1; CLI_NGINX=0; CLI_SERVICE=0; CLI_BACKUP=0 ;;
+    -h|--help) sed -n '2,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "Unbekannte Option: $1  (Hilfe: --help)"; exit 1 ;;
   esac
   shift
 done
 
+# Ort: /opt/beamlog (Standard) oder dieser Ordner (--here, wird im Ordner gemerkt)
+HERE=0
+if [ -f "$SRC_DIR/.install.options" ] && grep -qx 'HERE=1' "$SRC_DIR/.install.options"; then HERE=1; fi
+[ -n "$CLI_HERE" ] && HERE=$CLI_HERE
+# Ohne Dienst gibt es keinen Grund zu kopieren: dann bleibt BeamLog automatisch in diesem Ordner (außer mit --system)
+AUTO_HERE=0
+if [ -z "$CLI_HERE" ] && [ "$CLI_SERVICE" = 0 ] && [ "$HERE" = 0 ]; then HERE=1; AUTO_HERE=1; fi
+RUN_USER=beamlog; RUN_GROUP=beamlog
+OPTS="$APP_DIR/.install.options"
+if [ "$HERE" = 1 ]; then
+  case "$SRC_DIR" in *[[:space:]]*) echo "--here: Der Ordnerpfad enthält Leerzeichen ($SRC_DIR) – bitte in einen Ordner ohne Leerzeichen legen."; exit 1 ;; esac
+  APP_DIR="$SRC_DIR"; DATA_DIR="$SRC_DIR/data"; CONF="$SRC_DIR/.env"; OPTS="$SRC_DIR/.install.options"
+  RUN_USER="${SUDO_USER:-root}"; RUN_GROUP="$(id -gn "$RUN_USER")"
+fi
+# Welche Teile eingerichtet werden (1 = ja): gemerkte Wahl laden, Kommandozeile überstimmt sie
+WANT_NGINX=1; WANT_SERVICE=1; WANT_BACKUP=1
+OPTS_CANDS=("$OPTS"); [ "$HERE" = 0 ] && OPTS_CANDS+=(/etc/beamlog/install.options)   # gemerkte Wahl älterer Installationen
+for f in "${OPTS_CANDS[@]}"; do
+  if [ -f "$f" ]; then
+    # shellcheck disable=SC1090
+    . <(grep -E '^WANT_(NGINX|SERVICE|BACKUP)=[01]$' "$f" || true)
+    break
+  fi
+done
+[ -n "$CLI_NGINX" ] && WANT_NGINX=$CLI_NGINX
+[ -n "$CLI_SERVICE" ] && WANT_SERVICE=$CLI_SERVICE
+[ -n "$CLI_BACKUP" ] && WANT_BACKUP=$CLI_BACKUP
+# Befehle im --here-Modus als der Besitzer des Ordners ausführen (nicht als root)
+as_run() { if [ "$HERE" = 1 ] && [ "$RUN_USER" != root ]; then runuser -u "$RUN_USER" -- "$@"; else "$@"; fi; }
+
 if [ "$(id -u)" -ne 0 ]; then echo "Bitte mit sudo ausführen."; exit 1; fi
+
+# Die Einstellungsdatei heißt jetzt „.env“: eine vorhandene beamlog.env (bzw. contestlogger.env) daneben umbenennen,
+# damit beim Update nichts verloren geht. Die Dienst-Unit wird weiter unten passend neu geschrieben.
+for OLD_CONF in "$(dirname "$CONF")/beamlog.env" "$(dirname "$CONF")/contestlogger.env"; do
+  if [ -f "$OLD_CONF" ] && [ ! -f "$CONF" ]; then
+    mv "$OLD_CONF" "$CONF"
+    echo "== Einstellungen umbenannt: $OLD_CONF -> $CONF"
+  elif [ -f "$OLD_CONF" ]; then
+    echo "== Hinweis: $OLD_CONF wird nicht mehr gelesen (es gilt $CONF) – bitte prüfen und löschen."
+  fi
+done
 
 # Wert aus der env-Datei lesen (letzte Zeile gewinnt, Kommentare/Anführungszeichen entfernt)
 conf_get() { { grep -E "^[[:space:]]*$1=" "$CONF" 2>/dev/null || true; } | tail -1 | cut -d= -f2- | sed -e 's/[[:space:]]#.*$//' -e "s/^[[:space:]\"']*//" -e "s/[[:space:]\"']*\$//"; }
@@ -37,6 +110,41 @@ adopt_unit_options() {
     key=$(echo "$opt" | tr 'a-z-' 'A-Z_')
     if [ -n "$val" ] && [ "$(conf_get "$key")" != "$val" ]; then conf_set "$key" "$val"; echo "   $key=$val aus $(basename "$unit") übernommen"; fi
   done
+}
+
+# Fehlt eine Vorlage aus deploy/ (z. B. unvollständig entpackt oder versehentlich gelöscht), wird eine Standardversion
+# angelegt statt abzubrechen.
+ensure_template() {
+  local f=$1 kind=$2 host=127.0.0.1
+  [ -f "$f" ] && return 0
+  mkdir -p "$(dirname "$f")"
+  echo "   Vorlage $f fehlt – lege eine Standardversion an"
+  case "$kind" in
+    env)
+      [ "$WANT_NGINX" = 1 ] || host=0.0.0.0
+      printf '%s\n' "# BeamLog – Einstellungen (KEY=VALUE), automatisch angelegt" "HOST=$host" "PORT=8000" "BACKUP_MIN=15" \
+        "#PUBLIC_URL=http://contest.local/" > "$f" ;;
+    service)
+      printf '%s\n' "[Unit]" "Description=BeamLog – Amateurfunk-Contest-Logger" "After=network.target" "" "[Service]" "Type=simple" \
+        "User=beamlog" "Group=beamlog" "WorkingDirectory=/opt/beamlog" "Environment=PYTHONUNBUFFERED=1" \
+        "ExecStart=/opt/beamlog/.venv/bin/python run.py --config /opt/beamlog/.env" "Restart=always" "RestartSec=3" \
+        "AmbientCapabilities=CAP_NET_BIND_SERVICE" "CapabilityBoundingSet=CAP_NET_BIND_SERVICE" "NoNewPrivileges=true" \
+        "PrivateTmp=true" "ProtectSystem=strict" "ProtectHome=true" "ReadWritePaths=/opt/beamlog" "" "[Install]" \
+        "WantedBy=multi-user.target" > "$f" ;;
+    nginx)
+      printf '%s\n' "server {" "    listen 80 default_server;" "    listen [::]:80 default_server;" "    server_name _;" \
+        "    client_max_body_size 50m;" "    location /ws {" "        proxy_pass http://127.0.0.1:8000;" "        proxy_http_version 1.1;" \
+        "        proxy_set_header Upgrade \$http_upgrade;" "        proxy_set_header Connection \"upgrade\";" \
+        "        proxy_set_header Host \$host;" "        proxy_read_timeout 3600s;" "    }" "    location / {" \
+        "        proxy_pass http://127.0.0.1:8000;" "        proxy_set_header Host \$host;" \
+        "        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;" "        proxy_set_header X-Forwarded-Proto \$scheme;" \
+        "    }" "}" > "$f" ;;
+    backup)
+      printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'DATA_DIR="${1:-/opt/beamlog/data}"' 'mkdir -p "$DATA_DIR/backup-daily"' \
+        'STAMP=$(date -u +%Y%m%d-%H%M%S); OUT="$DATA_DIR/backup-daily/beamlog-$STAMP.db"' \
+        'python3 -c "import sqlite3,sys; s=sqlite3.connect(sys.argv[1]); d=sqlite3.connect(sys.argv[2]); s.backup(d)" "$DATA_DIR/beamlog.db" "$OUT"' \
+        'gzip -f "$OUT"' 'find "$DATA_DIR/backup-daily" -name "beamlog-*.db.gz" -mtime +30 -delete' > "$f" ;;
+  esac
 }
 
 # Server aus Version 0.9 (hieß „ContestLogger“): Dienst, Nutzer, Pfade und Dateien auf BeamLog umstellen.
@@ -61,7 +169,7 @@ migrate_from_contestlogger() {
   fi
   if [ -f /etc/contestlogger/contestlogger.env ] && [ ! -f "$CONF" ]; then
     mkdir -p "$(dirname "$CONF")"
-    sed -e 's#/var/lib/contestlogger/contestlogger\.db#/var/lib/beamlog/beamlog.db#g' -e 's#/var/lib/contestlogger#/var/lib/beamlog#g' \
+    sed -e "s#/var/lib/contestlogger/contestlogger\.db#$DATA_DIR/beamlog.db#g" -e "s#/var/lib/contestlogger#$DATA_DIR#g" \
         -e 's/CONTESTLOGGER_/BEAMLOG_/g' /etc/contestlogger/contestlogger.env > "$CONF"
     echo "   Einstellungen: /etc/contestlogger/contestlogger.env -> $CONF"
   fi
@@ -83,35 +191,93 @@ migrate_from_contestlogger() {
 }
 
 if [ "$MODE" = install ]; then
-  echo "== Pakete installieren"
+  PKGS="python3 python3-venv python3-pip mdbtools rsync"; [ "$WANT_NGINX" = 1 ] && PKGS="$PKGS nginx"
+  echo "== Pakete installieren ($PKGS)"
   apt-get update -qq
-  apt-get install -y -qq python3 python3-venv python3-pip nginx mdbtools rsync
+  # shellcheck disable=SC2086
+  apt-get install -y -qq $PKGS
 fi
-migrate_from_contestlogger
-id beamlog >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin beamlog
+# Bis 1.0.0 lagen Daten in /var/lib/beamlog und Einstellungen in /etc/beamlog – jetzt alles in $APP_DIR.
+# Einstellungen und gemerkte Wahl werden verschoben, die Daten kopiert (das Original bleibt als Sicherung liegen).
+LEGACY_DATA=/var/lib/beamlog
+LEGACY_ETC=/etc/beamlog
+MOVED_DATA=0
+migrate_to_app_dir() {
+  local f
+  mkdir -p "$APP_DIR" "$DATA_DIR"
+  for f in "$LEGACY_ETC/.env" "$LEGACY_ETC/beamlog.env"; do
+    if [ -f "$f" ] && [ ! -f "$CONF" ]; then
+      mv "$f" "$CONF"
+      echo "== Umzug: Einstellungen $f -> $CONF"
+    fi
+  done
+  if [ -f "$LEGACY_ETC/install.options" ]; then
+    [ -f "$OPTS" ] || mv "$LEGACY_ETC/install.options" "$OPTS"
+    rm -f "$LEGACY_ETC/install.options"
+  fi
+  rmdir "$LEGACY_ETC" 2>/dev/null || true
+  if [ -f "$LEGACY_DATA/beamlog.db" ] && [ ! -f "$DATA_DIR/beamlog.db" ]; then
+    systemctl stop beamlog >/dev/null 2>&1 || true   # konsistente Kopie: Dienst kurz anhalten (startet unten neu)
+    cp -a "$LEGACY_DATA/." "$DATA_DIR/"
+    MOVED_DATA=1
+    echo "== Umzug: Daten $LEGACY_DATA -> $DATA_DIR (das Original bleibt als Sicherung liegen)"
+  fi
+  # Pfade in der Einstellungsdatei nachziehen (z. B. DB=/var/lib/beamlog/beamlog.db)
+  if [ -f "$CONF" ] && grep -q "$LEGACY_DATA/" "$CONF"; then
+    sed -i "s#$LEGACY_DATA/#$DATA_DIR/#g" "$CONF"
+    echo "   Pfade in $CONF auf $DATA_DIR umgestellt"
+  fi
+}
 
-echo "== Code nach $APP_DIR kopieren"
-mkdir -p "$APP_DIR" "$DATA_DIR"
-rsync -a --delete --exclude .git --exclude .venv --exclude data --exclude __pycache__ "$SRC_DIR/" "$APP_DIR/"
+if [ "$HERE" = 0 ]; then
+  migrate_from_contestlogger
+  id beamlog >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin beamlog
+  migrate_to_app_dir
+fi
 
-echo "== Python-Umgebung"
-[ -d "$APP_DIR/.venv" ] || python3 -m venv "$APP_DIR/.venv"
-"$APP_DIR/.venv/bin/pip" install -q --upgrade pip
-"$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/requirements.txt"
-chown -R beamlog:beamlog "$APP_DIR" "$DATA_DIR"
+if [ "$HERE" = 1 ]; then
+  echo "== BeamLog bleibt in $APP_DIR (kein Kopieren$( [ "$AUTO_HERE" = 1 ] && echo ", weil ohne Dienst")), läuft als Nutzer $RUN_USER; Daten in $DATA_DIR"
+  mkdir -p "$DATA_DIR"
+  chown "$RUN_USER:$RUN_GROUP" "$DATA_DIR"
+else
+  echo
+  echo "######################################################################################"
+  echo "#  ACHTUNG: BeamLog wird nach $APP_DIR KOPIERT – wegen des systemd-Dienstes."
+  echo "#  Der Dienst läuft dort als eigener Nutzer „beamlog“, Daten in $DATA_DIR,"
+  echo "#  Einstellungen in $CONF. Dieser Ordner ($SRC_DIR) wird danach nicht mehr benutzt."
+  echo "#  Im Ordner bleiben stattdessen:  --here (mit Dienst)  oder  --no-service / --deps-only"
+  echo "######################################################################################"
+  echo
+  echo "== Code nach $APP_DIR kopieren"
+  mkdir -p "$APP_DIR" "$DATA_DIR"
+  rsync -a --delete --exclude .git --exclude /.venv --exclude /data --exclude /.env --exclude /beamlog.env --exclude /.install.options --exclude __pycache__ "$SRC_DIR/" "$APP_DIR/"
+fi
+
+echo "== Python-Umgebung $APP_DIR/.venv"
+[ -d "$APP_DIR/.venv" ] || as_run python3 -m venv "$APP_DIR/.venv"
+as_run "$APP_DIR/.venv/bin/pip" install -q --upgrade pip
+as_run "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/requirements.txt"
+as_run cp "$APP_DIR/requirements.txt" "$APP_DIR/.venv/.requirements.installed"   # start.sh installiert dann nicht erneut
+if [ "$HERE" = 0 ]; then chown -R beamlog:beamlog "$APP_DIR" "$DATA_DIR"; fi
 
 echo "== Konfiguration $CONF"
 mkdir -p "$(dirname "$CONF")"
 if [ ! -f "$CONF" ]; then
-  cp "$APP_DIR/deploy/portable/beamlog.env" "$CONF"
-  echo "   neu angelegt (Vorlage deploy/portable/beamlog.env)"
+  TEMPLATE="$APP_DIR/deploy/portable/server.env"; [ "$HERE" = 1 ] && TEMPLATE="$APP_DIR/.env.example"
+  ensure_template "$TEMPLATE" env
+  cp "$TEMPLATE" "$CONF"
+  echo "   neu angelegt (Vorlage ${TEMPLATE#"$APP_DIR"/})"
 else
   echo "   vorhanden, bleibt unverändert"
 fi
 if [ -n "$PUBLIC_URL" ]; then
   if grep -q '^#\?PUBLIC_URL=' "$CONF"; then sed -i "s#^\#\?PUBLIC_URL=.*#PUBLIC_URL=$PUBLIC_URL#" "$CONF"; else echo "PUBLIC_URL=$PUBLIC_URL" >> "$CONF"; fi
 fi
-chmod 640 "$CONF"; chown root:beamlog "$CONF"
+chmod 640 "$CONF"; chown "$RUN_USER:$RUN_GROUP" "$CONF"
+printf '# Von install.sh gemerkte Wahl (1 = einrichten, 0 = weglassen) – ändern mit --no-… / --with-… / --here / --system\nHERE=%s\nWANT_NGINX=%s\nWANT_SERVICE=%s\nWANT_BACKUP=%s\n' \
+  "$HERE" "$WANT_NGINX" "$WANT_SERVICE" "$WANT_BACKUP" > "$OPTS"
+chown "$RUN_USER:$RUN_GROUP" "$OPTS"
+echo "   Ort: $APP_DIR$( [ "$HERE" = 1 ] && echo " (--here)")   Teile: nginx=$( [ "$WANT_NGINX" = 1 ] && echo ja || echo nein ), Dienst=$( [ "$WANT_SERVICE" = 1 ] && echo ja || echo nein ), Backup-Cron=$( [ "$WANT_BACKUP" = 1 ] && echo ja || echo nein )  (gemerkt in $OPTS)"
 
 # Port und Adresse kommen aus der env-Datei. PORT=80: BeamLog direkt erreichbar, ohne nginx davor.
 # Jeder andere Port: nginx auf Port 80 leitet an 127.0.0.1:<PORT> weiter.
@@ -126,7 +292,18 @@ if [ "$CONF_PORT" = 80 ]; then
   fi
 fi
 
-if [ "$DIRECT" = 1 ]; then
+if [ "$WANT_NGINX" = 0 ]; then
+  echo "== nginx: übersprungen (--no-nginx)"
+  if [ -e /etc/nginx/sites-enabled/beamlog ]; then
+    rm -f /etc/nginx/sites-enabled/beamlog
+    echo "   frühere BeamLog-Site entfernt (nginx selbst und andere Sites bleiben unberührt)"
+    if systemctl is-active --quiet nginx 2>/dev/null && nginx -t >/dev/null 2>&1; then systemctl reload nginx || true; fi
+  fi
+  if [ "$DIRECT" = 1 ] && systemctl is-active --quiet nginx 2>/dev/null; then
+    echo "   Achtung: PORT=80, aber nginx läuft und belegt Port 80 vermutlich selbst – mit --no-nginx bleibt nginx unangetastet."
+    echo "   nginx abschalten:  sudo systemctl disable --now nginx   (oder mit --with-nginx, dann erledigt das das Skript)"
+  fi
+elif [ "$DIRECT" = 1 ]; then
   echo "== nginx: nicht nötig, BeamLog läuft direkt auf Port 80"
   rm -f /etc/nginx/sites-enabled/beamlog
   if systemctl is-active --quiet nginx 2>/dev/null; then
@@ -136,9 +313,11 @@ if [ "$DIRECT" = 1 ]; then
 elif [ "$MODE" = install ] || [ "$MIGRATED" = 1 ] || [ ! -e /etc/nginx/sites-enabled/beamlog ]; then
   echo "== nginx (Port 80 -> Dienst auf 127.0.0.1:$CONF_PORT)"
   if [ "$MODE" = install ] || [ ! -f /etc/nginx/sites-available/beamlog ]; then
+    ensure_template "$APP_DIR/deploy/nginx-beamlog.conf" nginx
     cp "$APP_DIR/deploy/nginx-beamlog.conf" /etc/nginx/sites-available/beamlog
   fi
   sed -i -E "s#proxy_pass http://127\.0\.0\.1:[0-9]+#proxy_pass http://127.0.0.1:$CONF_PORT#g" /etc/nginx/sites-available/beamlog
+  if [ "$HERE" = 1 ]; then sed -i '/location \/static\/ {/,/}/d' /etc/nginx/sites-available/beamlog; fi   # nginx darf in /home meist nicht lesen
   ln -sf /etc/nginx/sites-available/beamlog /etc/nginx/sites-enabled/beamlog
   rm -f /etc/nginx/sites-enabled/default
   # nginx starten, falls es (noch) nicht läuft – ein reines „reload“ scheitert bei gestopptem nginx
@@ -156,25 +335,66 @@ else
   fi
 fi
 
-echo "== systemd-Dienst"
-cp "$APP_DIR/deploy/beamlog.service" /etc/systemd/system/beamlog.service
-systemctl daemon-reload
-systemctl enable beamlog >/dev/null
-systemctl restart beamlog || true
-sleep 2
-systemctl is-active --quiet beamlog || SERVICE_FAILED=1
+if [ "$WANT_SERVICE" = 1 ]; then
+  echo "== systemd-Dienst"
+  ensure_template "$APP_DIR/deploy/beamlog.service" service
+  if [ "$HERE" = 1 ]; then
+    sed -e "s#/opt/beamlog#$APP_DIR#g" -e "s#^User=.*#User=$RUN_USER#" -e "s#^Group=.*#Group=$RUN_GROUP#" \
+        -e "s#^ReadWritePaths=.*#ReadWritePaths=$APP_DIR#" -e "s#^ProtectHome=.*#ProtectHome=false#" \
+        "$APP_DIR/deploy/beamlog.service" > /etc/systemd/system/beamlog.service
+  else
+    cp "$APP_DIR/deploy/beamlog.service" /etc/systemd/system/beamlog.service
+  fi
+  systemctl daemon-reload
+  systemctl enable beamlog >/dev/null
+  systemctl restart beamlog || true
+  sleep 2
+  systemctl is-active --quiet beamlog || SERVICE_FAILED=1
+else
+  echo "== systemd-Dienst: übersprungen (--no-service)"
+  if [ -e /etc/systemd/system/beamlog.service ]; then
+    systemctl disable --now beamlog >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/beamlog.service
+    systemctl daemon-reload
+    echo "   früheren Dienst „beamlog“ angehalten und entfernt"
+  fi
+fi
 
 # Tägliches Backup – bei jedem Lauf einrichten (fehlt sonst, falls ein früherer Lauf abgebrochen ist)
-echo "== Tägliches Backup (03:15 Uhr) nach $DATA_DIR/backup"
-cp "$APP_DIR/deploy/backup.sh" /usr/local/bin/beamlog-backup
-chmod +x /usr/local/bin/beamlog-backup
-echo "15 3 * * * root /usr/local/bin/beamlog-backup" > /etc/cron.d/beamlog-backup
+if [ "$WANT_BACKUP" = 1 ]; then
+  echo "== Tägliches Backup (03:15 Uhr) nach $DATA_DIR/backup"
+  ensure_template "$APP_DIR/deploy/backup.sh" backup
+  cp "$APP_DIR/deploy/backup.sh" /usr/local/bin/beamlog-backup
+  chmod +x /usr/local/bin/beamlog-backup
+  echo "15 3 * * * root /usr/local/bin/beamlog-backup $DATA_DIR" > /etc/cron.d/beamlog-backup
+else
+  echo "== Tägliches Backup: übersprungen (--no-backup)"
+  rm -f /etc/cron.d/beamlog-backup /usr/local/bin/beamlog-backup
+fi
 
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+START_CMD="sudo -u beamlog sh -c 'cd $APP_DIR && .venv/bin/python run.py --config $CONF'"
+[ "$HERE" = 1 ] && START_CMD="cd $APP_DIR && ./start.sh"
 echo
-echo "Fertig. BeamLog: http://${IP:-<server-ip>}/   (Status: systemctl status beamlog)"
-echo "Datenbank: $DATA_DIR/beamlog.db   Logs: journalctl -u beamlog -f"
-echo "Einstellungen: $CONF   (danach: sudo systemctl restart beamlog)"
+if [ "$HERE" = 0 ]; then
+  echo ">>> Installiert nach $APP_DIR (kopiert wegen des systemd-Dienstes) – Daten: $DATA_DIR, Einstellungen: $CONF"
+  echo ">>> Der Ordner $SRC_DIR wird nicht benutzt. Im Ordner bleiben: --here oder --no-service"
+else
+  echo ">>> BeamLog läuft aus diesem Ordner: $APP_DIR (Daten: $DATA_DIR, Einstellungen: $CONF)"
+fi
+if [ "$DIRECT" = 1 ] || [ "$WANT_NGINX" = 1 ]; then URL="http://${IP:-<server-ip>}/"
+elif [ "$CONF_HOST" = 127.0.0.1 ] || [ "$CONF_HOST" = localhost ]; then URL="http://127.0.0.1:$CONF_PORT/ (nur am Server – für den eigenen Reverse-Proxy)"
+else URL="http://${IP:-<server-ip>}:$CONF_PORT/"; fi
+if [ "$WANT_SERVICE" = 1 ]; then
+  echo "Fertig. BeamLog: $URL   (Status: systemctl status beamlog)"
+else
+  echo "Fertig. BeamLog ist installiert, aber ohne Dienst (--no-service) – selbst starten (als Nutzer $RUN_USER):"
+  echo "   $START_CMD"
+  echo "   Adresse danach: $URL"
+fi
+echo "Datenbank: $DATA_DIR/beamlog.db$( [ "$WANT_SERVICE" = 1 ] && echo "   Logs: journalctl -u beamlog -f")"
+echo "Einstellungen: $CONF   (danach: sudo systemctl restart beamlog bzw. eigenen Prozess neu starten)"
+if [ "$MOVED_DATA" = 1 ]; then echo "Umgezogen: Die bisherigen Daten liegen zusätzlich noch in $LEGACY_DATA – nach Prüfung löschbar (sudo rm -r $LEGACY_DATA)."; fi
 if [ "$MIGRATED" = 1 ]; then echo "Umgestellt von ContestLogger – die alten Daten liegen noch in /var/lib/contestlogger und können gelöscht werden."; fi
 if [ "$SERVICE_FAILED" = 1 ]; then
   echo

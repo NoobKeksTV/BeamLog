@@ -12,4 +12,6 @@ Stationsdatenbank, Dupe-Check, Operator-Fenster, Team-Chat, ON4KST-Chat, Aircraf
 | `BeamLog_YouTube_Thumbnail.png` | Vorschaubild für YouTube (1280×720) |
 | `YouTube.txt` | Titel, Beschreibung (mit Kapiteln) und Tags für das YouTube-Video |
 
+Veröffentlicht auf YouTube: https://youtu.be/yvYb6FNvjzA
+
 Musik und Effekte sind eigens für das Video erzeugt (keine fremden Rechte).
