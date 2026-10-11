@@ -54,6 +54,7 @@ SOURCES = {
 class Cancelled(Exception):
     """Import einer Liste abgebrochen (über den Fortschritts-Rückruf)."""
 IARU_ROBOT = "https://iaru.oevsv.at"
+IARU_PARALLEL = 3  # gleichzeitige Abrufe der Einzel-Logs
 OK2KKW = "https://www.ok2kkw.com/"
 OK2KKW_INDEX = OK2KKW + "contesting_en.htm"
 _OK2_SKIP = re.compile(r"contesting|winn\.htm|eme_contesting|log_cz|contests2_cz|statistika|main\.css", re.I)
@@ -253,10 +254,27 @@ def parse_iaru_logs(fetch: Fetch, cid: str, progress=None) -> Parsed:
         loc = next((c.upper() for c in cells if importers._LOC_TOKEN.fullmatch(c.upper() or "-")), "")  # noqa: SLF001
         if call and loc:
             rows.append((call, loc, ""))
-    for n, pid in enumerate(pids, 1):
+    # Jede QSO-Seite braucht auf dem Robot gut eine Sekunde – drei gleichzeitige Abrufe, Reihenfolge der Ergebnisse bleibt erhalten
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    lock, state = threading.Lock(), {"n": 0, "stop": False}
+
+    def one(pid: str) -> list[tuple[str, str, str]]:
+        if state["stop"]:
+            return []
+        page = _text(fetch(f"{IARU_ROBOT}/v_qsos/prg_list.php?reset=1&start=1&master_v_qsos_part_id={pid}&master_v_qsos_vw=v_part"))
+        with lock:
+            state["n"] += 1
+            n = state["n"]
         if progress and progress(n, len(pids)) is False:
-            raise Cancelled
-        rows += parse_iaru_qsos(_text(fetch(f"{IARU_ROBOT}/v_qsos/prg_list.php?reset=1&start=1&master_v_qsos_part_id={pid}&master_v_qsos_vw=v_part")))
+            state["stop"] = True
+        return parse_iaru_qsos(page)
+
+    with ThreadPoolExecutor(max_workers=IARU_PARALLEL) as pool:
+        for part_rows in pool.map(one, pids):
+            rows += part_rows
+    if state["stop"]:
+        raise Cancelled
     return Parsed(rows, 1 + len(pids))
 
 
