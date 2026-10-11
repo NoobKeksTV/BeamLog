@@ -5,7 +5,7 @@
 # BeamLog
 
 **Lokaler, webbasierter Contest-Logger für UKW-Contests (DARC / IARU Region 1)**
-Inoffizieller Nachfolger von DD3KU WinContest · ein Server im LAN, loggen von jedem Browser
+Basiert auf DD3KU WinContest · ein Server im LAN, loggen von jedem Browser
 Integrierter **ON4KST-Chat** (je Station, DMs, Rundruf) · **Aircraft-Scatter** wie AirScout direkt auf der Karte · Operator-Fenster für den zweiten Monitor
 
 [![Release](https://img.shields.io/github/v/release/NoobKeksTV/BeamLog?label=Release&color=3fb3ff)](https://github.com/NoobKeksTV/BeamLog/releases/latest)

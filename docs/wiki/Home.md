@@ -1,6 +1,6 @@
 # BeamLog – Wiki
 
-BeamLog (früher „ContestLogger“) ist ein lokaler, webbasierter Contest-Logger für UKW-Contests (DARC/IARU Region 1), gedacht als Nachfolger von DD3KU WinContest. Ein kleiner Server im LAN ist der zentrale Speicher; geloggt wird von beliebig vielen Rechnern, Tablets oder Handys im Browser. Keine Accounts, nur ein Nickname.
+BeamLog (früher „ContestLogger“) ist ein lokaler, webbasierter Contest-Logger für UKW-Contests (DARC/IARU Region 1), basierend auf DD3KU WinContest. Ein kleiner Server im LAN ist der zentrale Speicher; geloggt wird von beliebig vielen Rechnern, Tablets oder Handys im Browser. Keine Accounts, nur ein Nickname.
 
 ![Loggen](img/loggen.png)
 
