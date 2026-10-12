@@ -171,7 +171,8 @@ def test_prepare_data_creates_folders_and_explains_permissions(tmp_path, monkeyp
     monkeypatch.setattr(run.os, "access", lambda f, mode: False)  # Datei gehört z. B. root
     with pytest.raises(SystemExit) as e:
         run.prepare_data(str(db))
-    assert "kann nicht in" in str(e.value) and "chown" in str(e.value)
+    hint = "Ordnerrechte" if run.os.name == "nt" else "chown"  # Windows: kein chown, sondern Ordnerrechte prüfen
+    assert "kann nicht in" in str(e.value) and hint in str(e.value)
 
 
 def test_prepare_data_follows_moved_server_data(tmp_path, monkeypatch):
