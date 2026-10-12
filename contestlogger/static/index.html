@@ -62,6 +62,16 @@
         </div>
         <div id="macro-flash" class="macro-flash hidden"></div>
         <form id="qso-form" class="card qso-form" autocomplete="off">
+          <div id="lock-overlay" class="lock-overlay hidden" role="dialog" aria-live="polite">
+            <div class="lock-box">
+              <div class="lock-title">🔒 <span id="lock-station"></span> ist gesperrt</div>
+              <div class="lock-text muted">Zum Loggen mit dem Stations-Passwort freischalten. Zuschauen (Log, Karte, Statistik) geht auch ohne.</div>
+              <div class="lock-row">
+                <input id="lock-pw" type="password" placeholder="Stations-Passwort" autocomplete="current-password">
+                <button type="button" id="lock-btn" class="primary">🔓 Station freischalten</button>
+              </div>
+            </div>
+          </div>
           <div class="fields">
             <label class="f-call">Rufzeichen
               <input id="f-call" placeholder="DL1ABC" spellcheck="false" required>

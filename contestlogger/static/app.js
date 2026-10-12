@@ -404,15 +404,17 @@
       applyExchangeMode();
       const unlocked = canLog();
       $("#station-state").innerHTML = unlocked
-        ? `<span class="tag me">${t("freigeschaltet")}</span>`
-        : `<button class="ghost small" id="btn-unlock">🔒 ${t("freischalten")}</button>`;
-      $("#btn-unlock")?.addEventListener("click", () => askUnlock(st));
-      $("#qso-form").querySelectorAll("input,button").forEach((i) => { if (i.id !== "f-nr-sent") i.disabled = !unlocked; });
-      $("#hint-info").textContent = unlocked ? "" : t("Station ist nur im Lesemodus. Zum Loggen mit Stations-Passwort freischalten.");
+        ? `<span class="tag me">🔓 ${t("freigeschaltet")}</span>`
+        : `<button class="small unlock-btn" id="btn-unlock">🔒 ${t("Gesperrt – freischalten")}</button>`;
+      $("#btn-unlock")?.addEventListener("click", () => showLock(st, true));
+      $("#qso-form").querySelectorAll("input,button").forEach((i) => { if (i.id !== "f-nr-sent" && !i.closest("#lock-overlay")) i.disabled = !unlocked; });
+      $("#hint-info").textContent = "";
+      showLock(unlocked ? null : st);
     } else {
       $("#station-meta").textContent = "";
       $("#station-state").textContent = S.contests.length ? "" : t("Lege unter „Verwaltung“ einen Contest und eine Station an.");
-      $("#qso-form").querySelectorAll("input,button").forEach((i) => { i.disabled = true; });
+      $("#qso-form").querySelectorAll("input,button").forEach((i) => { if (!i.closest("#lock-overlay")) i.disabled = true; });
+      showLock(null);
     }
     renderMacroBar();
   }
@@ -425,7 +427,7 @@
   $("#sel-station")?.addEventListener("change", async (e) => {
     S.stationId = Number(e.target.value) || null;
     save(); renderStationBar(); await loadQsos(); renderScoreboard(); sendStatus();
-    if (S.stationId && !canLog()) askUnlock(station());
+    if (S.stationId && !canLog()) showLock(station(), true);
   });
 
   async function autoUnlock(st) {
@@ -434,6 +436,35 @@
       S.stationTokens[st.id] = r.token; save(); renderStationBar(); renderQsos();
     } catch (_) { askUnlock(st); }
   }
+  // Gesperrte Station: Hinweis mit Passwortfeld direkt über dem Eingabeformular (statt nur „freischalten“ oben)
+  function showLock(st, focus = false) {
+    const ov = $("#lock-overlay");
+    if (!ov) return;
+    ov.classList.toggle("hidden", !st);
+    if (!st) return;
+    if (ov.dataset.sid !== String(st.id)) {
+      ov.dataset.sid = String(st.id);
+      $("#lock-pw").value = S.info?.demo ? S.info.demo.station_password : "";
+    }
+    $("#lock-station").textContent = `${st.call} (${st.band})`;
+    if (focus || document.activeElement === document.body || document.activeElement?.disabled) setTimeout(() => $("#lock-pw").focus(), 20);
+  }
+  async function unlockFromOverlay() {
+    const st = station();
+    if (!st) return;
+    try {
+      const r = await api("POST", `/api/stations/${st.id}/unlock`, { password: $("#lock-pw").value });
+      S.stationTokens[st.id] = r.token; save(); $("#lock-pw").value = "";
+      renderStationBar(); renderQsos(); toast(t("{call} freigeschaltet", { call: st.call }), "ok"); $("#f-call").focus();
+    } catch (err) {
+      toast(err.message, "err");
+      const box = $("#lock-overlay .lock-box"); box.classList.remove("shake"); void box.offsetWidth; box.classList.add("shake");
+      $("#lock-pw").select();
+    }
+  }
+  $("#lock-btn")?.addEventListener("click", unlockFromOverlay);
+  $("#lock-pw")?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); unlockFromOverlay(); } });
+
   function askUnlock(st) {
     if (!st) return;
     if (!st.has_password) return autoUnlock(st);
