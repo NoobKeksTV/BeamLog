@@ -1,0 +1,33 @@
+{
+  "format": "servercontroller-app/1",
+  "name": "BeamLog",
+  "description": "Webbasierter Contest-Logger für UKW-Contests (Python/FastAPI, SQLite). Läuft aus einer eigenen virtuellen Umgebung als systemd-Dienst auf 127.0.0.1 hinter Nginx; Daten (Datenbank, Backups) liegen in data/ im Anwendungsordner und bleiben bei Updates erhalten.",
+  "app": {
+    "runtime": "command",
+    "source": "git",
+    "branch": "main",
+    "dir": "/opt/apps/{{app.name}}",
+    "run_user": "{{app.name}}",
+    "build_script": "python3 -m venv .venv\n.venv/bin/pip install --quiet --upgrade pip\n.venv/bin/pip install --quiet -r requirements.txt\ncp requirements.txt .venv/.requirements.installed",
+    "start_command": ".venv/bin/python run.py --host 127.0.0.1 --port $PORT",
+    "port": 8000,
+    "env": "HOST=127.0.0.1\nPUBLIC_URL=https://{{var.DOMAIN}}/\nBACKUP_MIN={{var.BACKUP_MIN}}\nOPEN_BROWSER=0\nDEMO={{var.DEMO}}\nDEMO_RESET={{var.DEMO_RESET}}",
+    "domains": ["{{var.DOMAIN}}"],
+    "tls": true
+  },
+  "variables": [
+    { "name": "DOMAIN", "label": "Domain", "required": true, "example": "beamlog.example.de", "description": "Adresse, unter der BeamLog erreichbar ist (erscheint auch im QR-Code)." },
+    { "name": "BACKUP_MIN", "label": "Automatische Sicherung alle N Minuten", "default": "15", "description": "0 schaltet die automatischen Sicherungen in data/backup/ ab." },
+    { "name": "DEMO", "label": "Demo-Modus (öffentliche Vorführ-Instanz)", "default": "0", "description": "1 = Admin- und Stations-Passwort fest „demo“, Server-Funktionen gesperrt, täglich ALLES zurücksetzen. Nur mit eigener, leerer Datenbank – nie für einen echten Contest-Server." },
+    { "name": "DEMO_RESET", "label": "Uhrzeit des täglichen Zurücksetzens (Demo)", "default": "03:00", "description": "HH:MM in Serverzeit, nur mit Demo-Modus wirksam." }
+  ],
+  "requirements": {
+    "packages": ["python3", "python3-venv", "git"],
+    "notes": [
+      "Beim ersten Aufruf das Admin-Passwort festlegen (entfällt im Demo-Modus, dort ist es „demo“).",
+      "Daten liegen in data/ (Datenbank beamlog.db, Backups) – nicht im Repository, bleiben bei Updates erhalten.",
+      "Vorher per deploy/install.sh eingerichtet? Dessen Dienst und Nginx-Site abschalten (sudo systemctl disable --now beamlog; sudo rm -f /etc/nginx/sites-enabled/beamlog), sonst sind Port und Domain doppelt belegt.",
+      "Ein vorhandener Ordner muss ein Git-Checkout sein; eine alte beamlog.env darin wird nicht mehr gelesen, sobald ServerController die .env schreibt – eigene Werte (z. B. DB=) in die .env übernehmen."
+    ]
+  }
+}
