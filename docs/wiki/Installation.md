@@ -88,6 +88,18 @@ gehen durch, z. B. `./start.sh --port 8080`. Danach funktioniert auch `python ru
 die Pakete, nimmt `run.py` automatisch `.venv`. Fehlt `python3-venv` (Debian/Ubuntu): `sudo apt install python3-venv`
 oder `sudo bash deploy/install.sh --deps-only` (installiert Systempakete und `.venv`, bleibt im Ordner).
 
+Im Hintergrund ohne systemd-Dienst (z. B. per SSH oder aus einem Control Panel wie ServerController):
+
+```bash
+./beamlogctl start      # startet ./start.sh im Hintergrund, Ausgabe in data/beamlog.log
+./beamlogctl status     # „läuft …“ / „gestoppt …“ mit Grund; Exit-Code 0 = läuft, sonst 1
+./beamlogctl stop       # auch restart und log [ZEILEN]
+```
+
+Der Port kommt aus `$PORT`, sonst aus `PORT=` in der `.env`, sonst 8000. `status` erkennt BeamLog an der Antwort auf
+`/api/info` oder am Prozess aus diesem Ordner – auch eine schon von Hand gestartete Instanz – und beendet die eigene
+Shell nicht.
+
 Von Hand ohne Startskript:
 
 ```bash

@@ -1,0 +1,138 @@
+#!/bin/sh
+# BeamLog ohne systemd-Dienst im Hintergrund betreiben (z. B. für ServerController oder per SSH):
+#   ./beamlogctl start | stop | restart | status | log [ZEILEN]
+# Läuft aus dem Ordner dieses Skripts über ./start.sh, Ausgabe in data/beamlog.log.
+# Port: $PORT (setzt z. B. ServerController), sonst PORT= aus .env bzw. beamlog.env, sonst 8000.
+# status endet mit Exit-Code 0, wenn BeamLog läuft, sonst mit 1; die erste Zeile sagt warum.
+# Gefahrlos auch in der eigenen Shell aufrufbar (beendet sie nicht): ./beamlogctl status; echo $?
+cd "$(dirname "$0")" || exit 1
+DIR=$(pwd -P)
+LOG=data/beamlog.log
+
+setting() {  # Wert aus .env (ältere Stände: beamlog.env), Kommentar und Anführungszeichen entfernt
+  for f in .env beamlog.env; do
+    [ -f "$f" ] || continue
+    v=$(sed -n "s/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}$1[[:space:]]*=[[:space:]]*//p" "$f" | tail -n 1 |
+        sed 's/[[:space:]]\{1,\}#.*$//; s/^["'\'']//; s/["'\'']$//')
+    [ -n "$v" ] && { echo "$v"; return; }
+  done
+}
+
+PORT=${PORT:-$(setting PORT)}
+PORT=${PORT:-8000}
+HOSTNAME_=$(setting HOST)
+case "$HOSTNAME_" in
+  "" | 0.0.0.0 | "::" | "[::]") HOSTNAME_=127.0.0.1 ;;
+  *:*) HOSTNAME_="[$HOSTNAME_]" ;;
+esac
+URL="http://$HOSTNAME_:$PORT/api/info"
+
+answers() {  # antwortet hier wirklich BeamLog?
+  if command -v curl >/dev/null 2>&1; then
+    curl -fs --noproxy '*' -m 3 "$URL" 2>/dev/null | grep -q '"app":"BeamLog"'
+  else
+    py=python3; [ -x .venv/bin/python ] && py=.venv/bin/python
+    "$py" -c 'import sys, urllib.request as u
+o = u.build_opener(u.ProxyHandler({}))
+sys.exit(0 if b"\"app\":\"BeamLog\"" in o.open(sys.argv[1], timeout=3).read() else 1)' "$URL" 2>/dev/null
+  fi
+}
+
+scan() {  # BeamLog-Prozesse: "own" = aus diesem Ordner, "foreign" = run.py, dessen Ordner nicht lesbar ist
+  want=$1
+  for d in /proc/[0-9]*; do
+    # nur Programm und erste Argumente ansehen: python … run.py bzw. bash/sh start.sh (keine Shells, Editoren usw.)
+    args=$({ tr '\0' '\n' < "$d/cmdline"; } 2>/dev/null | head -n 3 | tr '\n' ' ') || continue
+    set -f; set -- $args; set +f
+    case "$1" in
+      *python*) case "$2" in *run.py) script=$2 ;; *) case "$3" in *run.py) script=$3 ;; *) continue ;; esac ;; esac ;;
+      *sh) case "$2" in *start.sh) script=$2 ;; *) continue ;; esac ;;
+      *) continue ;;
+    esac
+    p=${d#/proc/}
+    cwd=$(readlink "$d/cwd" 2>/dev/null)
+    case "$script" in
+      /*) here=$(dirname "$script") ;;  # mit absolutem Pfad gestartet
+      *) here=$cwd ;;
+    esac
+    if [ -n "$here" ] && [ "$here" = "$DIR" ]; then
+      [ "$want" = own ] && echo "$p"
+    elif [ -z "$cwd" ] && [ "$want" = foreign ]; then
+      case "$1" in *python*) echo "PID $p ($(stat -c %U "$d" 2>/dev/null))" ;; esac
+    fi
+  done
+}
+
+status() {
+  own=$(scan own | tr '\n' ' ')
+  if answers; then
+    echo "läuft: antwortet auf $URL${own:+ (PID ${own% })}"
+    return 0
+  fi
+  if [ -n "$own" ]; then
+    echo "läuft: Prozess ${own% } in $DIR, antwortet aber (noch) nicht auf $URL"
+    return 0
+  fi
+  foreign=$(scan foreign | tr '\n' ' ')
+  if [ -n "$foreign" ]; then
+    echo "gestoppt: nichts auf $URL; BeamLog-Prozess eines anderen Benutzers (${foreign% }) – als $(id -un) nicht prüfbar"
+  else
+    echo "gestoppt: nichts auf $URL und kein BeamLog-Prozess aus $DIR"
+  fi
+  return 1
+}
+
+start() {
+  if status >/dev/null; then
+    status
+    return 0
+  fi
+  mkdir -p data || return 1
+  echo "starte BeamLog auf Port $PORT (Ausgabe: $DIR/$LOG) …"
+  if command -v setsid >/dev/null 2>&1; then
+    setsid nohup ./start.sh --port "$PORT" >> "$LOG" 2>&1 < /dev/null &
+  else
+    nohup ./start.sh --port "$PORT" >> "$LOG" 2>&1 < /dev/null &
+  fi
+  i=0
+  while [ "$i" -lt 180 ]; do  # erster Start installiert ggf. noch Pakete
+    sleep 1
+    if answers; then
+      status
+      return 0
+    fi
+    [ -n "$(scan own)" ] || break
+    i=$((i + 1))
+  done
+  echo "BeamLog antwortet nicht auf $URL – letzte Zeilen aus $LOG:" >&2
+  tail -n 15 "$LOG" >&2
+  return 1
+}
+
+stop() {
+  own=$(scan own)
+  if [ -z "$own" ]; then
+    foreign=$(scan foreign | tr '\n' ' ')
+    [ -n "$foreign" ] && echo "Hinweis: BeamLog-Prozess eines anderen Benutzers (${foreign% }) – den als dieser Benutzer bzw. root beenden" >&2
+    echo "nicht gestartet"
+    return 0
+  fi
+  kill $own 2>/dev/null
+  i=0
+  while [ "$i" -lt 20 ]; do
+    [ -z "$(scan own)" ] && { echo "gestoppt"; return 0; }
+    sleep 1
+    i=$((i + 1))
+  done
+  kill -9 $(scan own) 2>/dev/null
+  echo "gestoppt (nach 20 s hart beendet)"
+}
+
+case "$1" in
+  start) start ;;
+  stop) stop ;;
+  restart) stop && start ;;
+  status) status ;;
+  log) tail -n "${2:-${LINES:-100}}" "$LOG" ;;
+  *) echo "Aufruf: $0 start|stop|restart|status|log [ZEILEN]" >&2; exit 2 ;;
+esac
