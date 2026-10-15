@@ -926,7 +926,7 @@
     box.classList.add("wide");
   }
   $("#help-btn")?.addEventListener("click", helpDialog);
-  document.addEventListener("keydown", (e) => { if (e.key === "F1") { e.preventDefault(); if ($("#modal").classList.contains("hidden")) helpDialog(); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "F1" && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); if ($("#modal").classList.contains("hidden")) helpDialog(); } });
 
   // ------------------------------------------------------------ Karte (Leaflet, lokal gebündelt; Kacheln von OSM oder eigenem Server)
   function locToLatLon(loc) {

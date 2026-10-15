@@ -4,6 +4,7 @@ für alle im LAN angemeldeten Browser.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import re
 import time
@@ -1608,11 +1609,27 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     # ------------------------------------------------------------ Frontend
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
+    stamps: dict[str, tuple[tuple[int, int], str]] = {}
+
+    def stamp(rel: str) -> str:
+        """Fingerabdruck einer eigenen Datei (Version + Inhalt): ändert sich bei jeder Code-Änderung, auch ohne neue
+        Versionsnummer (git pull im Entwicklungsstand) – sonst liefern Browser und Cloudflare weiter das alte app.js."""
+        f = STATIC / rel
+        try:
+            st = f.stat()
+        except OSError:
+            return __version__
+        key = (st.st_mtime_ns, st.st_size)
+        if rel not in stamps or stamps[rel][0] != key:
+            stamps[rel] = (key, hashlib.sha256(f.read_bytes()).hexdigest()[:10])
+        return f"{__version__}-{stamps[rel][1]}"
+
     def html_page(name: str) -> Response:
-        """HTML-Seiten nie cachen und die eigenen Skripte/Stylesheets mit der Version stempeln – nach einem Update
-        passen Seite und Skript so immer zusammen (sonst alte Seite aus dem Cache + neues app.js)."""
+        """HTML-Seiten nie cachen und die eigenen Skripte/Stylesheets mit einem Fingerabdruck stempeln – nach einem
+        Update passen Seite und Skript so immer zusammen (sonst alte Seite aus dem Cache + neues app.js oder umgekehrt)."""
         html = (STATIC / name).read_text(encoding="utf-8")
-        html = html.replace('"/static/app.js"', f'"/static/app.js?v={__version__}"').replace('"/static/style.css"', f'"/static/style.css?v={__version__}"')
+        for rel in ("app.js", "style.css"):
+            html = html.replace(f'"/static/{rel}"', f'"/static/{rel}?v={stamp(rel)}"')
         return Response(html, media_type="text/html", headers={"Cache-Control": "no-cache, must-revalidate"})
 
     @app.get("/")

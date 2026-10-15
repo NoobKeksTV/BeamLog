@@ -350,3 +350,19 @@ def test_calc_accepts_alternative_locators(client):
         assert not any("Stationsdatenbank" in x for x in w), (loc, w)
     w = client.get("/api/calc", params={"my": "JO31AA", "loc": "JN75AA", "call": "9A1CRS"}).json()["warnings"]
     assert any("Stationsdatenbank kennt 9A1CRS mit" in x and "JN95AE" in x and "JN85OD" in x and "–" not in x for x in w), w
+
+
+def test_assets_stamped_with_content_fingerprint(client):
+    """app.js/style.css tragen einen Fingerabdruck des Inhalts: jede Code-Änderung lädt neu, auch ohne neue Version
+    (sonst liefern Browser und Cloudflare weiter das alte app.js)."""
+    import hashlib
+    import re
+
+    from contestlogger import __version__
+    from contestlogger.app import STATIC
+
+    html = client.get("/").text
+    m = re.search(r'"/static/app\.js\?v=([^"]+)"', html)
+    assert m and m.group(1) == f"{__version__}-{hashlib.sha256((STATIC / 'app.js').read_bytes()).hexdigest()[:10]}"
+    assert re.search(r'"/static/style\.css\?v=' + re.escape(__version__) + r'-[0-9a-f]{10}"', html)
+    assert client.get(f"/static/app.js?v={m.group(1)}").status_code == 200
