@@ -12,7 +12,7 @@ BeamLog hieß bis Version 0.9 „ContestLogger“. **Umstieg von 0.9.x:** Versio
    | Datei | Zweck |
    |---|---|
    | `BeamLog(.exe)` | Server und Oberfläche – das Hauptprogramm |
-   | `BeamLog-CAT(.exe)` | Bridge zum Funkgerät (Hamlib rigctld / flrig), meldet Frequenz, sendet CW |
+   | `BeamLog-CAT(.exe)` | Bridge zum Funkgerät (Hamlib rigctld / flrig), meldet die Frequenz |
    | `BeamLog-Import(.exe)` | Kommandozeilen-Import eines alten WinContest-Ordners |
    | `start.sh` / `BeamLog-Port8080.bat` | Startskripte |
    | `data/` | Datenbank, Backups, eigene Sprachdateien – **das ist alles, was gesichert werden muss** |

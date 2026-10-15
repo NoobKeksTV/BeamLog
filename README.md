@@ -50,7 +50,7 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 | **Import** | WinContest-Ordner (`.mdb` ohne Zusatzsoftware, `.txt`, `.EXP`), EDI, ADIF, Ergebnislisten (DARC/IARU), DARC-Contest-Hub direkt |
 | **Export / Abgabe** | EDI (REG1TEST) mit Pflicht-Log-Prüfung und Online-Abgleich (HamQTH/QRZ), Cabrillo, ADIF, CSV, alle Bänder als ZIP; Wertung je Contest (km oder Punkte je QSO, Multiplikator Großfelder/DOKs) |
 | **Stationsdatenbank** | Rufzeichen, Locator, Name, DOK; wächst mit jedem QSO, der KST-Nutzerliste, Importen (DARC-Hub mit DOK) und Online-Abfragen; Export und Abgleich mit dem Repo |
-| **CAT / CW** | Frequenz vom Funkgerät (Hamlib, flrig), Sprachbausteine F2–F8 als CW |
+| **CAT** | Frequenz vom Funkgerät (Hamlib, flrig) |
 | **Betrieb** | Backups auf dem Server (crash-sicher), Aktionsprotokoll, Update-Prüfung mit Selbst-Aktualisierung, „Was ist neu“, mehrsprachig, hell/dunkel, Hilfe mit F1 |
 
 ## Live-Demo
@@ -110,7 +110,7 @@ Aus dem Quellcode (Python 3.11+): `./start.sh` (Linux/macOS/Raspberry Pi) bzw. `
 
 ## Dokumentation
 
-Das [Wiki](https://github.com/NoobKeksTV/BeamLog/wiki) erklärt alles ausführlich: [Installation](https://github.com/NoobKeksTV/BeamLog/wiki/Installation), [Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy), [Erste Schritte](https://github.com/NoobKeksTV/BeamLog/wiki/Erste-Schritte), [Loggen](https://github.com/NoobKeksTV/BeamLog/wiki/Loggen), [Tastenkürzel](https://github.com/NoobKeksTV/BeamLog/wiki/Tastenkuerzel), [Chat/KST/DM](https://github.com/NoobKeksTV/BeamLog/wiki/Chat-KST), [Operator-Fenster](https://github.com/NoobKeksTV/BeamLog/wiki/Operator-Fenster), [Statistik](https://github.com/NoobKeksTV/BeamLog/wiki/Statistik), [Import/Export](https://github.com/NoobKeksTV/BeamLog/wiki/Import-Export), [Log-Prüfung](https://github.com/NoobKeksTV/BeamLog/wiki/Log-Pruefung), [Stationsdatenbank](https://github.com/NoobKeksTV/BeamLog/wiki/Stationsdatenbank), [Flugzeug-Scatter](https://github.com/NoobKeksTV/BeamLog/wiki/Flugzeug-Scatter), [CAT/CW](https://github.com/NoobKeksTV/BeamLog/wiki/CAT), [Verwaltung](https://github.com/NoobKeksTV/BeamLog/wiki/Verwaltung), [Updates](https://github.com/NoobKeksTV/BeamLog/wiki/Updates), [Fehlersuche](https://github.com/NoobKeksTV/BeamLog/wiki/Fehlersuche).
+Das [Wiki](https://github.com/NoobKeksTV/BeamLog/wiki) erklärt alles ausführlich: [Installation](https://github.com/NoobKeksTV/BeamLog/wiki/Installation), [Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy), [Erste Schritte](https://github.com/NoobKeksTV/BeamLog/wiki/Erste-Schritte), [Loggen](https://github.com/NoobKeksTV/BeamLog/wiki/Loggen), [Tastenkürzel](https://github.com/NoobKeksTV/BeamLog/wiki/Tastenkuerzel), [Chat/KST/DM](https://github.com/NoobKeksTV/BeamLog/wiki/Chat-KST), [Operator-Fenster](https://github.com/NoobKeksTV/BeamLog/wiki/Operator-Fenster), [Statistik](https://github.com/NoobKeksTV/BeamLog/wiki/Statistik), [Import/Export](https://github.com/NoobKeksTV/BeamLog/wiki/Import-Export), [Log-Prüfung](https://github.com/NoobKeksTV/BeamLog/wiki/Log-Pruefung), [Stationsdatenbank](https://github.com/NoobKeksTV/BeamLog/wiki/Stationsdatenbank), [Flugzeug-Scatter](https://github.com/NoobKeksTV/BeamLog/wiki/Flugzeug-Scatter), [CAT](https://github.com/NoobKeksTV/BeamLog/wiki/CAT), [Verwaltung](https://github.com/NoobKeksTV/BeamLog/wiki/Verwaltung), [Updates](https://github.com/NoobKeksTV/BeamLog/wiki/Updates), [Fehlersuche](https://github.com/NoobKeksTV/BeamLog/wiki/Fehlersuche).
 
 ## Technik
 

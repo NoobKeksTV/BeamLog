@@ -47,7 +47,6 @@ def main() -> None:
     ap.add_argument("--rigctld", default="localhost:4532", help="Host:Port von rigctld")
     ap.add_argument("--flrig", default="", help="statt rigctld: flrig-XML-RPC-URL, z. B. http://localhost:12345")
     ap.add_argument("--interval", type=float, default=2.0)
-    ap.add_argument("--cw", action="store_true", help="CW-Makros (F-Tasten) über rigctld (send_morse) ausgeben")
     a = ap.parse_args()
 
     base = a.server.rstrip("/")
@@ -58,24 +57,7 @@ def main() -> None:
     print(f"Verbunden mit {base}, Station {a.station}. Strg+C beendet.")
     host, _, port = a.rigctld.partition(":")
     last = None
-    next_poll = 0.0
     while True:
-        if a.cw:
-            # CW-Warteschlange zügig abfragen (alle 0,3 s), Frequenz nur alle --interval Sekunden
-            try:
-                rq = urllib.request.Request(f"{base}/api/stations/{a.station}/cw/next", headers={"X-Station-Token": token})
-                job = json.load(urllib.request.urlopen(rq, timeout=5))
-                if job.get("stop"):
-                    send_rigctld(host or "localhost", int(port or 4532), "\\stop_morse")
-                elif job.get("text"):
-                    print(f"CW: {job['text']}")
-                    send_rigctld(host or "localhost", int(port or 4532), f"b {job['text']}")
-            except (OSError, ValueError) as e:
-                print(f"CW-Fehler: {e}", file=sys.stderr)
-            if time.time() < next_poll:
-                time.sleep(0.3)
-                continue
-            next_poll = time.time() + a.interval
         try:
             freq, mode = read_flrig(a.flrig) if a.flrig else read_rigctld(host or "localhost", int(port or 4532))
             if (freq, mode) != last:
@@ -88,14 +70,7 @@ def main() -> None:
         except (OSError, ValueError, xmlrpc.client.Error) as e:
             print(f"Fehler: {e}", file=sys.stderr)
             last = None
-        if not a.cw:
-            time.sleep(a.interval)
-
-
-def send_rigctld(host: str, port: int, cmd: str) -> None:
-    with socket.create_connection((host, port), timeout=3) as s:
-        s.sendall((cmd + "\n").encode())
-        s.recv(64)
+        time.sleep(a.interval)
 
 
 if __name__ == "__main__":

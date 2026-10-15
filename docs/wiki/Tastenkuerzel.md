@@ -12,10 +12,8 @@ Im Programm jederzeit mit **F1** oder dem „?“ im Kopf abrufbar.
 | **Leertaste** | Springt Rufzeichen → Nr erh. → Locator → Kommentar → Rufzeichen. Im Rufzeichenfeld wird dabei die Stationsdatenbank abgefragt. Im Kommentar bleibt die Leertaste ein Leerzeichen. |
 | **↑ / ↓** | In der Vorschlagsliste unter dem Rufzeichen blättern. |
 | **Enter / Tab** | Markierten Vorschlag übernehmen (Rufzeichen und Locator). |
-| **Esc** | Formular leeren bzw. offenes Fenster schließen; laufende CW-Ausgabe stoppen. |
+| **Esc** | Formular leeren bzw. offenes Fenster schließen. |
 | **F1** | Hilfe. |
-| **F2 … F8** | Sprachbausteine: Text wird groß eingeblendet und, mit CAT-Bridge im CW-Modus, als CW gesendet. |
-| **F9** | Makroleiste ein-/ausblenden (Übersicht aller Sprachbausteine mit ausgefülltem Text). |
 | Klick auf einen Standort | Hat ein Rufzeichen mehrere bekannte Locator, erscheinen sie unter dem Formular zur Auswahl. |
 
 ## Chat, KST und DM

@@ -234,15 +234,6 @@ tr.total td { border-top: 2px solid var(--line); }
 #e-fixnote { margin: 0 0 8px; }
 .chk-general { margin-top: 8px; font-size: 13px; } .chk-general summary { cursor: pointer; color: var(--muted); }
 .chk-general ul { margin: 4px 0 0 4px; padding: 0; list-style: none; } .chk-general li { margin: 2px 0; } .chk-general li.chk-err { color: #ffb3ba; }
-.macro-bar { padding: 10px 14px; }
-.macro-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.macro-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.macro-list div { background: var(--card2); border-radius: 6px; padding: 5px 8px; font-size: 13px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.macro-list div:hover { outline: 1px solid var(--accent); }
-.macro-list b { font-family: var(--mono); color: var(--accent); margin-right: 6px; }
-.macro-flash { position: fixed; top: 110px; left: 50%; transform: translateX(-50%); z-index: 4000; background: var(--accent2); color: #fff; font-family: var(--mono); font-size: 34px; font-weight: 700; padding: 14px 28px; border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.5); max-width: 90vw; text-align: center; }
-.macro-flash small { display: block; font-size: 13px; font-weight: 400; opacity: .8; font-family: var(--sans); }
-@media (max-width: 900px) { .macro-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .kpis.big .kpi b { font-size: 40px; }
 .kpis.big { grid-template-columns: repeat(4, 1fr); }
 .kpis.big .kpi.wide { grid-column: span 2; }

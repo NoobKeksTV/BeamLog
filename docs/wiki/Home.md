@@ -42,7 +42,7 @@ BeamLog (früher „ContestLogger“) basiert auf DD3KU WinContest. Ein kleiner 
 | [Log-Prüfung](Log-Pruefung.md) | Was vor der EDI-Abgabe geprüft wird, Online-Abgleich mit HamQTH/QRZ |
 | [Stationsdatenbank](Stationsdatenbank.md) | Callbuch, Quellen, Export, Abgleich mit dem Repo |
 | [Flugzeug-Scatter](Flugzeug-Scatter.md) | ADS-B-Ebene auf der Karte (wie AirScout) |
-| [CAT und CW](CAT.md) | Frequenz vom Funkgerät, CW-Ausgabe über die Bridge |
+| [CAT](CAT.md) | Frequenz vom Funkgerät über die Bridge |
 | [Verwaltung](Verwaltung.md) | Alle Einstellungen, Backups, Aktionsprotokoll, Sprachen |
 | [Updates](Updates.md) | Update-Prüfung, Selbst-Aktualisierung, Was ist neu |
 | [Fehlersuche](Fehlersuche.md) | Häufige Probleme und Lösungen |

@@ -76,10 +76,6 @@ Die Liste unter der Karte zeigt die letzten QSOs mit ✎ (bearbeiten) und ✕ (l
 
 Das Feld über der Karte („Hinweis für das Operator-Fenster“) schickt einen Text, z. B. die Frequenz oder „QSY 432.250“, groß an das [Operator-Fenster](Operator-Fenster.md). Er bleibt je Station gespeichert, bis er mit ✕ gelöscht wird.
 
-## Sprachbausteine (F2–F8)
-
-Vorformulierte Texte („CQ Contest DN2LH/P …“), die bei Tastendruck groß eingeblendet und, wenn die CAT-Bridge mit `--cw` läuft, als CW gesendet werden. F9 blendet die Makroleiste mit allen Bausteinen ein, ✎ öffnet den Editor. Platzhalter: `{mycall} {myloc} {call} {rst} {nr} {loc} {band} {nick}`.
-
 ## Mehrere Operatoren
 
 Mehrere Browser können dieselbe Station bedienen; die laufende Nummer vergibt der Server, Kollisionen gibt es nicht. Wer was geloggt hat, steht im Log (Spalte Op) und im Aktionsprotokoll.

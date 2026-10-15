@@ -1,4 +1,4 @@
-# CAT-Anbindung und CW
+# CAT-Anbindung
 
 `BeamLog-CAT` (bzw. `tools/cat_bridge.py`) läuft auf dem Rechner, an dem das Funkgerät hängt, und meldet die Frequenz an den Server. Sie erscheint in der Stationsleiste, im Operator-Fenster und wird je QSO gespeichert (ADIF `FREQ`).
 
@@ -18,10 +18,6 @@ BeamLog-CAT --server http://192.168.1.10:8000 --station 1 --password 70cm --flri
 ```
 
 Die Bridge fragt die Frequenz alle paar Sekunden ab und meldet Änderungen.
-
-## CW über die Bridge
-
-Mit `--cw` holt die Bridge die Sprachbausteine (F2–F8) vom Server ab und gibt sie über rigctld als CW aus. Esc im Logger stoppt die laufende Ausgabe. Die Texte mit Platzhaltern (`{call} {rst} {nr} …`) werden vor dem Senden ausgefüllt.
 
 ## Hinweise
 

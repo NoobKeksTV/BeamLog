@@ -416,7 +416,6 @@
       $("#qso-form").querySelectorAll("input,button").forEach((i) => { if (!i.closest("#lock-overlay")) i.disabled = true; });
       showLock(null);
     }
-    renderMacroBar();
   }
   $("#sel-contest")?.addEventListener("change", async (e) => {
     S.contestId = Number(e.target.value) || null;
@@ -635,7 +634,7 @@
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       if (!$("#modal").classList.contains("hidden")) closeModal();
-      else if ($("#view-log").classList.contains("active")) { clearForm(); $("#macro-flash").classList.add("hidden"); if (canLog() && S.rig[S.stationId]?.cw) api("POST", `/api/stations/${S.stationId}/cw`, { stop: true }).catch(() => {}); }
+      else if ($("#view-log").classList.contains("active")) clearForm();
     }
   });
 
@@ -670,7 +669,6 @@
     if (S.locAuto) { F.loc.value = ""; S.locAuto = false; F.loc.classList.remove("auto"); }
     fetchSuggest(); updateHints();
     clearTimeout(lookupTimer); lookupTimer = setTimeout(lookupCall, 150);
-    if (!$("#macro-bar").classList.contains("hidden")) renderMacroBar();
   });
   F.loc.addEventListener("input", () => { F.loc.value = F.loc.value.toUpperCase(); updateHints(); });
   F.dok.addEventListener("input", () => { F.dok.value = F.dok.value.toUpperCase().replace(/\s+/g, ""); });
@@ -892,51 +890,6 @@
     try { await api("POST", `/api/stations/${st.id}/serial`, { start: Number(v) }); toast(t("Nächste Nr.: {nr}", { nr: pad3(v) }), "ok"); } catch (err) { toast(err.message, "err"); }
   });
 
-  // ------------------------------------------------------------ Makros (F1–F8)
-  const MACRO_DEFAULTS = { F2: "CQ Contest {mycall} {mycall} Contest", F3: "{call}", F4: "{rst} {nr} {myloc}", F5: "QRZ? {mycall}", F6: "{mycall}", F7: "TU {mycall}", F8: "AGN? NR?" };  // F1 = Hilfe
-  const MACRO_KEYS = Object.keys(MACRO_DEFAULTS);
-  const macros = () => ({ ...MACRO_DEFAULTS, ...((station()?.info || {}).macros || {}) });
-  function expandMacro(text) {
-    const st = station() || {};
-    return text.replace(/\{(\w+)\}/g, (_, k) => ({
-      mycall: st.call || "", myloc: st.locator || "", call: F.call.value.trim() || "?", rst: F.rs.value.trim() || "59",
-      nr: pad3(st.serial_next || 1), loc: F.loc.value.trim() || "?", nick: S.nick, band: st.band || "", dok: F.dok.value.trim() || "?", mydok: (st.info || {}).exchange || "",
-    })[k] ?? `{${k}}`);
-  }
-  function renderMacroBar() {
-    const list = $("#macro-list"); list.innerHTML = "";
-    const m = macros();
-    MACRO_KEYS.forEach((k) => list.append(el("div", { title: m[k], onclick: () => fireMacro(k) }, el("b", {}, k), expandMacro(m[k]))));
-  }
-  let flashTimer;
-  async function fireMacro(key) {
-    const text = expandMacro(macros()[key]);
-    const f = $("#macro-flash"); f.innerHTML = ""; f.append(text, el("small", {}, `${key}${S.rig[S.stationId]?.cw ? " · " + t("wird als CW gesendet") : ""}`));
-    f.classList.remove("hidden"); clearTimeout(flashTimer); flashTimer = setTimeout(() => f.classList.add("hidden"), 4000);
-    if (canLog() && S.stationId) { try { await api("POST", `/api/stations/${S.stationId}/cw`, { text }); } catch (_) { /* keine Bridge */ } }
-  }
-  function macroEditor() {
-    const st = station(); if (!st) return;
-    const m = macros();
-    const box = modal(el("div", {}, el("h3", {}, t("Makros für {call}", st)),
-      el("p", { class: "muted small" }, t("Platzhalter: {mycall} {myloc} {call} {loc} {rst} {nr} {nick} {band}. Die Makros gelten für alle Operatoren dieser Station. Mit laufender CAT-Bridge (--cw) werden sie als CW gegeben, sonst nur groß angezeigt.")),
-      el("form", { id: "macro-form", class: "stack" },
-        MACRO_KEYS.map((k) => lab(k, el("input", { id: `m-${k}`, value: m[k] }))),
-        el("div", { class: "row" }, el("button", { class: "primary" }, t("Speichern")), el("button", { type: "button", class: "ghost", onclick: () => { MACRO_KEYS.forEach((k) => { box.querySelector(`#m-${k}`).value = MACRO_DEFAULTS[k]; }); } }, t("Standard")), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Abbrechen"))))));
-    box.querySelector("#macro-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const out = {}; MACRO_KEYS.forEach((k) => { out[k] = box.querySelector(`#m-${k}`).value; });
-      try { await api("PATCH", `/api/stations/${st.id}`, { info: { ...(st.info || {}), macros: out } }); closeModal(); toast(t("Makros gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
-    });
-  }
-  $("#btn-macro-edit")?.addEventListener("click", macroEditor);
-  document.addEventListener("keydown", (e) => {
-    if (!$("#view-log").classList.contains("active") || !$("#modal").classList.contains("hidden")) return;
-    if (e.key === "F9") { e.preventDefault(); $("#macro-bar").classList.toggle("hidden"); localStorage.setItem("cl.macrobar", $("#macro-bar").classList.contains("hidden") ? "0" : "1"); renderMacroBar(); return; }
-    if (/^F[2-8]$/.test(e.key)) { e.preventDefault(); if (station()) fireMacro(e.key); }
-  });
-  if (localStorage.getItem("cl.macrobar") === "1") $("#macro-bar").classList.remove("hidden");
-
   // ------------------------------------------------------------ Hilfe (F1 / „?“ im Kopf)
   function helpDialog() {
     const K = (keys, what) => el("tr", {}, el("td", { class: "keys" }, ...keys.map((k) => el("kbd", {}, k))), el("td", {}, what));
@@ -949,10 +902,8 @@
         K(["DOK"], t("Ist der Austausch des Contests „DOK/OV“ (Verwaltung → Contest), erscheint statt der Nummer das Feld „DOK erh.“; bei „Nummer + DOK“ beides. Der DOK wird aus der Stationsdatenbank vorbelegt.")),
         K(["↑", "↓"], t("In der Vorschlagsliste unter dem Rufzeichen blättern.")),
         K(["Enter", "Tab"], t("Markierten Vorschlag übernehmen (Rufzeichen und Locator).")),
-        K(["Esc"], t("Formular leeren (bzw. offenes Fenster schließen); laufende CW-Ausgabe stoppen.")),
+        K(["Esc"], t("Formular leeren (bzw. offenes Fenster schließen).")),
         K(["F1"], t("Diese Hilfe.")),
-        K(["F2", "…", "F8"], t("Sprachbausteine F2–F8 (F1 ist die Hilfe): Text wird groß eingeblendet und, wenn eine CAT-Bridge mit CW läuft, als CW gesendet. Platzhalter: {mycall} {myloc} {call} {rst} {nr} {loc} {band} {nick}. Bearbeiten über ✎ in der Makroleiste.")),
-        K(["F9"], t("Makroleiste ein-/ausblenden (Übersicht aller Sprachbausteine mit ausgefülltem Text).")),
         K(["Klick auf Standort"], t("Hat ein Rufzeichen mehrere bekannte Locator, erscheinen sie unter dem Formular zur Auswahl.")),
         K(["✈ Flugzeuge"], t("Knopf an der Karte: Flugzeuge (ADS-B) einblenden – wie AirScout. Grüner Balken = Zone gemeinsamer Sichtbarkeit auf dem Pfad, orange Flugzeuge = im Korridor und von beiden Stationen sichtbar, darunter die Liste mit Entfernung vom Pfad und Kreuzungszeit. Quelle in der Verwaltung (adsb.fi oder eigener Empfänger)."))),
       ...H(t("Chat, KST und DM"),
