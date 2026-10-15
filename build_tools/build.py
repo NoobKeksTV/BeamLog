@@ -7,7 +7,7 @@
 
 Ergebnis in dist/:
     BeamLog[.exe]                Server + Weboberfläche (Daten in ./data neben der Datei)
-    BeamLog-CAT[.exe]            CAT-Bridge (Frequenz/CW vom Funkgerät an den Server)
+    BeamLog-CAT[.exe]            CAT-Bridge (Frequenz vom Funkgerät an den Server)
     BeamLog-Import[.exe]         Import eines kompletten WinContest-Ordners
     BeamLog-<version>-<os>-<arch>.zip   alles zusammen, portabel
 """
@@ -100,8 +100,8 @@ def main() -> None:
         f"3. Optionen: BeamLog{exe} --port 8080   --backup-min 5   --public-url http://contest.local/\n"
         f"   Dauerhaft: .env.example nach .env kopieren und Werte eintragen (Windows: copy .env.example .env).\n"
         f"   Eine alte beamlog.env wird beim Start automatisch in .env umbenannt.\n\n"
-        f"BeamLog-CAT{exe}: Frequenz/CW vom Funkgerät (Hamlib rigctld) an den Server melden, z. B.\n"
-        f"   BeamLog-CAT{exe} --server http://192.168.1.10:8000 --station 1 --password 70cm --cw\n"
+        f"BeamLog-CAT{exe}: Frequenz vom Funkgerät (Hamlib rigctld) an den Server melden, z. B.\n"
+        f"   BeamLog-CAT{exe} --server http://192.168.1.10:8000 --station 1 --password 70cm\n"
         f"BeamLog-Import{exe}: alten WinContest-Ordner übernehmen, z. B.\n"
         f"   BeamLog-Import{exe} \"D:\\Contest\" --db data\\beamlog.db\n\n"
         f"Beenden: Fenster schließen oder Strg+C. Vorher wird automatisch ein Backup geschrieben.\n",
@@ -117,9 +117,12 @@ def main() -> None:
         shutil.copytree(ROOT / "deploy" / "portable", pkg / "deploy")
         for f in (pkg / "deploy").glob("*.sh"):
             os.chmod(f, 0o755)
+        shutil.copy(ROOT / "beamlogctl", pkg / "beamlogctl")  # ein Befehl für install/update/start/stop/status/log
+        os.chmod(pkg / "beamlogctl", 0o755)
         with open(pkg / "START.txt", "a", encoding="utf-8") as fh:
-            fh.write("\nServer-Installation (Debian/Ubuntu/Raspberry Pi, nginx + systemd):  sudo bash deploy/install.sh\n"
-                     "   Einzelheiten in deploy/README.md\n")
+            fh.write("\nServer-Installation (Debian/Ubuntu/Raspberry Pi):  sudo ./beamlogctl install\n"
+                     "   fragt nach systemd-Dienst, nginx und Backup (ohne Rückfrage z. B. sudo ./beamlogctl install --no-nginx -y)\n"
+                     "   danach: ./beamlogctl status | start | stop | restart | log | update – Einzelheiten in deploy/README.md\n")
 
     if not a.no_zip:
         osname = {"Windows": "windows", "Linux": "linux", "Darwin": "macos"}.get(platform.system(), platform.system().lower())

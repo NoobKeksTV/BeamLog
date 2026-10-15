@@ -1,13 +1,31 @@
 #!/bin/sh
-# BeamLog ohne systemd-Dienst im Hintergrund betreiben (z. B. für ServerController oder per SSH):
-#   ./beamlogctl start | stop | restart | status | log [ZEILEN]
-# Läuft aus dem Ordner dieses Skripts über ./start.sh, Ausgabe in data/beamlog.log.
-# Port: $PORT (setzt z. B. ServerController), sonst PORT= aus .env bzw. beamlog.env, sonst 8000.
-# status endet mit Exit-Code 0, wenn BeamLog läuft, sonst mit 1; die erste Zeile sagt warum.
+# BeamLog auf Linux-Servern – ein Befehl für alles:
+#   ./beamlogctl install [OPTIONEN]  einrichten; fragt nach Dienst, nginx und Backup (mit Optionen bzw. -y ohne Rückfrage)
+#   ./beamlogctl update              neuen Stand holen (git pull bzw. neu entpacktes ZIP einspielen) und neu starten
+#   ./beamlogctl start|stop|restart  mit Dienst über systemd, sonst im Hintergrund (./start.sh, Ausgabe in data/beamlog.log)
+#   ./beamlogctl status              Exit-Code 0 = läuft, sonst 1; die erste Zeile sagt warum
+#   ./beamlogctl log [ZEILEN]        letzte Ausgaben (mit Dienst aus dem Journal)
+#
+# Optionen für install:
+#   --no-service / --service   systemd-Dienst (Autostart, Neustart bei Absturz) weglassen bzw. einrichten
+#   --no-nginx / --nginx       nginx davor (Port 80) weglassen – z. B. für einen eigenen Reverse-Proxy – bzw. einrichten
+#   --no-backup / --backup     täglichen Backup-Cron weglassen bzw. einrichten
+#   --here / --system          im aktuellen Ordner bleiben bzw. nach /opt/beamlog kopieren (nur mit Dienst; Standard: kopieren)
+#   --url ADRESSE              Adresse für QR-Code und Links, z. B. http://contest.local/
+#   --deps-only                nur Voraussetzungen installieren, nichts einrichten (wie --here --no-service --no-nginx --no-backup)
+#   -y, --yes                  keine Rückfragen: nicht angegebene Teile wie beim letzten Mal bzw. alle einrichten
+#   Beispiele:  sudo ./beamlogctl install              (fragt alles ab)
+#               sudo ./beamlogctl install --no-nginx -y
+# Unterbau ist deploy/install.sh (Einzelheiten: bash deploy/install.sh --help); die Wahl wird gemerkt und gilt fürs Update.
+#
+# Port: $PORT (z. B. von ServerController), sonst PORT= aus .env, sonst 8000.
 # Gefahrlos auch in der eigenen Shell aufrufbar (beendet sie nicht): ./beamlogctl status; echo $?
 cd "$(dirname "$0")" || exit 1
 DIR=$(pwd -P)
 LOG=data/beamlog.log
+UNIT=/etc/systemd/system/beamlog.service
+
+usage() { sed -n '2,/^# Gefahrlos/p' "$0" | sed 's/^# \{0,1\}//'; }
 
 setting() {  # Wert aus .env (ältere Stände: beamlog.env), Kommentar und Anführungszeichen entfernt
   for f in .env beamlog.env; do
@@ -27,6 +45,22 @@ case "$HOSTNAME_" in
 esac
 URL="http://$HOSTNAME_:$PORT/api/info"
 
+# Mit Dienst eingerichtet? Nur wenn der Dienst „beamlog“ genau aus diesem Ordner läuft – ein BeamLog in einem anderen
+# Ordner (z. B. eine Demo neben dem eigentlichen Server) steuert nie den Dienst.
+unit_dir() {
+  d=$(sed -n 's/^WorkingDirectory=//p' "$UNIT" 2>/dev/null | head -n 1)
+  [ -n "$d" ] && (cd "$d" 2>/dev/null && pwd -P)
+}
+SERVICE=0
+if [ -f "$UNIT" ] && command -v systemctl >/dev/null 2>&1 && [ "$(unit_dir)" = "$DIR" ]; then SERVICE=1; fi
+
+priv() {  # als root ausführen (sudo fragt ggf. nach dem Passwort)
+  if [ "$(id -u)" = 0 ]; then "$@"
+  elif command -v sudo >/dev/null 2>&1; then sudo "$@"
+  else echo "Dafür werden Administratorrechte gebraucht (als root aufrufen)." >&2; return 1
+  fi
+}
+
 answers() {  # antwortet hier wirklich BeamLog?
   if command -v curl >/dev/null 2>&1; then
     curl -fs --noproxy '*' -m 3 "$URL" 2>/dev/null | grep -q '"app":"BeamLog"'
@@ -38,15 +72,17 @@ sys.exit(0 if b"\"app\":\"BeamLog\"" in o.open(sys.argv[1], timeout=3).read() el
   fi
 }
 
-scan() {  # BeamLog-Prozesse: "own" = aus diesem Ordner, "foreign" = run.py, dessen Ordner nicht lesbar ist
+scan() {  # BeamLog-Prozesse: "own" = aus diesem Ordner, "foreign" = BeamLog, dessen Ordner nicht lesbar ist
   want=$1
   for d in /proc/[0-9]*; do
-    # nur Programm und erste Argumente ansehen: python … run.py bzw. bash/sh start.sh (keine Shells, Editoren usw.)
+    # nur Programm und erste Argumente ansehen: python … run.py, bash/sh start.sh oder das portable Programm BeamLog
+    # (keine Shells, Editoren usw.)
     args=$({ tr '\0' '\n' < "$d/cmdline"; } 2>/dev/null | head -n 3 | tr '\n' ' ') || continue
     set -f; set -- $args; set +f
     case "$1" in
       *python*) case "$2" in *run.py) script=$2 ;; *) case "$3" in *run.py) script=$3 ;; *) continue ;; esac ;; esac ;;
       *sh) case "$2" in *start.sh) script=$2 ;; *) continue ;; esac ;;
+      BeamLog | */BeamLog) script=$1 ;;
       *) continue ;;
     esac
     p=${d#/proc/}
@@ -58,12 +94,34 @@ scan() {  # BeamLog-Prozesse: "own" = aus diesem Ordner, "foreign" = run.py, des
     if [ -n "$here" ] && [ "$here" = "$DIR" ]; then
       [ "$want" = own ] && echo "$p"
     elif [ -z "$cwd" ] && [ "$want" = foreign ]; then
-      case "$1" in *python*) echo "PID $p ($(stat -c %U "$d" 2>/dev/null))" ;; esac
+      case "$1" in *sh) ;; *) echo "PID $p ($(stat -c %U "$d" 2>/dev/null))" ;; esac
     fi
   done
 }
 
-status() {
+# ------------------------------------------------------------------ mit Dienst (systemd)
+svc_status() {
+  st=$(systemctl is-active beamlog 2>/dev/null)
+  if [ "$st" = active ]; then
+    if answers; then echo "läuft: Dienst beamlog, antwortet auf $URL"
+    else echo "läuft: Dienst beamlog aktiv, antwortet aber (noch) nicht auf $URL"; fi
+    return 0
+  fi
+  echo "gestoppt: Dienst beamlog ist ${st:-unbekannt} (Ursache: sudo journalctl -u beamlog -n 40 --no-pager)"
+  return 1
+}
+
+svc_start() {
+  priv systemctl start beamlog || return 1
+  i=0
+  while [ "$i" -lt 30 ] && ! answers; do sleep 1; i=$((i + 1)); done
+  svc_status
+}
+
+svc_stop() { priv systemctl stop beamlog && echo "gestoppt (Dienst beamlog)"; }
+
+# ------------------------------------------------------------------ ohne Dienst (Hintergrund)
+bg_status() {
   own=$(scan own | tr '\n' ' ')
   if answers; then
     echo "läuft: antwortet auf $URL${own:+ (PID ${own% })}"
@@ -79,12 +137,15 @@ status() {
   else
     echo "gestoppt: nichts auf $URL und kein BeamLog-Prozess aus $DIR"
   fi
+  if [ -f "$UNIT" ] && d=$(unit_dir) && [ -n "$d" ]; then
+    echo "Hinweis: der Dienst beamlog läuft aus $d – dort steuern: $d/beamlogctl status" >&2
+  fi
   return 1
 }
 
-start() {
-  if status >/dev/null; then
-    status
+bg_start() {
+  if bg_status >/dev/null 2>&1; then
+    bg_status
     return 0
   fi
   mkdir -p data || return 1
@@ -98,7 +159,7 @@ start() {
   while [ "$i" -lt 180 ]; do  # erster Start installiert ggf. noch Pakete
     sleep 1
     if answers; then
-      status
+      bg_status
       return 0
     fi
     [ -n "$(scan own)" ] || break
@@ -109,7 +170,7 @@ start() {
   return 1
 }
 
-stop() {
+bg_stop() {
   own=$(scan own)
   if [ -z "$own" ]; then
     foreign=$(scan foreign | tr '\n' ' ')
@@ -128,11 +189,148 @@ stop() {
   echo "gestoppt (nach 20 s hart beendet)"
 }
 
+# ------------------------------------------------------------------ install / update
+interactive() { [ "$YES" = 0 ] && [ -t 0 ]; }
+
+ask() {  # ask FRAGE VORSCHLAG(1/0) -> 1 oder 0
+  if [ "$2" = 1 ]; then hint="[J/n]"; else hint="[j/N]"; fi
+  while :; do
+    printf '%s %s ' "$1" "$hint" >&2
+    read -r a || a=""
+    case "$a" in
+      "") echo "$2"; return ;;
+      [jJyY]*) echo 1; return ;;
+      [nN]*) echo 0; return ;;
+    esac
+  done
+}
+
+yn() { if [ "$1" = 1 ]; then echo ja; else echo nein; fi; }
+
+as_owner() {  # als Besitzer des Ordners ausführen (root startet BeamLog nicht unter eigenem Namen)
+  owner=$(stat -c %U . 2>/dev/null)
+  if [ "$(id -u)" = 0 ] && [ -n "$owner" ] && [ "$owner" != root ]; then runuser -u "$owner" -- "$@"; else "$@"; fi
+}
+
+remembered() {  # gemerkte Wahl (KEY=0/1) aus .install.options hier bzw. der Installation in /opt/beamlog
+  for f in .install.options /opt/beamlog/.install.options; do
+    [ -f "$f" ] || continue
+    sed -n "s/^$1=\([01]\)\$/\1/p" "$f" | tail -n 1
+    return
+  done
+}
+
+install_cmd() {
+  [ -f deploy/install.sh ] || { echo "deploy/install.sh fehlt – ist der BeamLog-Ordner vollständig?" >&2; return 1; }
+  svc=; ngx=; bak=; here=; url=; YES=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --no-service) svc=0 ;;
+      --service | --with-service) svc=1 ;;
+      --no-nginx) ngx=0 ;;
+      --nginx | --with-nginx) ngx=1 ;;
+      --no-backup) bak=0 ;;
+      --backup | --with-backup) bak=1 ;;
+      --here | --in-place) here=1 ;;
+      --system) here=0 ;;
+      --deps-only) svc=0; ngx=0; bak=0; here=1 ;;
+      --url) [ $# -ge 2 ] || { echo "--url braucht eine Adresse" >&2; return 2; }; url=$2; shift ;;
+      --url=*) url=${1#--url=} ;;
+      -y | --yes) YES=1 ;;
+      -h | --help) usage; return 0 ;;
+      *) echo "Unbekannte Option: $1  (Hilfe: ./beamlogctl help)" >&2; return 2 ;;
+    esac
+    shift
+  done
+  d_svc=$(remembered WANT_SERVICE); d_svc=${d_svc:-1}
+  d_ngx=$(remembered WANT_NGINX); d_ngx=${d_ngx:-1}
+  d_bak=$(remembered WANT_BACKUP); d_bak=${d_bak:-1}
+  d_here=$(remembered HERE); d_here=${d_here:-0}
+
+  if interactive; then
+    echo "BeamLog einrichten aus $DIR – Enter übernimmt den Vorschlag in [ ]."
+    [ -n "$svc" ] || svc=$(ask "systemd-Dienst einrichten (startet mit dem Server, Neustart bei Absturz)?" "$d_svc")
+    if [ "$svc" = 1 ] && [ -z "$here" ]; then
+      copy=$(ask "Nach /opt/beamlog kopieren (eigener Systemnutzer, empfohlen)? Nein = in diesem Ordner bleiben" $((1 - d_here)))
+      here=$((1 - copy))
+    fi
+    [ -n "$ngx" ] || ngx=$(ask "nginx davor einrichten (Port 80)? Nein z. B. bei eigenem Reverse-Proxy" "$d_ngx")
+    [ -n "$bak" ] || bak=$(ask "Tägliches Backup der Datenbank (03:15 Uhr, 30 Tage aufheben)?" "$d_bak")
+    if [ -z "$url" ]; then
+      printf '%s ' "Adresse für QR-Code und Links (z. B. http://contest.local/, Enter = unverändert):" >&2
+      read -r url || url=""
+    fi
+  fi
+  e_svc=${svc:-$d_svc}; e_here=${here:-$d_here}
+  [ "$e_svc" = 0 ] && [ -z "$here" ] && e_here=1   # ohne Dienst bleibt BeamLog im Ordner (install.sh kopiert dann nicht)
+  if [ "$e_here" = 1 ]; then where="dieser Ordner ($DIR)"; else where="/opt/beamlog (Kopie)"; fi
+  echo "Wird eingerichtet: Dienst $(yn "$e_svc") · nginx $(yn "${ngx:-$d_ngx}") · Backup $(yn "${bak:-$d_bak}") · Ort: $where"
+  if interactive && [ "$(ask "Weiter?" 1)" = 0 ]; then echo "abgebrochen"; return 1; fi
+
+  set --
+  case "$svc" in 0) set -- "$@" --no-service ;; 1) set -- "$@" --with-service ;; esac
+  case "$ngx" in 0) set -- "$@" --no-nginx ;; 1) set -- "$@" --with-nginx ;; esac
+  case "$bak" in 0) set -- "$@" --no-backup ;; 1) set -- "$@" --with-backup ;; esac
+  case "$here" in 0) set -- "$@" --system ;; 1) set -- "$@" --here ;; esac
+  [ -n "$url" ] && set -- "$@" --url "$url"
+  priv bash deploy/install.sh "$@" || return 1
+
+  if [ "$e_svc" = 0 ]; then
+    if interactive && [ "$(ask "BeamLog jetzt im Hintergrund starten?" 1)" = 1 ]; then
+      as_owner sh "$DIR/beamlogctl" start
+    fi
+  fi
+}
+
+update_cmd() {
+  to_service=0
+  [ "$1" = --service ] && to_service=1
+  if [ -d .git ] && command -v git >/dev/null 2>&1; then
+    echo "== neuen Stand holen (git pull)"
+    as_owner git pull --ff-only || return 1
+  fi
+  # mit install eingerichtet (Dienst aus diesem Ordner bzw. gemerkte Wahl hier): install.sh spielt alles ein
+  # (auch ein Server aus Version 0.9 „ContestLogger“: install.sh stellt ihn dabei auf BeamLog um)
+  if [ "$SERVICE" = 1 ] || [ -f .install.options ] || [ -f /etc/systemd/system/contestlogger.service ]; then
+    running=$(scan own)
+    priv bash deploy/install.sh --update || return 1
+    # ohne Dienst startet install.sh nichts neu: laufendes BeamLog mit dem neuen Stand neu starten
+    if [ "$SERVICE" = 0 ] && [ -n "$running" ]; then as_owner sh "$DIR/beamlogctl" restart; fi
+    return 0
+  fi
+  # Dienst-Installation in /opt/beamlog aus diesem (neu entpackten bzw. aktualisierten) Ordner bedienen – nur auf Nachfrage
+  # bzw. mit --service, damit ein zweites BeamLog (z. B. eine Demo) nie versehentlich den Server überschreibt
+  if [ -f "$UNIT" ] && [ "$(unit_dir)" = /opt/beamlog ] && [ "$DIR" != /opt/beamlog ]; then
+    if [ "$to_service" = 0 ] && [ -t 0 ]; then
+      YES=0; to_service=$(ask "Diesen Stand nach /opt/beamlog einspielen und den Dienst beamlog neu starten?" 1)
+    fi
+    if [ "$to_service" = 1 ]; then
+      priv bash deploy/install.sh --update
+      return
+    fi
+  elif [ "$DIR" = /opt/beamlog ] && [ ! -d .git ]; then
+    echo "Das ist die installierte Kopie. Aktualisieren aus dem neu entpackten ZIP bzw. dem Quellordner: dort  sudo ./beamlogctl update" >&2
+    echo "(oder im Programm: Verwaltung → Server & Updates)" >&2
+    return 1
+  fi
+  # ohne Einrichtung: im Ordner neu starten, falls BeamLog läuft (start.sh zieht neue Python-Pakete nach)
+  if [ -n "$(scan own)" ]; then
+    as_owner sh "$DIR/beamlogctl" restart
+  else
+    echo "aktualisiert – starten mit ./beamlogctl start"
+  fi
+}
+
 case "$1" in
-  start) start ;;
-  stop) stop ;;
-  restart) stop && start ;;
-  status) status ;;
-  log) tail -n "${2:-${LINES:-100}}" "$LOG" ;;
-  *) echo "Aufruf: $0 start|stop|restart|status|log [ZEILEN]" >&2; exit 2 ;;
+  start) if [ "$SERVICE" = 1 ]; then svc_start; else bg_start; fi ;;
+  stop) if [ "$SERVICE" = 1 ]; then svc_stop; else bg_stop; fi ;;
+  restart) if [ "$SERVICE" = 1 ]; then priv systemctl restart beamlog && svc_start; else bg_stop && bg_start; fi ;;
+  status) if [ "$SERVICE" = 1 ]; then svc_status; else bg_status; fi ;;
+  log)
+    n=${2:-${LINES:-100}}
+    if [ "$SERVICE" = 1 ]; then priv journalctl -u beamlog -n "$n" --no-pager; else tail -n "$n" "$LOG"; fi ;;
+  install) shift; install_cmd "$@" ;;
+  update) shift; update_cmd "$@" ;;
+  help | -h | --help) usage ;;
+  *) usage >&2; exit 2 ;;
 esac

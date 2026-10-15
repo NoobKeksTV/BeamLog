@@ -64,7 +64,6 @@ BLOCKED: list[tuple[str, re.Pattern, str]] = [(m, re.compile(p), why) for m, p, 
     ("POST", r"/api/lookup/test$", "Rufzeichen-Abfrage (HamQTH/QRZ)"),
     ("POST", r"/api/backups$", "Backups"),
     ("POST", r"/api/kst/(start|send|broadcast|refresh_users)$", "ON4KST-Chat (echte Verbindung mit Zugangsdaten)"),
-    ("POST", r"/api/stations/\d+/cw$", "CW über das Funkgerät"),
     ("POST", r"/api/lang/[^/]+$", "Übersetzungen speichern"),
     ("POST", r"/api/(import/results|darc/import|results/.*|callbook/import_list)$", "Betreuer-Importe"),
 ]]

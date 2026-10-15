@@ -10,43 +10,73 @@ Netz erreichen den Logger per Browser über `http://<server-ip>/`.
 sudo apt install -y git
 git clone https://github.com/NoobKeksTV/BeamLog.git
 cd BeamLog
-sudo bash deploy/install.sh
+sudo ./beamlogctl install
 ```
 
-Das Skript installiert Python, nginx und mdbtools, kopiert den Code nach `/opt/beamlog`,
-legt den Systembenutzer `beamlog` an, schreibt die Konfiguration `/opt/beamlog/.env`,
-richtet den systemd-Dienst und die nginx-Site ein und aktiviert ein tägliches Backup nach
-`/opt/beamlog/data/backup/` (30 Tage Aufbewahrung). `--url http://contest.local/` setzt die öffentliche Adresse.
+`beamlogctl install` fragt nacheinander (Enter übernimmt den Vorschlag in `[ ]`):
 
-### Teile weglassen und im Ordner bleiben
+1. **systemd-Dienst einrichten?** – BeamLog startet mit dem Server und nach einem Absturz neu.
+2. **Nach `/opt/beamlog` kopieren?** (nur mit Dienst) – eigener Systemnutzer `beamlog`, gehärtete Unit; *Nein* = im
+   aktuellen Ordner bleiben (die Unit läuft dann als Besitzer des Ordners).
+3. **nginx davor einrichten?** – Port 80 mit WebSocket-Weiterleitung; *Nein* z. B. bei eigenem Reverse-Proxy.
+4. **Tägliches Backup?** – gepackte Sicherung um 03:15 Uhr nach `data/backup-daily/`, 30 Tage aufbewahrt.
+5. **Adresse** für QR-Code und Links (z. B. `http://contest.local/`, Enter = unverändert).
 
-**Wohin installiert wird:** Mit Dienst kopiert das Skript BeamLog nach `/opt/beamlog` (Daten in `/opt/beamlog/data`,
-Einstellungen in `/opt/beamlog/.env` – alles in einem Ordner): Der Dienst läuft dort als eigener Systemnutzer `beamlog` mit gehärteter
-Unit, die keinen Zugriff auf `/home` hat, und ein neu entpacktes ZIP lässt sich per `--update` einfach darüberspielen.
-Das Skript kündigt das Kopieren deutlich an. **Ohne Dienst (`--no-service`) wird nichts kopiert** – BeamLog bleibt
-automatisch im aktuellen Ordner. Mit `--here` bleibt es auch mit Dienst dort (die Unit läuft dann als dein Nutzer).
+Danach zeigt es die Auswahl („Wird eingerichtet: Dienst ja · nginx ja · Backup ja · Ort: /opt/beamlog“) und fragt
+„Weiter?“. Ohne Dienst bietet es an, BeamLog gleich im Hintergrund zu starten. Die eigentliche Arbeit macht
+`deploy/install.sh`: Python, nginx und mdbtools installieren, Code kopieren, Systembenutzer `beamlog` anlegen,
+`/opt/beamlog/.env` schreiben, Dienst, nginx-Site und Backup-Cron einrichten.
 
-Beliebig kombinierbar; die Wahl wird in `/opt/beamlog/.install.options` gemerkt und gilt auch für `--update`:
+### Ohne Rückfragen: Optionen
+
+Angegebene Teile werden nicht mehr gefragt; mit `-y` fragt `beamlogctl` gar nichts (für Skripte und Automatisierung).
+Beliebig kombinierbar; die Wahl wird in `.install.options` gemerkt und gilt auch für spätere Updates:
 
 | Option | Wirkung |
 |---|---|
-| `--no-nginx` | nginx weder installieren noch einrichten (eigener Reverse-Proxy oder `PORT=80` direkt); eine frühere BeamLog-Site wird entfernt, andere Sites bleiben |
-| `--no-service` | kein systemd-Dienst – das Skript zeigt den Startbefehl; ein früherer Dienst `beamlog` wird angehalten und entfernt |
-| `--no-backup` | kein täglicher Backup-Cron (ein vorhandener wird entfernt) |
-| `--with-nginx` / `--with-service` / `--with-backup` | wieder einrichten |
-| `--here` | Nicht kopieren: BeamLog bleibt im aktuellen Ordner und läuft als der aufrufende Nutzer; Daten in `./data`, Einstellungen in `./.env`. Dienst, nginx und Backup-Cron zeigen auf diesen Ordner. |
-| `--deps-only` | Nur die Voraussetzungen installieren (Systempakete, beim Quellcode zusätzlich `./.venv`) – wie `--here --no-nginx --no-service --no-backup`; danach selbst starten. |
-| `--system` | Gemerkte `--here`-Wahl aufheben und wieder nach `/opt/beamlog` installieren. |
+| `--no-service` / `--service` | ohne bzw. mit systemd-Dienst; ein früherer Dienst `beamlog` wird bei `--no-service` angehalten und entfernt |
+| `--no-nginx` / `--nginx` | nginx weder installieren noch einrichten (eigener Reverse-Proxy oder `PORT=80` direkt) bzw. einrichten; andere Sites bleiben unberührt |
+| `--no-backup` / `--backup` | täglichen Backup-Cron weglassen bzw. einrichten |
+| `--here` / `--system` | im aktuellen Ordner bleiben bzw. nach `/opt/beamlog` kopieren (nur mit Dienst; Standard: kopieren) |
+| `--url ADRESSE` | Adresse für QR-Code und Links (`PUBLIC_URL`) |
+| `--deps-only` | nur die Voraussetzungen installieren (Systempakete, beim Quellcode zusätzlich `./.venv`), nichts einrichten |
+| `-y`, `--yes` | keine Rückfragen: nicht angegebene Teile wie beim letzten Mal (beim ersten Mal: alles einrichten) |
 
 ```bash
-sudo bash deploy/install.sh --no-nginx                 # ohne nginx (eigener Reverse-Proxy auf 127.0.0.1:8000)
-sudo bash deploy/install.sh --no-service               # ohne systemd-Dienst (BeamLog selbst starten)
-sudo bash deploy/install.sh --no-nginx --no-backup     # mehrere gleichzeitig
-sudo bash deploy/install.sh --deps-only                # nur Python & Co. installieren, im Ordner bleiben, selbst starten
-sudo bash deploy/install.sh --here                     # im Ordner bleiben, aber mit Dienst, nginx und Backup
-sudo bash deploy/install.sh --update --with-nginx      # einen Teil später wieder einrichten
-sudo bash deploy/install.sh --help                     # alle Optionen
+sudo ./beamlogctl install -y                           # alles einrichten, ohne Rückfrage
+sudo ./beamlogctl install --no-nginx -y                # eigener Reverse-Proxy auf 127.0.0.1:8000
+sudo ./beamlogctl install --no-service --no-nginx -y   # ohne Dienst: bleibt im Ordner, Start mit ./beamlogctl start
+sudo ./beamlogctl install --deps-only                  # nur Python & Co. installieren
+sudo ./beamlogctl install --here                       # im Ordner bleiben, aber mit Dienst
+sudo ./beamlogctl install --nginx -y                   # nginx später doch einrichten, der Rest bleibt wie gemerkt
 ```
+
+**Wohin installiert wird:** Mit Dienst wird BeamLog standardmäßig nach `/opt/beamlog` kopiert (Daten in
+`/opt/beamlog/data`, Einstellungen in `/opt/beamlog/.env` – alles in einem Ordner): Der Dienst läuft dort als eigener
+Systemnutzer `beamlog` mit gehärteter Unit, die keinen Zugriff auf `/home` hat. **Ohne Dienst wird nichts kopiert** –
+BeamLog bleibt im aktuellen Ordner und läuft als dessen Besitzer.
+
+## Bedienen und aktualisieren
+
+```bash
+./beamlogctl status          # läuft? Exit-Code 0 = ja, sonst 1 – die Zeile sagt warum
+./beamlogctl start | stop | restart
+./beamlogctl log 50          # letzte Ausgaben (mit Dienst aus dem Journal)
+sudo ./beamlogctl update     # neuen Stand holen und neu starten
+```
+
+Mit Dienst steuert `beamlogctl` den Dienst `beamlog` (über systemctl), ohne Dienst startet es `./start.sh` im
+Hintergrund (Ausgabe in `data/beamlog.log`). Nach der Installation mit Kopie liegt es auch unter
+`/opt/beamlog/beamlogctl`. `status` beendet die eigene Shell nicht und eignet sich für Control Panels
+(z. B. ServerController: Start `sh ./beamlogctl start`, Stopp `sh ./beamlogctl stop`, Status `sh ./beamlogctl status`).
+
+`update` holt im Git-Checkout den neuen Stand (`git pull`), spielt ihn ein (`install.sh --update`: Pakete, Dienst,
+nginx) und startet neu. Liegt der Dienst in `/opt/beamlog`, fragt es im Quellordner bzw. im neu entpackten ZIP, ob
+dieser Stand dorthin eingespielt werden soll (ohne Rückfrage: `update --service`). Ein zweites BeamLog in einem anderen
+Ordner, etwa eine Demo, steuert nie den Dienst.
+
+`deploy/install.sh` lässt sich weiterhin direkt aufrufen (`sudo bash deploy/install.sh --update`, alle Optionen mit
+`--help`).
 
 ## Einstellungen: /opt/beamlog/.env
 
@@ -66,14 +96,14 @@ PUBLIC_URL=http://contest.local/                # Adresse im QR-Code und in Link
 #DEMO_RESET=03:00                               # Uhrzeit des täglichen Zurücksetzens
 ```
 
-Nach Änderungen `sudo systemctl restart beamlog`. Die Datei bleibt bei `--update` unverändert; Umgebungsvariablen
+Nach Änderungen `sudo ./beamlogctl restart`. Die Datei bleibt bei `--update` unverändert; Umgebungsvariablen
 `BEAMLOG_<KEY>` und Kommandozeilen-Optionen überstimmen sie.
 
 Update auf eine neue Version:
 
 ```bash
-cd BeamLog && git pull            # ältere Installationen: Ordner ContestLogger
-sudo bash deploy/install.sh --update
+cd BeamLog                        # ältere Installationen: Ordner ContestLogger
+sudo ./beamlogctl update          # git pull, einspielen, neu starten
 ```
 
 ## Dateien
@@ -84,7 +114,7 @@ sudo bash deploy/install.sh --update
 | `portable/` | Dateien für die portable Version (Binary statt venv) inkl. `.env`-Vorlage und Port-80-Unit |
 | `nginx-beamlog.conf` | nginx-Site auf Port 80, Reverse-Proxy inkl. WebSocket, statische Dateien direkt |
 | `nginx-beamlog-ssl.conf` | optionale HTTPS-Variante mit selbstsigniertem Zertifikat |
-| `install.sh` | Installation / Update in einem Rutsch; `--no-nginx`, `--no-service`, `--no-backup` lassen Teile weg (kombinierbar) |
+| `install.sh` | Installation / Update in einem Rutsch (Unterbau von `beamlogctl install` und `update`); `--no-nginx`, `--no-service`, `--no-backup` lassen Teile weg |
 | `backup.sh` | Konsistentes SQLite-Backup (Cron) |
 
 Pfade: Code `/opt/beamlog`, Datenbank `/opt/beamlog/data/beamlog.db`.
@@ -92,9 +122,10 @@ Pfade: Code `/opt/beamlog`, Datenbank `/opt/beamlog/data/beamlog.db`.
 ## Nützliche Befehle
 
 ```bash
-sudo systemctl status beamlog        # läuft der Dienst?
-sudo journalctl -u beamlog -f        # Log live
-sudo systemctl restart beamlog
+./beamlogctl status                  # läuft BeamLog? (mit und ohne Dienst)
+./beamlogctl log 100                 # letzte Ausgaben
+sudo journalctl -u beamlog -f        # Log des Dienstes live
+sudo ./beamlogctl restart
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -107,10 +138,10 @@ Damit `http://contest.local/` funktioniert, auf dem Server `avahi-daemon` instal
 ## Wiederherstellen aus einem Backup
 
 ```bash
-sudo systemctl stop beamlog
+sudo ./beamlogctl stop
 sudo gunzip -c /opt/beamlog/data/backup/beamlog-XXXX.db.gz > /opt/beamlog/data/beamlog.db
 sudo chown beamlog:beamlog /opt/beamlog/data/beamlog.db
-sudo systemctl start beamlog
+sudo ./beamlogctl start
 ```
 
 Zusätzlich sichert der Server selbst alle 15 Minuten (nur bei Änderungen) nach
@@ -119,15 +150,15 @@ eine manuelle Sicherung an derselben Stelle an.
 
 ## Ohne nginx
 
-Für den schnellen Einsatz reicht auch `./start.sh` im Repo-Ordner (richtet `.venv` ein, lauscht auf 0.0.0.0:8000) – nginx
-bringt nur Port 80, HTTPS-Option und das Ausliefern statischer Dateien.
+Für den schnellen Einsatz reicht auch `./start.sh` im Repo-Ordner (richtet `.venv` ein, lauscht auf 0.0.0.0:8000) bzw.
+`./beamlogctl start` im Hintergrund – nginx bringt nur Port 80, HTTPS-Option und das Ausliefern statischer Dateien.
 
 ## Alles in einem Ordner (Umzug älterer Installationen)
 
 Auf dem Server liegt jetzt alles unter `/opt/beamlog`: Programm, `data/` (Datenbank, Backups, Sprachen) und `.env`
 (Einstellungen) – ein Ordner, ein Besitzer (`beamlog`), keine verstreuten Rechte. Bis 1.0.0 lagen die Daten in
-`/var/lib/beamlog` und die Einstellungen in `/etc/beamlog/beamlog.env`. `sudo bash deploy/install.sh --update` holt
-alles automatisch in den neuen Ordner:
+`/var/lib/beamlog` und die Einstellungen in `/etc/beamlog/beamlog.env`. `sudo ./beamlogctl update` (bzw.
+`sudo bash deploy/install.sh --update`) holt alles automatisch in den neuen Ordner:
 
 - Einstellungen `/etc/beamlog/beamlog.env` (bzw. `.env`) und die gemerkte Wahl werden nach `/opt/beamlog/` **verschoben**,
   Pfade darin (z. B. `DB=/var/lib/beamlog/…`) auf `/opt/beamlog/data/` umgestellt,
@@ -143,8 +174,8 @@ Fehlt eine Vorlage aus `deploy/`, legt `install.sh` eine Standardversion an.
 ## Umstieg von ContestLogger 0.9 (Server)
 
 Bis Version 0.9 hieß BeamLog „ContestLogger“; Dienst, Nutzer und Pfade hießen entsprechend `contestlogger`.
-Im aktualisierten Checkout (`git pull`) `sudo bash deploy/install.sh --update` ausführen – das Skript stellt den Server
-automatisch um:
+Im Checkout `git pull` und danach `sudo ./beamlogctl update` (bzw. `sudo bash deploy/install.sh --update`) ausführen –
+das stellt den Server automatisch um:
 
 - Dienst `contestlogger` wird gestoppt und entfernt, `beamlog` eingerichtet und gestartet,
 - Daten werden von `/var/lib/contestlogger/` nach `/opt/beamlog/data/` **kopiert** (Datenbank heißt dann `beamlog.db`),

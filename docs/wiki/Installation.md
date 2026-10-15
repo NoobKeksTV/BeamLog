@@ -15,6 +15,7 @@ BeamLog hieß bis Version 0.9 „ContestLogger“. **Umstieg von 0.9.x:** Versio
    | `BeamLog-CAT(.exe)` | Bridge zum Funkgerät (Hamlib rigctld / flrig), meldet die Frequenz |
    | `BeamLog-Import(.exe)` | Kommandozeilen-Import eines alten WinContest-Ordners |
    | `start.sh` / `BeamLog-Port8080.bat` | Startskripte |
+   | `beamlogctl` (nur Linux) | ein Befehl für den Server: `install`, `start`, `stop`, `status`, `log`, `update`, siehe [Deploy](Deploy.md) |
    | `data/` | Datenbank, Backups, eigene Sprachdateien – **das ist alles, was gesichert werden muss** |
    | `.env.example` | Vorlage für dauerhafte Einstellungen (als `.env` daneben ablegen) |
    | `deploy/` (nur Linux) | Dienst- und nginx-Dateien für einen Debian-Server, siehe [Deploy](Deploy.md) |
@@ -48,7 +49,7 @@ Unter Windows im Explorer als `.env.` eingeben (der Punkt am Ende verschwindet) 
 `copy .env.example .env`; unter macOS/Linux sind Dateien mit Punkt vorne versteckt (`ls -a`, im Finder `⌘⇧.`).
 
 > Bis Version 1.0.0 hieß die Datei `beamlog.env`. Eine vorhandene `beamlog.env` benennt BeamLog beim Start
-> automatisch in `.env` um. Auf dem Server holt `install.sh --update` außerdem alles in einen Ordner: `/etc/beamlog/beamlog.env`
+> automatisch in `.env` um. Auf dem Server holt `sudo ./beamlogctl update` außerdem alles in einen Ordner: `/etc/beamlog/beamlog.env`
 > → `/opt/beamlog/.env`, Daten aus `/var/lib/beamlog` → `/opt/beamlog/data`.
 
 
@@ -86,14 +87,15 @@ cd BeamLog
 `requirements.txt`; ändert sich die Datei (z. B. nach `git pull`), wird beim nächsten Start nachinstalliert. Optionen
 gehen durch, z. B. `./start.sh --port 8080`. Danach funktioniert auch `python run.py` – fehlen dem aufrufenden Python
 die Pakete, nimmt `run.py` automatisch `.venv`. Fehlt `python3-venv` (Debian/Ubuntu): `sudo apt install python3-venv`
-oder `sudo bash deploy/install.sh --deps-only` (installiert Systempakete und `.venv`, bleibt im Ordner).
+oder `sudo ./beamlogctl install --deps-only` (installiert Systempakete und `.venv`, bleibt im Ordner).
 
-Im Hintergrund ohne systemd-Dienst (z. B. per SSH oder aus einem Control Panel wie ServerController):
+Im Hintergrund ohne systemd-Dienst (z. B. per SSH oder aus einem Control Panel wie ServerController) – als Dienst mit
+nginx einrichten: `sudo ./beamlogctl install`, siehe [Deploy](Deploy.md):
 
 ```bash
 ./beamlogctl start      # startet ./start.sh im Hintergrund, Ausgabe in data/beamlog.log
 ./beamlogctl status     # „läuft …“ / „gestoppt …“ mit Grund; Exit-Code 0 = läuft, sonst 1
-./beamlogctl stop       # auch restart und log [ZEILEN]
+./beamlogctl stop       # auch restart, log [ZEILEN] und update (git pull + Neustart)
 ```
 
 Der Port kommt aus `$PORT`, sonst aus `PORT=` in der `.env`, sonst 8000. `status` erkennt BeamLog an der Antwort auf

@@ -18,8 +18,8 @@ Das Repo ist öffentlich, ein Token ist nicht nötig. (Nur für ein privates For
 
 - **Linux/macOS:** die laufende Binärdatei wird in `.old` umbenannt, die neue startet per `exec`; unter systemd bleibt der Dienst erhalten.
 - **Windows:** eine laufende `.exe` lässt sich nicht überschreiben; ein kleines `update.bat` wartet auf das Programmende, kopiert die Dateien und startet neu. Das Fenster schließt sich kurz und öffnet sich wieder.
-- **Quellcode-Installation:** keine Selbst-Aktualisierung – `git pull && pip install -r requirements.txt`, dann Dienst neu starten.
-- **Debian-Server:** alternativ neues ZIP entpacken und `sudo bash deploy/install.sh --update`.
+- **Quellcode-Installation:** keine Selbst-Aktualisierung – `sudo ./beamlogctl update` (holt per `git pull`, zieht Pakete nach und startet neu).
+- **Debian-Server:** alternativ neues ZIP entpacken und dort `sudo ./beamlogctl update`.
 
 Jedes Update steht im Aktionsprotokoll.
 

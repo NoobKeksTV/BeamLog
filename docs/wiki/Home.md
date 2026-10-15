@@ -31,7 +31,7 @@ BeamLog (früher „ContestLogger“) basiert auf DD3KU WinContest. Ein kleiner 
 | Seite | Inhalt |
 |---|---|
 | [Installation](Installation.md) | Portable Version (Windows, Linux, macOS), Start, Datenordner, Optionen |
-| [Server-Deploy (Debian, nginx, systemd)](Deploy.md) | Dienst auf einem Debian-Server, nginx, Port 80, Backups, Updates |
+| [Server-Deploy (Debian, nginx, systemd)](Deploy.md) | `beamlogctl install`: Dienst, nginx, Port 80, Backups – Start, Stopp, Status und Updates mit einem Befehl |
 | [Erste Schritte](Erste-Schritte.md) | Admin-Passwort, globale Stationen, Contest anlegen, Operatoren freischalten |
 | [Loggen](Loggen.md) | Eingabe, Vorschläge, Dupe, Entfernung/Richtung, Karte, Bearbeiten, Nummern |
 | [Tastenkürzel](Tastenkuerzel.md) | Alle Tasten im Logger, Chat und allgemein |

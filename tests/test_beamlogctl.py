@@ -78,3 +78,57 @@ def test_start_reports_failure(folder: Path):
     r = ctl(folder, "start", port=free_port())
     assert r.returncode == 1 and "Port ist belegt" in r.stderr
     assert "Port ist belegt" in ctl(folder, "log", "5").stdout
+
+
+def fake_installer(folder: Path) -> Path:
+    """deploy/install.sh-Attrappe: schreibt nur ihre Argumente auf."""
+    (folder / "deploy").mkdir()
+    (folder / "deploy" / "install.sh").write_text(f'echo "$@" > "{folder}/args"\n')
+    return folder / "args"
+
+
+@pytest.mark.skipif(getattr(os, "geteuid", lambda: 1)() != 0 and not shutil.which("sudo"), reason="braucht root oder sudo")
+def test_install_options_without_prompts(folder: Path):
+    args = fake_installer(folder)
+    r = ctl(folder, "install", "--no-nginx", "--no-backup", "-y")
+    assert r.returncode == 0, r.stderr
+    assert args.read_text().split() == ["--no-nginx", "--no-backup"]  # Dienst: wie zuletzt (install.sh merkt sich die Wahl)
+    assert "nginx nein" in r.stdout and "Backup nein" in r.stdout
+    r = ctl(folder, "install", "--deps-only", "--url", "http://contest.local/", "-y")
+    assert args.read_text().split() == ["--no-service", "--no-nginx", "--no-backup", "--here", "--url", "http://contest.local/"]
+    assert "Dienst nein" in r.stdout and "Ort: dieser Ordner" in r.stdout  # ohne Dienst wird nicht kopiert
+    assert ctl(folder, "install", "--quatsch").returncode == 2
+
+
+@pytest.mark.skipif(getattr(os, "geteuid", lambda: 1)() != 0 and not shutil.which("sudo"), reason="braucht root oder sudo")
+def test_install_asks_interactively(folder: Path):
+    import pty
+    import select
+
+    args = fake_installer(folder)
+    master, slave = pty.openpty()
+    env = {k: v for k, v in os.environ.items() if k != "PORT"}
+    proc = subprocess.Popen(["sh", str(folder / "beamlogctl"), "install"], stdin=slave, stdout=slave, stderr=slave, env=env)
+    os.close(slave)
+    out = b""
+    # Dienst: nein · nginx: Vorschlag (ja) · Backup: nein · Adresse · Weiter: ja · jetzt starten: nein
+    answers = iter([b"n\n", b"\n", b"n\n", b"http://x.example/\n", b"\n", b"n\n"])
+    prompts = 0
+    while proc.poll() is None:
+        r, _, _ = select.select([master], [], [], 10)
+        if not r:
+            break
+        try:
+            chunk = os.read(master, 4096)
+        except OSError:
+            break
+        out += chunk
+        while out.count(b"?") + out.count(b"):") > prompts:  # neue Frage (endet auf „?“ bzw. „unverändert):“)
+            prompts += 1
+            os.write(master, next(answers, b"\n"))
+    proc.wait(timeout=30)
+    os.close(master)
+    text = out.decode(errors="replace")
+    assert proc.returncode == 0, text
+    assert args.read_text().split() == ["--no-service", "--with-nginx", "--no-backup", "--url", "http://x.example/"]
+    assert "Dienst nein · nginx ja · Backup nein" in text

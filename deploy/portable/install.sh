@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Installiert die PORTABLE Linux-Version von BeamLog (aus dem Release-ZIP, kein Python nötig)
 # auf Debian/Ubuntu/Raspberry Pi OS als systemd-Dienst hinter nginx.
+# Bequemer: ./beamlogctl install (fragt nach Dienst, nginx und Backup) – ruft dieses Skript auf.
 #
 #   unzip BeamLog-<version>-linux-x86_64.zip
 #   cd BeamLog
@@ -71,7 +72,9 @@ OPTS="$APP_DIR/.install.options"
 if [ "$HERE" = 1 ]; then
   case "$SRC_DIR" in *[[:space:]]*) echo "--here: Der Ordnerpfad enthält Leerzeichen ($SRC_DIR) – bitte in einen Ordner ohne Leerzeichen legen."; exit 1 ;; esac
   APP_DIR="$SRC_DIR"; DATA_DIR="$SRC_DIR/data"; CONF="$SRC_DIR/.env"; OPTS="$SRC_DIR/.install.options"
-  RUN_USER="${SUDO_USER:-root}"; RUN_GROUP="$(id -gn "$RUN_USER")"
+  # läuft als Besitzer des Ordners (auch wenn root ohne sudo aufruft), sonst als der per sudo aufrufende Nutzer
+  RUN_USER=$(stat -c %U "$SRC_DIR" 2>/dev/null || echo root); [ "$RUN_USER" = root ] && RUN_USER="${SUDO_USER:-root}"
+  RUN_GROUP="$(id -gn "$RUN_USER")"
 fi
 # Welche Teile eingerichtet werden (1 = ja): gemerkte Wahl laden, Kommandozeile überstimmt sie
 WANT_NGINX=1; WANT_SERVICE=1; WANT_BACKUP=1
@@ -381,6 +384,8 @@ sleep 1
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 START_CMD="sudo -u beamlog $APP_DIR/BeamLog --config $CONF"
 [ "$HERE" = 1 ] && START_CMD="cd $APP_DIR && ./BeamLog"
+CTL=""; [ -f "$APP_DIR/beamlogctl" ] && CTL="$APP_DIR/beamlogctl"   # ein Befehl für start/stop/status/log/update
+[ "$HERE" = 1 ] && [ -n "$CTL" ] && START_CMD="$CTL start"
 echo
 if [ "$HERE" = 0 ]; then
   echo ">>> Installiert nach $APP_DIR (kopiert wegen des systemd-Dienstes) – Daten: $DATA_DIR, Einstellungen: $CONF"
@@ -392,11 +397,12 @@ if [ "$DIRECT" = 1 ] || [ "$WANT_NGINX" = 1 ]; then URL="http://${IP:-<server-ip
 elif [ "$CONF_HOST" = 127.0.0.1 ] || [ "$CONF_HOST" = localhost ]; then URL="http://127.0.0.1:$CONF_PORT/ (nur am Server – für den eigenen Reverse-Proxy)"
 else URL="http://${IP:-<server-ip>}:$CONF_PORT/"; fi
 if [ "$WANT_SERVICE" = 1 ]; then
-  echo "Fertig. BeamLog: $URL   (Status: systemctl status beamlog)"
+  echo "Fertig. BeamLog: $URL   (Status: ${CTL:+$CTL status bzw. }systemctl status beamlog)"
 else
   echo "Fertig. BeamLog ist installiert, aber ohne Dienst (--no-service) – selbst starten (als Nutzer $RUN_USER):"
   echo "   $START_CMD"
   echo "   Adresse danach: $URL"
+  if [ -n "$CTL" ]; then echo "   Status: $CTL status   Stoppen: $CTL stop   Ausgaben: $CTL log"; fi
 fi
 echo "Datenbank: $DATA_DIR/beamlog.db$( [ "$WANT_SERVICE" = 1 ] && echo "   Logs: journalctl -u beamlog -f")"
 echo "Einstellungen: $CONF   (danach: sudo systemctl restart beamlog bzw. eigenen Prozess neu starten)"

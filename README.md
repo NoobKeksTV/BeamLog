@@ -71,20 +71,19 @@ Admin- und Stations-Passwort: `demo`. Eine eigene Demo-Instanz einrichten: [Wiki
 
 Dauerhafte Einstellungen (Port, Datenbank, Adresse für den QR-Code …) stehen in `.env` neben dem Programm (Vorlage `.env.example`).
 
-**Als Dienst auf einem Debian-/Ubuntu-Server oder Raspberry Pi** (systemd, nginx auf Port 80, tägliches Backup) – im entpackten Linux-ZIP:
+**Auf einem Debian-/Ubuntu-Server oder Raspberry Pi** gibt es einen Befehl für alles – im entpackten Linux-ZIP bzw. im
+Git-Checkout:
 
 ```bash
-sudo bash deploy/install.sh --url http://contest.local/   # Erstinstallation
-sudo bash deploy/install.sh --update                      # später: neue Version einspielen
+sudo ./beamlogctl install          # fragt: systemd-Dienst? nach /opt/beamlog kopieren? nginx auf Port 80? tägliches Backup? Adresse?
+./beamlogctl status                # läuft? (Exit-Code 0 = ja) – auch start, stop, restart, log
+sudo ./beamlogctl update           # neuen Stand einspielen und neu starten
 ```
 
-Teile lassen sich weglassen, auch mehrere gleichzeitig: `--no-nginx` (eigener Reverse-Proxy oder `PORT=80` direkt),
-`--no-service` (ohne systemd-Dienst), `--no-backup` (ohne Backup-Cron); die Wahl wird für spätere Updates gemerkt,
-`--with-…` schaltet wieder ein, `--help` zeigt alles.
-
-Mit Dienst kopiert das Skript BeamLog nach `/opt/beamlog` (Einstellungen in `/opt/beamlog/.env`) und sagt das
-deutlich. Ohne Dienst wird nichts kopiert, BeamLog bleibt im aktuellen Ordner: `--deps-only` installiert nur Python & Co.,
-`--here` bleibt im Ordner und richtet trotzdem Dienst, nginx und Backup ein. Anleitung im
+Ohne Rückfragen mit Optionen, auch kombiniert: `--no-service`, `--no-nginx` (eigener Reverse-Proxy oder `PORT=80` direkt),
+`--no-backup`, `--here` (im Ordner bleiben), `--url http://contest.local/`, `--deps-only` (nur Python & Co.) und `-y`
+(nichts fragen), z. B. `sudo ./beamlogctl install --no-nginx -y`. Die Wahl wird für Updates gemerkt. Mit Dienst steuert
+`beamlogctl` den Dienst `beamlog`, ohne Dienst läuft BeamLog im Hintergrund aus dem Ordner. Anleitung im
 [Wiki › Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy) (dort auch die [öffentliche Demo-Instanz](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy#öffentliche-demo-instanz) mit `DEMO=1`).
 
 Aus dem Quellcode (Python 3.11+): `./start.sh` (Linux/macOS/Raspberry Pi) bzw. `start.bat` (Windows) – legt beim ersten Mal die virtuelle Umgebung `.venv` an, installiert die Pakete und hält sie nach `git pull` aktuell. Danach startet auch `python run.py` (nimmt `.venv` automatisch).
