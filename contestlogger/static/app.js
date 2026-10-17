@@ -638,8 +638,12 @@
     }
   });
 
+  // Enter, Leertaste und Tab gehen nur über die nötigen Felder: Rufzeichen -> Nr erh. (-> DOK) -> Locator -> Kommentar;
+  // RST geg./erh. sind mit 59 vorbelegt und nur per Klick erreichbar (tabindex -1 im HTML).
+  const steps = () => [F.call, F.nr, F.dok, F.loc, F.cmt].filter((f) => !f.parentElement.classList.contains("hidden"));
+  function nextStep(inp) { const s = steps(); const i = s.indexOf(inp); return i < 0 ? firstRcvd() : s[i + 1] || F.call; }
   // Enter springt weiter; wenn Call + Locator vorhanden und man im letzten Pflichtfeld ist, wird geloggt.
-  order.forEach((inp, i) => {
+  order.forEach((inp) => {
     inp.addEventListener("keydown", (e) => {
       if (inp === F.call && !$("#suggest").classList.contains("hidden")) {
         if (e.key === "ArrowDown") { e.preventDefault(); moveSuggest(1); return; }
@@ -651,16 +655,13 @@
         const ready = F.call.value.trim().length >= 3 && F.loc.value.trim().length >= 4;
         const dokOk = !hasDok() || F.dok.value.trim() || inp === F.dok;
         if (ready && dokOk && (inp === F.loc || inp === F.cmt || inp === F.nr || inp === F.dok)) submitQso();
-        else if (inp === F.call && ready) firstRcvd().focus();
-        else { let n = order[i + 1]; while (n && n.parentElement.classList.contains("hidden")) n = order[order.indexOf(n) + 1]; (n || F.call).focus(); }
+        else nextStep(inp).focus();
       }
-      // Leertaste springt: Rufzeichen -> Nr erhalten (-> DOK) -> Locator -> Kommentar -> Rufzeichen
+      // Leertaste springt wie Enter und Tab nur über die nötigen Felder (im Kommentar bleibt sie ein Leerzeichen)
       if (e.key === " " && inp !== F.cmt) {
         e.preventDefault();
         if (inp === F.call) lookupCall();
-        const afterNr = hasDok() ? F.dok : F.loc;
-        const hop = { [F.call.id]: firstRcvd(), [F.rs.id]: firstRcvd(), [F.rr.id]: firstRcvd(), [F.nr.id]: afterNr, [F.dok.id]: F.loc, [F.loc.id]: F.cmt };
-        (hop[inp.id] || F.call).focus();
+        nextStep(inp).focus();
       }
     });
   });
@@ -897,8 +898,8 @@
     const P = (text) => el("p", { class: "muted small" }, text);
     const box = modal(el("div", { class: "help" }, el("h3", {}, t("Hilfe und Tastenkürzel")),
       ...H(t("Loggen (Eingabeformular)"),
-        K(["Enter"], t("Weiter zum nächsten Feld. Stehen Rufzeichen und Locator, wird im Feld Nr erh., Locator oder Kommentar das QSO geloggt.")),
-        K(["Leertaste"], t("Springt Rufzeichen → Nr erh. → Locator → Kommentar → Rufzeichen (im Rufzeichenfeld wird dabei die Stationsdatenbank abgefragt). Im Kommentar bleibt die Leertaste ein Leerzeichen.")),
+        K(["Enter"], t("Weiter zum nächsten nötigen Feld (wie Tab: Rufzeichen → Nr erh. → Locator → Kommentar; RST nur per Klick). Stehen Rufzeichen und Locator, wird im Feld Nr erh., Locator oder Kommentar das QSO geloggt.")),
+        K(["Leertaste"], t("Springt wie Tab und Enter nur über die nötigen Felder: Rufzeichen → Nr erh. → Locator → Kommentar → Rufzeichen (im Rufzeichenfeld wird dabei die Stationsdatenbank abgefragt). Im Kommentar bleibt die Leertaste ein Leerzeichen.")),
         K(["DOK"], t("Ist der Austausch des Contests „DOK/OV“ (Verwaltung → Contest), erscheint statt der Nummer das Feld „DOK erh.“; bei „Nummer + DOK“ beides. Der DOK wird aus der Stationsdatenbank vorbelegt.")),
         K(["↑", "↓"], t("In der Vorschlagsliste unter dem Rufzeichen blättern.")),
         K(["Enter", "Tab"], t("Markierten Vorschlag übernehmen (Rufzeichen und Locator).")),

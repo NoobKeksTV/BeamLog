@@ -7,7 +7,7 @@
 | Feld | Hinweise |
 |---|---|
 | **Rufzeichen** | Wird automatisch in Großbuchstaben gesetzt. Beim Tippen erscheinen Vorschläge aus der Stationsdatenbank und allen eigenen Logs mit Locator, Entfernung, Richtung und „schon gearbeitet“-Hinweis. |
-| **RST geg. / RST erh.** | Vorbelegt mit 59 (bzw. 599 bei CW). |
+| **RST geg. / RST erh.** | Vorbelegt mit 59 (bzw. 599 bei CW). Tab, Enter und Leertaste überspringen die Felder – ändern per Mausklick. |
 | **Nr geg.** | Laufende Nummer, automatisch hochzählend, orange hervorgehoben. Rücksetzen über den Knopf „Nr. zurücksetzen“ oder in der Verwaltung. |
 | **Nr erh.** | Empfangene Nummer. |
 | **DOK erh.** | DOK/Ortsverband der Gegenstation – nur bei Contests mit Austausch „DOK/OV“ oder „Nummer + DOK“ (siehe unten). |
@@ -28,13 +28,17 @@ Was geloggt werden muss, legt der Contest fest (Verwaltung → Contest → **Aus
 
 ![Loggen mit DOK](img/loggen-dok.png)
 
-Der DOK wird aus der [Stationsdatenbank](Stationsdatenbank.md) vorbelegt (grün umrandet), sobald das Rufzeichen bekannt ist, und mit jedem QSO dort gelernt. Die Leertaste springt Rufzeichen → Nr erh. → DOK erh. → Locator; fehlt die Nummer im Contest, direkt zum DOK. Der eigene DOK steht bei der Station in den EDI-Angaben („Eigener DOK/OV bzw. Austausch“) und landet im EDI-Kopf als `PExch`; der empfangene DOK steht in der EDI-QSO-Zeile (Spalte „Exchange received“), im ADIF (`DARC_DOK`, `SRX_STRING`) und in der CSV. Die Statistikzeile zählt die verschiedenen DOKs, die Log-Prüfung warnt bei fehlendem DOK. Das Operator-Fenster zeigt das DOK-Feld statt bzw. neben den Nummern.
+Der DOK wird aus der [Stationsdatenbank](Stationsdatenbank.md) vorbelegt (grün umrandet), sobald das Rufzeichen bekannt ist, und mit jedem QSO dort gelernt. Tab, Enter und Leertaste springen Rufzeichen → Nr erh. → DOK erh. → Locator; fehlt die Nummer im Contest, direkt zum DOK. Der eigene DOK steht bei der Station in den EDI-Angaben („Eigener DOK/OV bzw. Austausch“) und landet im EDI-Kopf als `PExch`; der empfangene DOK steht in der EDI-QSO-Zeile (Spalte „Exchange received“), im ADIF (`DARC_DOK`, `SRX_STRING`) und in der CSV. Die Statistikzeile zählt die verschiedenen DOKs, die Log-Prüfung warnt bei fehlendem DOK. Das Operator-Fenster zeigt das DOK-Feld statt bzw. neben den Nummern.
 
 ## Ablauf mit der Tastatur
 
-- **Rufzeichen tippen → Leertaste** springt zu *Nr erh.*, gleichzeitig wird die Stationsdatenbank (und ggf. HamQTH/QRZ) abgefragt und der Locator vorbelegt.
+Tab, Enter und Leertaste gehen alle denselben kurzen Weg über die nötigen Felder: **Rufzeichen → Nr erh. (→ DOK erh.)
+→ Locator → Kommentar**. Die mit 59 vorbelegten RST-Felder werden übersprungen; wer einen anderen Rapport braucht,
+klickt hinein (Umschalt+Tab geht zurück).
+
+- **Rufzeichen tippen → Leertaste** (oder Tab/Enter) springt zu *Nr erh.*; mit der Leertaste wird gleichzeitig die Stationsdatenbank (und ggf. HamQTH/QRZ) abgefragt und der Locator vorbelegt.
 - **Nr erh. → Leertaste** springt zum Locator, **Locator → Leertaste** zum Kommentar.
-- **Enter** loggt, sobald Rufzeichen und Locator stehen (in *Nr erh.*, *Locator* oder *Kommentar*).
+- **Enter** loggt, sobald Rufzeichen und Locator stehen (in *Nr erh.*, *DOK erh.*, *Locator* oder *Kommentar*); sonst geht es ins nächste nötige Feld.
 - **Esc** leert das Formular.
 - Pfeiltasten blättern in den Vorschlägen, Enter/Tab übernimmt den markierten Vorschlag.
 

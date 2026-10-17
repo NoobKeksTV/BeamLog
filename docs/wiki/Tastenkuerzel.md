@@ -8,8 +8,9 @@ Im Programm jederzeit mit **F1** oder dem „?“ im Kopf abrufbar.
 
 | Taste | Wirkung |
 |---|---|
-| **Enter** | Weiter zum nächsten Feld. Stehen Rufzeichen und Locator, wird in *Nr erh.*, *Locator* oder *Kommentar* das QSO geloggt. |
-| **Leertaste** | Springt Rufzeichen → Nr erh. → Locator → Kommentar → Rufzeichen. Im Rufzeichenfeld wird dabei die Stationsdatenbank abgefragt. Im Kommentar bleibt die Leertaste ein Leerzeichen. |
+| **Tab / Enter / Leertaste** | Springen nur über die nötigen Felder: Rufzeichen → Nr erh. (→ DOK erh.) → Locator → Kommentar. *RST geg.* und *RST erh.* (mit 59 vorbelegt) werden übersprungen – ändern per Mausklick; Umschalt+Tab geht zurück. |
+| **Enter** | Stehen Rufzeichen und Locator, wird in *Nr erh.*, *DOK erh.*, *Locator* oder *Kommentar* das QSO geloggt, sonst geht es ins nächste nötige Feld. |
+| **Leertaste** | Im Rufzeichenfeld wird dabei die Stationsdatenbank abgefragt (Locator wird vorbelegt). Im Kommentar bleibt die Leertaste ein Leerzeichen. |
 | **↑ / ↓** | In der Vorschlagsliste unter dem Rufzeichen blättern. |
 | **Enter / Tab** | Markierten Vorschlag übernehmen (Rufzeichen und Locator). |
 | **Esc** | Formular leeren bzw. offenes Fenster schließen. |
