@@ -357,7 +357,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         known = db.lookup_call(core)
         if known and known.get("locator"):
             alts = [a for a in (known.get("alt_locators") or "").split(",") if a and a != known["locator"]]
-            return {"source": "local", **{k: known[k] for k in ("call", "locator", "name")}, "alt_locators": alts}
+            return {"source": "local", **{k: known[k] for k in ("call", "locator", "name")}, "dok": known.get("dok") or "", "alt_locators": alts}
         client = lookup_client()
         if not client.enabled or not prefixes.is_plausible_call(core):
             return {"source": "none"}
@@ -1628,7 +1628,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         """HTML-Seiten nie cachen und die eigenen Skripte/Stylesheets mit einem Fingerabdruck stempeln – nach einem
         Update passen Seite und Skript so immer zusammen (sonst alte Seite aus dem Cache + neues app.js oder umgekehrt)."""
         html = (STATIC / name).read_text(encoding="utf-8")
-        for rel in ("app.js", "style.css"):
+        for rel in ("app.js", "quickentry.js", "style.css"):
             html = html.replace(f'"/static/{rel}"', f'"/static/{rel}?v={stamp(rel)}"')
         return Response(html, media_type="text/html", headers={"Cache-Control": "no-cache, must-revalidate"})
 

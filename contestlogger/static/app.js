@@ -5,6 +5,7 @@
   // ------------------------------------------------------------ Zustand
   const S = {
     nick: localStorage.getItem("cl.nick") || "",
+    quick: localStorage.getItem("cl.quick") === "1",  // Schnelleingabe (eine Zeile) – je Browser
     adminToken: localStorage.getItem("cl.admin") || "",
     stationTokens: JSON.parse(localStorage.getItem("cl.stationTokens") || "{}"),
     contests: [],
@@ -163,14 +164,13 @@
     if (v === "stats") { renderContest(); renderStats(); }
     if (v === "fulllog") renderFullLog();
     if (v === "admin") renderAdmin();
-    if (v === "log") setTimeout(() => $("#f-call").focus(), 20);
+    if (v === "log") setTimeout(() => $(S.quick ? "#f-quick" : "#f-call").focus(), 20);
   }
 
   // ------------------------------------------------------------ Start
   async function boot() {
     S.info = await GET("/api/info");
     await loadLanguage();
-    renderLangSelect();
     $("#version").textContent = "v" + S.info.version;
     $$(".maint-only").forEach((e) => e.classList.toggle("hidden", !S.info.maintainer)); $$(".maint-hide").forEach((e) => e.classList.toggle("hidden", !!S.info.maintainer));
     if (S.info.maintainer && S.adminToken) archPoll(true);  // läuft noch ein Archiv-Import (z. B. nach Neuladen der Seite)?
@@ -185,7 +185,7 @@
     connectWs();  // Verbindung immer aufbauen, auch wenn Contest/Station nicht geladen werden konnten
     loadChat();
     loadKst();
-    $("#f-call").focus();
+    $(S.quick ? "#f-quick" : "#f-call").focus();
     checkUpdateBadge(); whatsNew();
   }
   // ------------------------------------------------------------ Demo-Instanz (BEAMLOG_DEMO=1)
@@ -296,7 +296,32 @@
       });
     });
   }
-  $("#nick-badge")?.addEventListener("click", askNick);
+  $("#nick-badge")?.addEventListener("click", () => settingsDialog());
+  $("#settings-btn")?.addEventListener("click", () => settingsDialog());
+
+  // ------------------------------------------------------------ Einstellungen (je Browser): Nutzername, Sprache, Schnelleingabe
+  function settingsDialog() {
+    const box = modal(fromTpl("tpl-settings"));
+    const nick = box.querySelector("#set-nick"), lang = box.querySelector("#set-lang"), quick = box.querySelector("#set-quick");
+    nick.value = S.nick; quick.checked = S.quick;
+    fillLangSelect(lang);
+    setTimeout(() => nick.focus(), 30);
+    box.querySelector("#settings-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const n = nick.value.trim().slice(0, 24);
+      if (!n) return nick.focus();
+      const langChanged = lang.value && lang.value !== currentLang();
+      if (n !== S.nick) {
+        S.nick = n; save(); $("#nick-badge").textContent = S.nick;
+        if (S.ws) { try { S.ws.close(); } catch (_) { /* */ } }  // neu verbinden, damit Chat und Nutzerliste den neuen Namen zeigen
+      }
+      S.quick = quick.checked; localStorage.setItem("cl.quick", S.quick ? "1" : "0"); applyQuickMode();
+      closeModal();
+      if ($("#view-log").classList.contains("active")) setTimeout(() => (S.quick ? Q : F.call).focus(), 30);
+      if (langChanged) { localStorage.setItem("cl.lang", lang.value); location.reload(); return; }
+      toast(t("Einstellungen gespeichert"), "ok");
+    });
+  }
 
   // ------------------------------------------------------------ Töne (WebAudio, keine Dateien nötig)
   const Sound = {
@@ -344,15 +369,14 @@
   });
 
   // ------------------------------------------------------------ Sprachauswahl
-  async function renderLangSelect() {
-    const sel = $("#lang-select"); if (!sel) return;
+  const currentLang = () => localStorage.getItem("cl.lang") || (navigator.language || "de").slice(0, 2).toLowerCase();
+  async function fillLangSelect(sel) {  // Auswahl im Einstellungsdialog; gewechselt wird beim Speichern (Seite lädt neu)
     let langs = [{ code: "de", name: "Deutsch" }];
     try { langs = await GET("/api/lang"); } catch (_) { /* */ }
     sel.innerHTML = "";
-    const cur = localStorage.getItem("cl.lang") || (navigator.language || "de").slice(0, 2).toLowerCase();
+    const cur = currentLang();
     for (const l of langs) sel.append(el("option", { value: l.code, selected: l.code === cur ? 1 : null }, l.name));
     if (!langs.find((l) => l.code === cur)) sel.value = "de";
-    sel.onchange = () => { localStorage.setItem("cl.lang", sel.value); location.reload(); };
   }
 
   // ------------------------------------------------------------ Theme
@@ -454,7 +478,7 @@
     try {
       const r = await api("POST", `/api/stations/${st.id}/unlock`, { password: $("#lock-pw").value });
       S.stationTokens[st.id] = r.token; save(); $("#lock-pw").value = "";
-      renderStationBar(); renderQsos(); toast(t("{call} freigeschaltet", { call: st.call }), "ok"); $("#f-call").focus();
+      renderStationBar(); renderQsos(); toast(t("{call} freigeschaltet", { call: st.call }), "ok"); $(S.quick ? "#f-quick" : "#f-call").focus();
     } catch (err) {
       toast(err.message, "err");
       const box = $("#lock-overlay .lock-box"); box.classList.remove("shake"); void box.offsetWidth; box.classList.add("shake");
@@ -474,7 +498,7 @@
       e.preventDefault();
       try {
         const r = await api("POST", `/api/stations/${st.id}/unlock`, { password: box.querySelector("#unlock-pw").value });
-        S.stationTokens[st.id] = r.token; save(); closeModal(); renderStationBar(); renderQsos(); toast(t("{call} freigeschaltet", { call: st.call }), "ok"); $("#f-call").focus();
+        S.stationTokens[st.id] = r.token; save(); closeModal(); renderStationBar(); renderQsos(); toast(t("{call} freigeschaltet", { call: st.call }), "ok"); $(S.quick ? "#f-quick" : "#f-call").focus();
       } catch (err) { toast(err.message, "err"); }
     });
   }
@@ -603,6 +627,7 @@
   // ---- Eingabeformular
   const F = { call: $("#f-call"), rs: $("#f-rst-sent"), ns: $("#f-nr-sent"), rr: $("#f-rst-rcvd"), nr: $("#f-nr-rcvd"), dok: $("#f-dok"), loc: $("#f-loc"), cmt: $("#f-comment") };
   const order = [F.call, F.rs, F.rr, F.nr, F.dok, F.loc, F.cmt];
+  const Q = $("#f-quick");  // Schnelleingabe: eine Zeile für alles (quickentry.js)
   // Austausch des Contests: "serial" (Nummer), "dok" (DOK/OV, z. B. Köln-Aachen-Contest) oder "serial_dok" (beides)
   const exchangeMode = () => contest()?.exchange || "serial";
   // Wertung des Contests: "km" | "fixN" [ "*squares" | "*doks" | "*squares_doks" ] – wie contestlogger/scoring.py
@@ -622,13 +647,15 @@
     const form = $("#qso-form"); form.classList.remove("x-serial", "x-dok", "x-serial_dok"); form.classList.add("x-" + exchangeMode());
     F.dok.parentElement.classList.toggle("hidden", !hasDok());
     F.nr.parentElement.classList.toggle("hidden", !hasSerial()); F.ns.parentElement.classList.toggle("hidden", !hasSerial());
+    applyQuickMode();
   }
 
   function clearForm() {
     F.call.value = ""; F.rs.value = "59"; F.rr.value = "59"; F.nr.value = ""; F.dok.value = ""; F.loc.value = ""; F.cmt.value = "";
-    S.locAuto = false; F.loc.classList.remove("auto");
+    S.locAuto = false; F.loc.classList.remove("auto"); F.dok.classList.remove("auto");
     S.editingId = null; $("#qso-form button.primary").textContent = t("Loggen ⏎");
-    hideSuggest(); updateHints(); F.call.focus();
+    Q.value = ""; S.quickRes = null;
+    hideSuggest(); updateHints(); (S.quick ? Q : F.call).focus();
   }
   $("#btn-clear")?.addEventListener("click", clearForm);
   document.addEventListener("keydown", (e) => {
@@ -676,6 +703,63 @@
   F.call.addEventListener("blur", () => setTimeout(hideSuggest, 150));
   F.nr.addEventListener("blur", () => { if (/^\d+$/.test(F.nr.value)) F.nr.value = pad3(Number(F.nr.value)); });
 
+  // ---- Schnelleingabe: alles in eine Zeile („DL1ABC JO31AA 012 57 G01“, beliebige Reihenfolge), Enter loggt.
+  // Die Zeile füllt live die normalen Felder (die sich weiter von Hand korrigieren lassen); eigene Angaben (RST geg.,
+  // Nr geg.) bleiben unberührt. Ein- und ausschalten je Browser über ⚙ Einstellungen.
+  function applyQuickMode() {
+    $("#quick-row").classList.toggle("hidden", !S.quick);
+    $("#qso-form").classList.toggle("quick", S.quick);
+    Q.placeholder = hasDok() ? (hasSerial() ? "DL1ABC JO31AA 012 57 G01" : "DL1ABC JO31AA G01 57") : "DL1ABC JO31AA 012 57";
+    renderQuick();
+  }
+  function applyQuick() {
+    const st = station() || {};
+    const r = BeamQuick.parse(Q.value, { mode: st.mode, serial: hasSerial(), dok: hasDok() });
+    const callChanged = F.call.value !== r.call;
+    F.call.value = r.call;
+    if (r.locator) { F.loc.value = r.locator; S.locAuto = false; F.loc.classList.remove("auto"); }
+    else if (!S.locAuto || callChanged) { F.loc.value = ""; S.locAuto = false; F.loc.classList.remove("auto"); }
+    if (r.dok) { F.dok.value = r.dok; F.dok.classList.remove("auto"); }
+    else if (!F.dok.classList.contains("auto") || callChanged) { F.dok.value = ""; F.dok.classList.remove("auto"); }
+    F.nr.value = r.serial; F.rr.value = r.rst || "59"; F.cmt.value = r.comment;
+    if (callChanged) { clearTimeout(lookupTimer); hideAltLocs(); if (r.call.length >= 3) lookupTimer = setTimeout(lookupCall, 150); }
+    S.quickRes = r;
+    updateHints(); sendTyping();
+    return r;
+  }
+  function hideAltLocs() { $("#hint-altloc").classList.add("hidden"); }
+  function renderQuick() {
+    const box = $("#quick-parsed"); if (!box) return;
+    box.innerHTML = "";
+    if (!S.quick) return;
+    const r = S.quickRes;
+    if (!r || !Q.value.trim()) {
+      box.append(t("Erkannt werden Rufzeichen, Locator, Nr erh., RST erh. (51–59, CW 511–599; sonst „r44“) und DOK – Reihenfolge egal."));
+      return;
+    }
+    const chip = (label, val, cls = "") => box.append(el("span", { class: "qp " + cls }, el("b", {}, label), val));
+    chip(t("Rufzeichen"), F.call.value || "–", F.call.value ? "" : "miss");
+    if (hasSerial()) chip(t("Nr erh."), F.nr.value || "–", F.nr.value ? "" : "miss");
+    chip(t("RST erh."), F.rr.value + (r.rst ? "" : " " + t("(Standard)")));
+    if (hasDok()) chip(t("DOK erh."), F.dok.value || "–", F.dok.value ? (F.dok.classList.contains("auto") ? "auto" : "") : "miss");
+    chip(t("Locator"), F.loc.value || "–", F.loc.value ? (S.locAuto ? "auto" : "") : "miss");
+    if (F.cmt.value) chip(t("Kommentar"), F.cmt.value);
+    for (const n of r.notes) if (n.kind === "ambiguous") chip("⚠", t("{a} / {b}: RST oder Nummer? Eindeutig mit r57 bzw. #12", { a: n.values[0], b: n.values[1] }), "warn");
+  }
+  Q.addEventListener("input", applyQuick);
+  Q.addEventListener("keydown", async (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    applyQuick();
+    if (F.call.value.trim().length < 3) { toast(t("Schnelleingabe: kein Rufzeichen erkannt"), "err"); return; }
+    if (F.loc.value.trim().length < 4) await lookupCall();  // Locator noch nicht aus der Stationsdatenbank geholt?
+    if (F.loc.value.trim().length < 4) { renderQuick(); toast(t("Schnelleingabe: Locator fehlt"), "err"); return; }
+    if (hasDok() && !F.dok.value.trim()) { toast(t("Schnelleingabe: DOK fehlt"), "err"); return; }
+    submitQso();
+  });
+  [F.call, F.nr, F.rr, F.dok, F.loc, F.cmt].forEach((f) => f.addEventListener("input", () => { if (S.quick) renderQuick(); }));
+  applyQuickMode();
+
   const coreOf = (call) => (call || "").trim().toUpperCase().replace(/-.*$/, "").split("/").filter((p) => !["P", "M", "MM", "AM", "QRP"].includes(p) && !/^\d+$/.test(p)).sort((a, b) => b.length - a.length)[0] || "";
   function setAutoLocator(loc) {
     // Locator aus der Stationsdatenbank übernehmen, solange der Operator nichts eigenes eingetragen hat
@@ -689,6 +773,7 @@
     try {
       const r = await GET(`/api/lookup?call=${encodeURIComponent(call)}`);
       if (call !== F.call.value.trim()) return;
+      if (r && r.dok && hasDok() && !F.dok.value) { F.dok.value = r.dok; F.dok.classList.add("auto"); }
       if (r && r.locator) { setAutoLocator(r.locator); showAltLocators(r.locator, r.alt_locators || []); if (r.source !== "local") toast(`${r.call}: ${r.locator}${r.name ? " · " + r.name : ""} (${r.source === "hamqth" ? "HamQTH" : "QRZ"})`); }
       else { showAltLocators("", []); if (r && r.source === "error") toast(r.error, "err"); }
     } catch (_) { /* */ }
@@ -751,6 +836,7 @@
 
   let hintTimer;
   function updateHints() {
+    if (S.quick) setTimeout(renderQuick, 0);
     const st = station(); const call = F.call.value.trim(); const loc = F.loc.value.trim();
     const dupeBox = $("#hint-dupe");
     if (call.length < 3) $("#hint-altloc").classList.add("hidden");
@@ -900,6 +986,7 @@
       ...H(t("Loggen (Eingabeformular)"),
         K(["Enter"], t("Weiter zum nächsten nötigen Feld (wie Tab: Rufzeichen → Nr erh. → Locator → Kommentar; RST nur per Klick). Stehen Rufzeichen und Locator, wird im Feld Nr erh., Locator oder Kommentar das QSO geloggt.")),
         K(["Leertaste"], t("Springt wie Tab und Enter nur über die nötigen Felder: Rufzeichen → Nr erh. → Locator → Kommentar → Rufzeichen (im Rufzeichenfeld wird dabei die Stationsdatenbank abgefragt). Im Kommentar bleibt die Leertaste ein Leerzeichen.")),
+        K(["⚙", t("Schnelleingabe")], t("Alles in eine Zeile, Reihenfolge egal, z. B. „DL1ABC JO31AA 012 57 G01“ – BeamLog erkennt Rufzeichen, Locator, Nr erh., RST erh. (51–59, CW 511–599) und DOK; Enter loggt. Eindeutig machen: r44 = RST, #12 = Nummer. Einschalten unter ⚙ Einstellungen (je Browser).")),
         K(["DOK"], t("Ist der Austausch des Contests „DOK/OV“ (Verwaltung → Contest), erscheint statt der Nummer das Feld „DOK erh.“; bei „Nummer + DOK“ beides. Der DOK wird aus der Stationsdatenbank vorbelegt.")),
         K(["↑", "↓"], t("In der Vorschlagsliste unter dem Rufzeichen blättern.")),
         K(["Enter", "Tab"], t("Markierten Vorschlag übernehmen (Rufzeichen und Locator).")),
@@ -921,7 +1008,7 @@
         K(["🔔"], t("Töne an/aus: Pling beim QSO, Brummen bei Dupe, Ping bei Chat/DM/„an mich“, Tick wenn eine andere Station loggt.")),
         K(["📱"], t("Adresse des Servers als QR-Code für Handy oder Tablet.")),
         K(["◐"], t("Hell/Dunkel umschalten.")),
-        K([t("Sprache")], t("Umschalten der Oberfläche; eigene Übersetzungen über die Verwaltung."))),
+        K(["⚙"], t("Einstellungen dieses Browsers: Nutzername (Chat, Log, Aktionsprotokoll), Sprache der Oberfläche (eigene Übersetzungen über die Verwaltung) und Schnelleingabe ein/aus. Auch per Klick auf den Namen im Kopf."))),
       P(t("Export und Abgabe: in der Verwaltung unter „Export / Abgabe“ – EDI je Station/Band (mit Log-Prüfung), ADIF, CSV oder alle Bänder als EDI-ZIP. Jede Änderung steht im Aktionsprotokoll.")),
       el("div", { class: "row" }, el("span", { class: "muted small grow" }, `${S.info.app || "BeamLog"} ${S.info.version || ""} · ${S.info.copyright || ""} · ${S.info.license || ""}`, " · ", el("a", { href: S.info.source_url, target: "_blank", rel: "noopener" }, t("Quellcode"))), el("button", { type: "button", class: "ghost", "data-close": 1 }, t("Schließen")))));
     box.classList.add("wide");

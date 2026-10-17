@@ -440,3 +440,15 @@ kbd { display: inline-block; padding: 1px 6px; margin-right: 3px; border: 1px so
 @keyframes lockshake { 25% { transform: translateX(-6px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
 button.unlock-btn { background: var(--warn); border-color: var(--warn); color: #1a1a1a; font-weight: 700; }
 button.unlock-btn:hover { filter: brightness(1.08); }
+
+/* Schnelleingabe: alles in eine Zeile */
+.quick-row { margin-bottom: 10px; }
+.qso-form input#f-quick { font-size: 22px; text-transform: none; border-color: var(--accent); }
+.quick-parsed { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; min-height: 24px; align-items: center; }
+.quick-parsed .qp { background: var(--card2); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; color: var(--text); font-family: var(--mono); font-size: 13.5px; }
+.quick-parsed .qp b { color: var(--muted); font-family: var(--sans); font-weight: 500; margin-right: 5px; }
+.quick-parsed .qp.auto { border-color: var(--ok); }
+.quick-parsed .qp.miss { color: var(--warn); border-style: dashed; }
+.quick-parsed .qp.warn { color: var(--warn); border-color: var(--warn); }
+#settings-form label.check { flex-direction: row; align-items: baseline; gap: 6px; flex-wrap: wrap; color: var(--text); font-size: 14px; }
+#settings-form label.check .muted { flex-basis: 100%; padding-left: 22px; }

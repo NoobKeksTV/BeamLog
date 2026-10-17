@@ -58,7 +58,7 @@ Kachel-URL für die Karten (Standard OpenStreetMap). **Offline-Cache**: mit „K
 Quelle (adsb.fi oder eigener Empfänger), Korridor, Antennenhöhe. Siehe [Flugzeug-Scatter](Flugzeug-Scatter.md).
 
 ## Sprachen
-Übersetzungsvorlage herunterladen, Werte übersetzen, als `lang/<code>.json` neben der Datenbank ablegen (z. B. `data/lang/nl.json`), Server neu starten. Die Sprache erscheint dann in der Auswahl im Kopf. Mitgeliefert: Deutsch und Englisch.
+Übersetzungsvorlage herunterladen, Werte übersetzen, als `lang/<code>.json` neben der Datenbank ablegen (z. B. `data/lang/nl.json`), Server neu starten. Die Sprache erscheint dann unter ⚙ Einstellungen → Sprache der Oberfläche. Mitgeliefert: Deutsch und Englisch.
 
 ## Admin-Passwort
 Ändern und Abmelden.

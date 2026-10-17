@@ -16,6 +16,41 @@
 
 Unter dem Formular: Entfernung in km und Richtung in Grad, Dupe-Warnung („⚠ DL8NAS bereits gearbeitet um 10:12 UTC (JN59LE) – DUPE!“) und Plausibilitätshinweise (z. B. deutsches Rufzeichen mit Locator im Ausland, oder Stationsdatenbank kennt den Partner mit anderem Locator).
 
+## Schnelleingabe: alles in eine Zeile
+
+Wer lieber tippt als Felder anspringt, schaltet unter **⚙ Einstellungen** (oben rechts) die **Schnelleingabe** ein – je
+Browser, nicht je Station; jeder Operator entscheidet selbst. Über dem Formular erscheint dann eine Zeile, in die alles
+nacheinander in **beliebiger Reihenfolge** kommt, getrennt durch Leerzeichen (oder Komma):
+
+```
+DL1ABC JO31AA 012 57 G01
+57 012 g01 jo31aa dl1abc
+dl1abc 59 12 jn59le tnx Peter
+```
+
+![Schnelleingabe](img/schnelleingabe.png)
+
+BeamLog ordnet jedes Stück selbst zu und füllt live die normalen Felder; darunter steht, was erkannt wurde
+(*Rufzeichen · Nr erh. · RST erh. · DOK erh. · Locator · Kommentar*), fehlende Pflichtangaben gestrichelt. **Enter**
+loggt, **Esc** leert die Zeile. Die eigenen Angaben (*RST geg.*, *Nr geg.*) verändert die Schnelleingabe nie.
+
+| Stück | Erkannt als |
+|---|---|
+| `JO31AA`, `JO31` | Locator (Maidenhead, 4 oder 6 Stellen) |
+| `DL1ABC`, `OK1KZ/P`, `DL/PA3XYZ` | Rufzeichen |
+| `57`, `59` (Sprechfunk) bzw. `579`, `599` (CW) | RST erh. – nur Rapporte, die mit 5 beginnen, gelten als RST |
+| andere Zahlen, `012`, `7`, `123` | Nr erh. (führende Null = immer Nummer; gespeichert dreistellig, z. B. `007`) |
+| `G01`, `Z21` | DOK erh. (nur bei Contests mit DOK im Austausch) |
+| alles andere | Kommentar (Schreibweise bleibt erhalten) |
+
+- Eine einzelne Zahl ist die Nummer (bei reinem DOK-Austausch der RST). RST erh. ohne Angabe bleibt 59.
+- Zwei Zahlen: die plausible RST-Zahl ist der RST. Sind beide plausibel (`57 55`), gilt `59`/`599` als RST, sonst die
+  zweite – mit einem ⚠-Hinweis „RST oder Nummer?“. Eindeutig machen: **`r44`** = RST (auch seltene Rapporte wie 44),
+  **`#12`** oder `nr12` = Nummer.
+- Fehlt der Locator, nimmt BeamLog ihn (und den DOK) aus der [Stationsdatenbank](Stationsdatenbank.md), sobald das
+  Rufzeichen bekannt ist (grün markiert). Ohne Locator bzw. ohne DOK (bei DOK-Contests) wird nicht geloggt.
+- Die normalen Felder bleiben bedienbar, etwa um nach dem Tippen noch etwas zu korrigieren.
+
 ## Austausch je Contest: Nummer, DOK oder beides
 
 Was geloggt werden muss, legt der Contest fest (Verwaltung → Contest → **Austausch**):
