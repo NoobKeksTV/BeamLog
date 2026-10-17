@@ -68,7 +68,7 @@
             </div>
           </div>
           <div id="quick-row" class="quick-row hidden">
-            <label class="f-quick">Schnelleingabe <span class="muted small">– alles in eine Zeile, beliebige Reihenfolge, Enter loggt</span>
+            <label class="f-quick">Schnelleingabe <span class="muted small">– alles in eine Zeile oder in Teilen, beliebige Reihenfolge; Enter übernimmt und loggt, sobald alles da ist</span>
               <input id="f-quick" placeholder="DL1ABC JO31AA 012 57" spellcheck="false" autocomplete="off"></label>
             <div id="quick-parsed" class="quick-parsed muted small"></div>
           </div>
@@ -408,7 +408,8 @@
       <input id="set-nick" maxlength="24" required></label>
     <label>Sprache der Oberfläche<select id="set-lang"></select></label>
     <label class="check"><input type="checkbox" id="set-quick"> Schnelleingabe: alles in eine Zeile
-      <span class="muted small">– z. B. „DL1ABC JO31AA 012 57 G01“ in beliebiger Reihenfolge; BeamLog erkennt Rufzeichen, Locator, Nr erh., RST erh. und DOK selbst, Enter loggt</span></label>
+      <span class="muted small">– z. B. „DL1ABC JO31AA 012 57 G01“ in beliebiger Reihenfolge oder in Teilen; BeamLog erkennt Rufzeichen, Locator, Nr erh., RST erh. und DOK selbst – Enter übernimmt und loggt, sobald alles da ist</span></label>
+    <label>Position der Schnelleingabe<select id="set-quickpos"><option value="above">über den Eingabefeldern</option><option value="below">unter den Eingabefeldern</option></select></label>
     <div class="row"><button class="primary">Speichern</button><button type="button" class="ghost" data-close="1">Abbrechen</button></div>
   </form>
 </template>

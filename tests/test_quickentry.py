@@ -54,3 +54,11 @@ def test_dok_only_and_comment():
 def test_never_touches_own_data():
     r = parse("DL1ABC JO31AA 012 57")
     assert set(r) == {"call", "locator", "serial", "rst", "dok", "comment", "notes"}             # kein RST geg./Nr geg.
+
+
+def test_stepwise_entry_single_number_after_serial_is_rst():
+    """Eingabe in Teilen (Enter übernimmt): ist die Nummer schon da, ist eine plausible RST-Zahl der RST."""
+    assert fields(parse("57", haveSerial=True))[2:4] == ("", "57")
+    assert fields(parse("57"))[2:4] == ("057", "")                      # ohne übernommene Nummer: Nummer
+    assert fields(parse("123", haveSerial=True))[2:4] == ("123", "")    # keine RST-Zahl: neue Nummer (Korrektur)
+    assert fields(parse("55", haveSerial=True, haveRst=True))[2:4] == ("055", "")

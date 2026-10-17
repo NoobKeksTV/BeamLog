@@ -6,7 +6,7 @@ Beim ersten Aufruf der Oberfläche fragt BeamLog nach einem Admin-Passwort. Es s
 
 ## 2. Nickname
 
-Jeder Browser meldet sich mit einem Nickname (z. B. „Lars“). Er erscheint im Chat, in der Anwesenheitsliste („online: Lars@DN2LH/P, Peter@DN2LH“) und im Aktionsprotokoll bei jedem QSO. Ändern: **⚙ Einstellungen** oben rechts (oder Klick auf den Namen im Kopf). Dort stellt jeder Browser außerdem die Sprache der Oberfläche und die [Schnelleingabe](Loggen.md#schnelleingabe-alles-in-eine-zeile) ein – das gilt nur für diesen Browser, nicht für die Station.
+Jeder Browser meldet sich mit einem Nickname (z. B. „Lars“). Er erscheint im Chat, in der Anwesenheitsliste („online: Lars@DN2LH/P, Peter@DN2LH“) und im Aktionsprotokoll bei jedem QSO. Ändern: **⚙ Einstellungen** oben rechts (oder Klick auf den Namen im Kopf). Dort stellt jeder Browser außerdem die Sprache der Oberfläche und die [Schnelleingabe](Loggen.md#schnelleingabe-alles-in-eine-zeile) (ein/aus, über oder unter den Eingabefeldern) ein – das gilt nur für diesen Browser, nicht für die Station.
 
 ![Einstellungen](img/einstellungen.png)
 

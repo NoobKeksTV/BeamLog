@@ -6,6 +6,7 @@
   const S = {
     nick: localStorage.getItem("cl.nick") || "",
     quick: localStorage.getItem("cl.quick") === "1",  // Schnelleingabe (eine Zeile) – je Browser
+    quickPos: localStorage.getItem("cl.quickPos") === "below" ? "below" : "above",  // Zeile über oder unter den Feldern
     adminToken: localStorage.getItem("cl.admin") || "",
     stationTokens: JSON.parse(localStorage.getItem("cl.stationTokens") || "{}"),
     contests: [],
@@ -302,8 +303,9 @@
   // ------------------------------------------------------------ Einstellungen (je Browser): Nutzername, Sprache, Schnelleingabe
   function settingsDialog() {
     const box = modal(fromTpl("tpl-settings"));
-    const nick = box.querySelector("#set-nick"), lang = box.querySelector("#set-lang"), quick = box.querySelector("#set-quick");
-    nick.value = S.nick; quick.checked = S.quick;
+    const nick = box.querySelector("#set-nick"), lang = box.querySelector("#set-lang"), quick = box.querySelector("#set-quick"), pos = box.querySelector("#set-quickpos");
+    nick.value = S.nick; quick.checked = S.quick; pos.value = S.quickPos;
+    const showPos = () => pos.closest("label").classList.toggle("hidden", !quick.checked); showPos(); quick.addEventListener("change", showPos);
     fillLangSelect(lang);
     setTimeout(() => nick.focus(), 30);
     box.querySelector("#settings-form").addEventListener("submit", (e) => {
@@ -315,7 +317,8 @@
         S.nick = n; save(); $("#nick-badge").textContent = S.nick;
         if (S.ws) { try { S.ws.close(); } catch (_) { /* */ } }  // neu verbinden, damit Chat und Nutzerliste den neuen Namen zeigen
       }
-      S.quick = quick.checked; localStorage.setItem("cl.quick", S.quick ? "1" : "0"); applyQuickMode();
+      S.quick = quick.checked; localStorage.setItem("cl.quick", S.quick ? "1" : "0");
+      S.quickPos = pos.value === "below" ? "below" : "above"; localStorage.setItem("cl.quickPos", S.quickPos); applyQuickMode();
       closeModal();
       if ($("#view-log").classList.contains("active")) setTimeout(() => (S.quick ? Q : F.call).focus(), 30);
       if (langChanged) { localStorage.setItem("cl.lang", lang.value); location.reload(); return; }
@@ -654,7 +657,7 @@
     F.call.value = ""; F.rs.value = "59"; F.rr.value = "59"; F.nr.value = ""; F.dok.value = ""; F.loc.value = ""; F.cmt.value = "";
     S.locAuto = false; F.loc.classList.remove("auto"); F.dok.classList.remove("auto");
     S.editingId = null; $("#qso-form button.primary").textContent = t("Loggen ⏎");
-    Q.value = ""; S.quickRes = null;
+    Q.value = ""; S.quickRes = null; S.quickBase = emptyQuick();
     hideSuggest(); updateHints(); (S.quick ? Q : F.call).focus();
   }
   $("#btn-clear")?.addEventListener("click", clearForm);
@@ -703,38 +706,61 @@
   F.call.addEventListener("blur", () => setTimeout(hideSuggest, 150));
   F.nr.addEventListener("blur", () => { if (/^\d+$/.test(F.nr.value)) F.nr.value = pad3(Number(F.nr.value)); });
 
-  // ---- Schnelleingabe: alles in eine Zeile („DL1ABC JO31AA 012 57 G01“, beliebige Reihenfolge), Enter loggt.
-  // Die Zeile füllt live die normalen Felder (die sich weiter von Hand korrigieren lassen); eigene Angaben (RST geg.,
-  // Nr geg.) bleiben unberührt. Ein- und ausschalten je Browser über ⚙ Einstellungen.
+  // ---- Schnelleingabe: alles in eine Zeile („DL1ABC JO31AA 012 57 G01“, beliebige Reihenfolge) – oder in mehreren
+  // Schritten: Enter übernimmt das Getippte ins QSO und leert die Zeile; sobald alles Nötige da ist (Rufzeichen, Locator,
+  // Nr erh. bzw. DOK erh.), loggt Enter. Enter auf leerer Zeile loggt auch ohne Nr erh. Die Zeile füllt live die normalen
+  // Felder (die sich weiter von Hand korrigieren lassen); eigene Angaben (RST geg., Nr geg.) bleiben unberührt.
+  // Ein/aus und Position (über/unter den Feldern) je Browser über ⚙ Einstellungen.
+  const emptyQuick = () => ({ call: "", locator: "", serial: "", rst: "", dok: "", comment: "" });
+  S.quickBase = emptyQuick();  // schon mit Enter übernommene (oder von Hand in die Felder getippte) Angaben
   function applyQuickMode() {
-    $("#quick-row").classList.toggle("hidden", !S.quick);
+    const row = $("#quick-row"), fields = $("#qso-form .fields");
+    // nur umhängen, wenn sich die Position ändert – jedes Umhängen nimmt dem Eingabefeld den Fokus
+    if (S.quickPos === "below" && fields.nextElementSibling !== row) fields.after(row);
+    else if (S.quickPos !== "below" && row.nextElementSibling !== fields) fields.before(row);
+    row.classList.toggle("below", S.quickPos === "below");
+    row.classList.toggle("hidden", !S.quick);
     $("#qso-form").classList.toggle("quick", S.quick);
     Q.placeholder = hasDok() ? (hasSerial() ? "DL1ABC JO31AA 012 57 G01" : "DL1ABC JO31AA G01 57") : "DL1ABC JO31AA 012 57";
     renderQuick();
   }
   function applyQuick() {
-    const st = station() || {};
-    const r = BeamQuick.parse(Q.value, { mode: st.mode, serial: hasSerial(), dok: hasDok() });
-    const callChanged = F.call.value !== r.call;
-    F.call.value = r.call;
-    if (r.locator) { F.loc.value = r.locator; S.locAuto = false; F.loc.classList.remove("auto"); }
+    const st = station() || {}, b = S.quickBase;
+    const r = BeamQuick.parse(Q.value, { mode: st.mode, serial: hasSerial(), dok: hasDok(), haveSerial: !!b.serial, haveRst: !!b.rst });
+    // Neues aus der Zeile ersetzt das Übernommene im selben Feld (Korrektur), der Kommentar wird ergänzt
+    const m = { call: r.call || b.call, locator: r.locator || b.locator, serial: r.serial || b.serial, rst: r.rst || b.rst,
+      dok: r.dok || b.dok, comment: [b.comment, r.comment].filter(Boolean).join(" ") };
+    const callChanged = F.call.value !== m.call;
+    F.call.value = m.call;
+    if (m.locator) { F.loc.value = m.locator; S.locAuto = false; F.loc.classList.remove("auto"); }
     else if (!S.locAuto || callChanged) { F.loc.value = ""; S.locAuto = false; F.loc.classList.remove("auto"); }
-    if (r.dok) { F.dok.value = r.dok; F.dok.classList.remove("auto"); }
+    if (m.dok) { F.dok.value = m.dok; F.dok.classList.remove("auto"); }
     else if (!F.dok.classList.contains("auto") || callChanged) { F.dok.value = ""; F.dok.classList.remove("auto"); }
-    F.nr.value = r.serial; F.rr.value = r.rst || "59"; F.cmt.value = r.comment;
-    if (callChanged) { clearTimeout(lookupTimer); hideAltLocs(); if (r.call.length >= 3) lookupTimer = setTimeout(lookupCall, 150); }
-    S.quickRes = r;
+    F.nr.value = m.serial; F.rr.value = m.rst || "59"; F.cmt.value = m.comment;
+    if (callChanged) { clearTimeout(lookupTimer); hideAltLocs(); if (m.call.length >= 3) lookupTimer = setTimeout(lookupCall, 150); }
+    S.quickRes = { ...m, notes: r.notes };
     updateHints(); sendTyping();
-    return r;
+    return S.quickRes;
   }
+  function quickFromFields() {  // Felder von Hand geändert: zählt als übernommen
+    S.quickBase = { call: F.call.value.trim().toUpperCase(), locator: S.locAuto ? "" : F.loc.value.trim().toUpperCase(), serial: F.nr.value.trim(),
+      rst: F.rr.value.trim() === "59" ? "" : F.rr.value.trim(), dok: F.dok.classList.contains("auto") ? "" : F.dok.value.trim().toUpperCase(), comment: F.cmt.value.trim() };
+    S.quickRes = { ...S.quickBase, notes: [] };
+  }
+  const quickMissing = (full) => [
+    F.call.value.trim().length < 3 && t("Rufzeichen"),
+    full && hasSerial() && !F.nr.value.trim() && t("Nr erh."),
+    hasDok() && !F.dok.value.trim() && t("DOK erh."),
+    F.loc.value.trim().length < 4 && t("Locator"),
+  ].filter(Boolean);
   function hideAltLocs() { $("#hint-altloc").classList.add("hidden"); }
   function renderQuick() {
     const box = $("#quick-parsed"); if (!box) return;
     box.innerHTML = "";
     if (!S.quick) return;
     const r = S.quickRes;
-    if (!r || !Q.value.trim()) {
-      box.append(t("Erkannt werden Rufzeichen, Locator, Nr erh., RST erh. (51–59, CW 511–599; sonst „r44“) und DOK – Reihenfolge egal."));
+    if (!r || (!Q.value.trim() && !Object.values(S.quickBase).some(Boolean))) {
+      box.append(t("Erkannt werden Rufzeichen, Locator, Nr erh., RST erh. (51–59, CW 511–599; sonst „r44“) und DOK – Reihenfolge egal; Enter übernimmt und loggt, sobald alles da ist."));
       return;
     }
     const chip = (label, val, cls = "") => box.append(el("span", { class: "qp " + cls }, el("b", {}, label), val));
@@ -745,19 +771,27 @@
     chip(t("Locator"), F.loc.value || "–", F.loc.value ? (S.locAuto ? "auto" : "") : "miss");
     if (F.cmt.value) chip(t("Kommentar"), F.cmt.value);
     for (const n of r.notes) if (n.kind === "ambiguous") chip("⚠", t("{a} / {b}: RST oder Nummer? Eindeutig mit r57 bzw. #12", { a: n.values[0], b: n.values[1] }), "warn");
+    const miss = quickMissing(true);
+    box.append(el("span", { class: "qp-state" }, miss.length ? t("Enter übernimmt – noch fehlt: {f}", { f: miss.join(", ") }) : t("Enter loggt")));
   }
   Q.addEventListener("input", applyQuick);
   Q.addEventListener("keydown", async (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
+    const typed = Q.value.trim() !== "";
     applyQuick();
-    if (F.call.value.trim().length < 3) { toast(t("Schnelleingabe: kein Rufzeichen erkannt"), "err"); return; }
-    if (F.loc.value.trim().length < 4) await lookupCall();  // Locator noch nicht aus der Stationsdatenbank geholt?
-    if (F.loc.value.trim().length < 4) { renderQuick(); toast(t("Schnelleingabe: Locator fehlt"), "err"); return; }
-    if (hasDok() && !F.dok.value.trim()) { toast(t("Schnelleingabe: DOK fehlt"), "err"); return; }
-    submitQso();
+    if (typed) { const { notes, ...m } = S.quickRes; S.quickBase = m; Q.value = ""; }  // übernehmen, Zeile frei für den nächsten Teil
+    if (F.call.value.trim().length >= 3 && F.loc.value.trim().length < 4) await lookupCall();  // Locator aus der Stationsdatenbank abwarten
+    renderQuick();
+    // mit Eingabe: loggen, wenn alles da ist (auch Nr erh.); auf leerer Zeile genügt das Nötigste
+    const miss = quickMissing(typed);
+    if (!miss.length) return submitQso();
+    if (!typed) toast(t("Schnelleingabe: es fehlt noch {f}", { f: miss.join(", ") }), "err");
   });
-  [F.call, F.nr, F.rr, F.dok, F.loc, F.cmt].forEach((f) => f.addEventListener("input", () => { if (S.quick) renderQuick(); }));
+  [F.call, F.nr, F.rr, F.dok, F.loc, F.cmt].forEach((f) => f.addEventListener("input", () => {
+    if (!S.quick) return;
+    Q.value = ""; quickFromFields(); renderQuick();  // von Hand korrigiert: Zeile ist damit übernommen
+  }));
   applyQuickMode();
 
   const coreOf = (call) => (call || "").trim().toUpperCase().replace(/-.*$/, "").split("/").filter((p) => !["P", "M", "MM", "AM", "QRP"].includes(p) && !/^\d+$/.test(p)).sort((a, b) => b.length - a.length)[0] || "";
@@ -986,7 +1020,7 @@
       ...H(t("Loggen (Eingabeformular)"),
         K(["Enter"], t("Weiter zum nächsten nötigen Feld (wie Tab: Rufzeichen → Nr erh. → Locator → Kommentar; RST nur per Klick). Stehen Rufzeichen und Locator, wird im Feld Nr erh., Locator oder Kommentar das QSO geloggt.")),
         K(["Leertaste"], t("Springt wie Tab und Enter nur über die nötigen Felder: Rufzeichen → Nr erh. → Locator → Kommentar → Rufzeichen (im Rufzeichenfeld wird dabei die Stationsdatenbank abgefragt). Im Kommentar bleibt die Leertaste ein Leerzeichen.")),
-        K(["⚙", t("Schnelleingabe")], t("Alles in eine Zeile, Reihenfolge egal, z. B. „DL1ABC JO31AA 012 57 G01“ – BeamLog erkennt Rufzeichen, Locator, Nr erh., RST erh. (51–59, CW 511–599) und DOK; Enter loggt. Eindeutig machen: r44 = RST, #12 = Nummer. Einschalten unter ⚙ Einstellungen (je Browser).")),
+        K(["⚙", t("Schnelleingabe")], t("Alles in eine Zeile, Reihenfolge egal, z. B. „DL1ABC JO31AA 012 57 G01“ – BeamLog erkennt Rufzeichen, Locator, Nr erh., RST erh. (51–59, CW 511–599) und DOK; Enter übernimmt auch Teile (z. B. erst Rufzeichen, dann Nummer) und loggt, sobald alles da ist; Enter auf leerer Zeile loggt ohne Nr erh. Eindeutig machen: r44 = RST, #12 = Nummer. Ein/aus und Position (über/unter den Feldern) unter ⚙ Einstellungen (je Browser).")),
         K(["DOK"], t("Ist der Austausch des Contests „DOK/OV“ (Verwaltung → Contest), erscheint statt der Nummer das Feld „DOK erh.“; bei „Nummer + DOK“ beides. Der DOK wird aus der Stationsdatenbank vorbelegt.")),
         K(["↑", "↓"], t("In der Vorschlagsliste unter dem Rufzeichen blättern.")),
         K(["Enter", "Tab"], t("Markierten Vorschlag übernehmen (Rufzeichen und Locator).")),

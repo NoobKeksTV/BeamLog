@@ -19,8 +19,9 @@ Unter dem Formular: Entfernung in km und Richtung in Grad, Dupe-Warnung („⚠ 
 ## Schnelleingabe: alles in eine Zeile
 
 Wer lieber tippt als Felder anspringt, schaltet unter **⚙ Einstellungen** (oben rechts) die **Schnelleingabe** ein – je
-Browser, nicht je Station; jeder Operator entscheidet selbst. Über dem Formular erscheint dann eine Zeile, in die alles
-nacheinander in **beliebiger Reihenfolge** kommt, getrennt durch Leerzeichen (oder Komma):
+Browser, nicht je Station; jeder Operator entscheidet selbst. Über den Eingabefeldern (oder darunter – ebenfalls in den
+Einstellungen wählbar) erscheint dann eine Zeile, in die alles in **beliebiger Reihenfolge** kommt, getrennt durch
+Leerzeichen (oder Komma):
 
 ```
 DL1ABC JO31AA 012 57 G01
@@ -31,8 +32,23 @@ dl1abc 59 12 jn59le tnx Peter
 ![Schnelleingabe](img/schnelleingabe.png)
 
 BeamLog ordnet jedes Stück selbst zu und füllt live die normalen Felder; darunter steht, was erkannt wurde
-(*Rufzeichen · Nr erh. · RST erh. · DOK erh. · Locator · Kommentar*), fehlende Pflichtangaben gestrichelt. **Enter**
-loggt, **Esc** leert die Zeile. Die eigenen Angaben (*RST geg.*, *Nr geg.*) verändert die Schnelleingabe nie.
+(*Rufzeichen · Nr erh. · RST erh. · DOK erh. · Locator · Kommentar*), fehlende Angaben gestrichelt, dahinter „Enter
+loggt“ bzw. „noch fehlt: …“. **Esc** leert alles. Die eigenen Angaben (*RST geg.*, *Nr geg.*) verändert die
+Schnelleingabe nie.
+
+**Enter übernimmt – auch in Teilen.** Man muss nicht alles in eine Zeile schreiben: Enter übernimmt das Getippte ins
+QSO und leert die Zeile für den nächsten Teil. Sobald alles Nötige da ist – Rufzeichen, Locator und je nach Contest
+Nr erh. und/oder DOK erh. –, loggt Enter. Beispiel:
+
+```
+DL1ABC ⏎        übernommen, Locator kommt aus der Stationsdatenbank – noch fehlt: Nr erh.
+012 57 ⏎        vollständig → geloggt
+```
+
+Ein neuer Teil ersetzt den übernommenen Wert im selben Feld (zum Korrigieren einfach nochmal tippen, z. B. einen
+anderen Locator), ein weiterer Kommentar wird angehängt. Ist die Nummer schon übernommen, gilt eine einzelne
+RST-Zahl (`57`) als RST. **Enter auf leerer Zeile** loggt auch ohne Nr erh., sobald Rufzeichen und Locator (und bei
+DOK-Contests der DOK) stehen. Wer zwischendurch ein Feld von Hand ändert, übernimmt damit den Stand der Zeile.
 
 | Stück | Erkannt als |
 |---|---|

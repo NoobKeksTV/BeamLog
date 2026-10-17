@@ -452,3 +452,5 @@ button.unlock-btn:hover { filter: brightness(1.08); }
 .quick-parsed .qp.warn { color: var(--warn); border-color: var(--warn); }
 #settings-form label.check { flex-direction: row; align-items: baseline; gap: 6px; flex-wrap: wrap; color: var(--text); font-size: 14px; }
 #settings-form label.check .muted { flex-basis: 100%; padding-left: 22px; }
+.quick-row.below { margin: 12px 0 4px; }
+.quick-parsed .qp-state { color: var(--muted); margin-left: 4px; }

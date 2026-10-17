@@ -7,7 +7,8 @@
  *  - RST ist plausibel, wenn er mit 5 beginnt: 51–59 (Sprechfunk) bzw. 511–599 (CW); 4x, 3x … sind sehr selten und
  *    gelten als Nummer – ausdrücklich als RST mit „r“ davor: r44, rst449. Nummer ausdrücklich: #12 oder nr12.
  *  - Führende Null (012, 059) = immer Nummer.
- *  - Eine einzelne Zahl ist die Nummer (bei reinem DOK-Austausch der RST).
+ *  - Eine einzelne Zahl ist die Nummer (bei reinem DOK-Austausch der RST; ist die Nummer schon übernommen, ist eine
+ *    plausible RST-Zahl der RST).
  *  - Zwei Zahlen: die plausible RST-Zahl ist der RST, die andere die Nummer; sind beide plausibel (57 55), gilt
  *    59/599 als RST, sonst die zweite – mit Hinweis „mehrdeutig“.
  */
@@ -27,7 +28,8 @@
     return phone || cw;  // MIXED / unbekannt
   }
 
-  /** opts: { mode: "SSB"|"CW"|"FM"|"MIXED", serial: bool (Nummer im Austausch), dok: bool (DOK im Austausch) } */
+  /** opts: { mode: "SSB"|"CW"|"FM"|"MIXED", serial: bool (Nummer im Austausch), dok: bool (DOK im Austausch),
+   *          haveSerial / haveRst: bool – schon mit Enter übernommen (Eingabe in mehreren Schritten) } */
   function parse(line, opts) {
     opts = Object.assign({ mode: "SSB", serial: true, dok: false }, opts || {});
     const out = { call: "", locator: "", serial: "", rst: "", dok: "", comment: "", notes: [] };
@@ -53,7 +55,11 @@
     } else {
       if (out.serial && !out.rst) { const r = nums.find(isRst); if (r) out.rst = take(r); }
       if (!out.serial && out.rst && nums.length) out.serial = take(nums[0]);
-      if (!out.serial && !out.rst && nums.length === 1) out.serial = take(nums[0]);
+      if (!out.serial && !out.rst && nums.length === 1) {
+        // schon übernommene Nummer (Enter vorher) und noch kein RST: eine plausible RST-Zahl ist dann der RST
+        if (opts.haveSerial && !opts.haveRst && isRst(nums[0])) out.rst = take(nums[0]);
+        else out.serial = take(nums[0]);
+      }
       if (!out.serial && !out.rst && nums.length >= 2) {
         const cands = nums.filter(isRst);
         let r = null;
