@@ -110,21 +110,34 @@ button.danger { color: var(--bad); }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
 label > input, label > select { color: var(--text); font-size: 15px; }
 
+/* Spalten mit Mindestbreiten, damit Nummern (auch vierstellig), Locator und DOK nie abgeschnitten werden; reicht die
+   Breite des Formulars nicht (z. B. mit Chat daneben), bricht es per Container-Abfrage in zwei Zeilen um (unten) */
+.qso-form { container-type: inline-size; container-name: qso; }
 .qso-form .fields {
   display: grid; gap: 8px; align-items: end;
-  grid-template-columns: 2.2fr .8fr .8fr .8fr .9fr 1.3fr 1.6fr auto;
+  /* Rufzeichen · RST geg. · Nr geg. · RST erh. · Nr erh. · Locator · Kommentar · Knopf */
+  grid-template-columns: minmax(130px, 2.2fr) minmax(44px, .7fr) minmax(72px, .8fr) minmax(44px, .7fr) minmax(62px, .9fr) minmax(100px, 1.3fr) minmax(90px, 1.6fr) auto;
 }
 /* Austausch je Contest: Nummer, DOK/OV oder beides – die Spalten passen sich an */
-.qso-form.x-serial_dok .fields { grid-template-columns: 2.2fr .7fr .7fr .7fr .8fr .9fr 1.2fr 1.5fr auto; }
+.qso-form.x-serial_dok .fields { grid-template-columns: minmax(130px, 2.2fr) minmax(44px, .6fr) minmax(72px, .8fr) minmax(44px, .6fr) minmax(62px, .8fr) minmax(64px, .8fr) minmax(100px, 1.2fr) minmax(80px, 1.4fr) auto; }
+/* nur DOK: Rufzeichen · RST geg. · RST erh. · DOK erh. · Locator · Kommentar · Knopf */
+.qso-form.x-dok .fields { grid-template-columns: minmax(130px, 2.2fr) minmax(44px, .7fr) minmax(44px, .7fr) minmax(64px, .9fr) minmax(100px, 1.3fr) minmax(90px, 1.6fr) auto; }
+/* kurze Felder mit weniger Innenabstand – mehr Platz für die Ziffern */
+.qso-form input#f-rst-sent, .qso-form input#f-rst-rcvd, .qso-form input#f-nr-sent, .qso-form input#f-nr-rcvd, .qso-form input#f-dok { padding-left: 6px; padding-right: 6px; text-align: center; }
 .qso-form input#f-dok.auto { border-color: var(--ok); box-shadow: inset 0 0 0 1px var(--ok); }
 .qso-form input { font-family: var(--mono); font-size: 20px; text-transform: uppercase; padding: 10px 12px; }
 .qso-form input#f-comment { text-transform: none; font-size: 16px; }
 .qso-form input[readonly] { color: var(--muted); background: var(--card2); }
 .f-call { position: relative; }
 .f-btn { height: 46px; font-size: 16px; }
-@media (max-width: 900px) {
-  .qso-form .fields { grid-template-columns: repeat(4, 1fr); }
-  .f-call { grid-column: span 2; } .f-loc { grid-column: span 2; } .f-cmt { grid-column: span 3; }
+/* zu schmal für eine Zeile: zwei Zeilen mit vier Spalten (Grenzen = Summe der Mindestbreiten oben) */
+@container qso (max-width: 720px) {
+  .qso-form .fields, .qso-form.x-dok .fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .qso-form .f-call { grid-column: span 2; } .qso-form .f-loc { grid-column: span 2; } .qso-form .f-cmt { grid-column: span 3; }
+}
+@container qso (max-width: 800px) {
+  .qso-form.x-serial_dok .fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .qso-form.x-serial_dok .f-call { grid-column: span 2; } .qso-form.x-serial_dok .f-loc { grid-column: span 2; } .qso-form.x-serial_dok .f-cmt { grid-column: span 3; }
 }
 .hint-row { display: flex; gap: 16px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
 .hint { font-size: 14px; }
