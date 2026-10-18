@@ -233,6 +233,7 @@
           <a href="/api/callbook/export.csv" class="button ghost" download>Stationsdatenbank exportieren (CSV)</a>
           <a href="/api/callbook/export_seed.csv" class="button ghost maint-only" download title="Call;Locator;Zuletzt;DOK – zum Einchecken als contestlogger/seed/stationsdatenbank.csv im Repo">Export im Repo-Format</a>
         </div>
+        <p id="maint-blocked" class="hint warn hidden">Betreuer-Modus ist eingeschaltet (MAINTAINER bzw. DEV), in der Demo-Instanz (DEMO=1) aber gesperrt – Quellen-Importe und das Ergebnislisten-Archiv gibt es nur ohne Demo-Modus.</p>
         <p class="muted small maint-hide">Die Stationsdatenbank wird zentral gepflegt: „Nach neuen suchen (Repo)“ unter <b>Updates</b> holt die aktuelle Liste. Eigene Funde (neue Rufzeichen, Locator, DOKs) helfen allen – einfach „Stationsdatenbank exportieren (CSV)“ und die Datei an den Betreuer schicken, er pflegt sie in die Liste im Repo ein.</p>
         <form id="cb-list-form" class="row maint-only">
           <span class="tag">Betreuer</span><input type="file" id="cb-list-file" accept=".csv,.txt" required><button class="ghost small">Stationsliste einpflegen</button><span id="cb-list-result" class="muted small"></span>

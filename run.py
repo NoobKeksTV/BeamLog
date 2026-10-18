@@ -235,7 +235,11 @@ def main() -> None:
     print(f"\n  {__app_name__} {__version__}  {__copyright__}")
     print(f"  Lokal:    http://localhost:{a.port}")
     print(f"  Im LAN:   {url}")
-    demo_on = cfg.get("DEMO", "").strip().lower() in ("1", "true", "yes", "ja", "on")
+    on = ("1", "true", "yes", "ja", "on")
+    demo_on = cfg.get("DEMO", "").strip().lower() in on
+    if any(cfg.get(k, "").strip().lower() in on for k in ("MAINTAINER", "DEV")):
+        print("  Betreuer:  AUS – MAINTAINER/DEV wird im Demo-Modus (DEMO=1) ignoriert" if demo_on else
+              "  Betreuer:  an – Quellen-Importe und Ergebnislisten-Archiv unter Verwaltung → Stationsdatenbank & Import")
     print(f"  Daten:    {a.db}  " + ("(DEMO-MODUS: keine Backups, täglich zurückgesetzt)\n" if demo_on else f"(Backups alle {a.backup_min:g} min in backup/)\n"))
     if getattr(sys, "frozen", False) and os.name == "nt" and env("NO_BROWSER") != "1":
         import threading

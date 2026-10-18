@@ -29,7 +29,9 @@ Regeln: Der neueste DOK gewinnt (ein Rufzeichen kann den OV wechseln). Der neues
 Die Liste wird **zentral** gepflegt, damit alle dieselben, geprüften Daten haben:
 
 - **Normale Installation**: bekommt die Liste über „Nach neuen suchen (Repo)“ (Verwaltung → Updates). Die Quellen-Importe (Ergebnislisten, Ergebnislisten-Archiv) sind ausgeblendet. Eigene Funde (neue Rufzeichen, Locator, DOKs aus den Logs) gibt man weiter: „Stationsdatenbank exportieren (CSV)“ und die Datei an den Betreuer schicken.
-- **Betreuer** (`MAINTAINER=1` oder `DEV=true` in `.env`, dann Server neu starten): sieht zusätzlich die Importkarten und unter der Stationsdatenbank „Stationsliste einpflegen“ für die eingeschickten CSV-Dateien (DOK, Name und „zuletzt gesehen“ werden übernommen, der neuere Stand gewinnt). Danach „Export im Repo-Format“ und die Datei als `contestlogger/seed/stationsdatenbank.csv` ins Repo einchecken – beim nächsten „Nach neuen suchen“ haben alle den Stand.
+- **Betreuer** (`MAINTAINER=1` oder `DEV=true` in `.env`, dann Server neu starten; die Importkarten liegen unter Verwaltung → **Stationsdatenbank & Import**): sieht zusätzlich die Importkarten und unter der Stationsdatenbank „Stationsliste einpflegen“ für die eingeschickten CSV-Dateien (DOK, Name und „zuletzt gesehen“ werden übernommen, der neuere Stand gewinnt). Danach „Export im Repo-Format“ und die Datei als `contestlogger/seed/stationsdatenbank.csv` ins Repo einchecken – beim nächsten „Nach neuen suchen“ haben alle den Stand.
+
+  Ob der Modus wirkt, steht beim Start in der Konsole („Betreuer: an“). **Im Demo-Modus (`DEMO=1`) ist er immer aus** – die öffentliche Vorführ-Instanz soll keine Quellen-Importe anbieten; die Konsole meldet dann „Betreuer: AUS“, die Verwaltung zeigt einen Hinweis. Für die Pflege also eine eigene Installation ohne `DEMO=1` nehmen.
 
 ## Abgleich mit dem Repo
 

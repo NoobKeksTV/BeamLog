@@ -268,6 +268,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
             "mdbtools": True,  # MDB-Import rein in Python eingebaut
             "maintainer": is_maintainer(),
+            # MAINTAINER/DEV gesetzt, aber in der Demo-Instanz gesperrt – die Oberfläche sagt das statt still nichts zu zeigen
+            "maintainer_blocked": bool(DEMO) and any(env(k).strip().lower() in ("1", "true", "yes", "ja", "on") for k in ("MAINTAINER", "DEV")),
             "demo": demo.info() if DEMO else None,
         }
 

@@ -173,6 +173,7 @@
     S.info = await GET("/api/info");
     await loadLanguage();
     $("#version").textContent = "v" + S.info.version;
+    $("#maint-blocked")?.classList.toggle("hidden", !S.info.maintainer_blocked);
     $$(".maint-only").forEach((e) => e.classList.toggle("hidden", !S.info.maintainer)); $$(".maint-hide").forEach((e) => e.classList.toggle("hidden", !!S.info.maintainer));
     if (S.info.maintainer && S.adminToken) archPoll(true);  // läuft noch ein Archiv-Import (z. B. nach Neuladen der Seite)?
     // Fußzeile mit Lizenz und Link zum Quellcode (GNU AGPLv3, Abschnitt 13: Quellcode für Nutzer über das Netz)

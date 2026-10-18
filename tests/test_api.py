@@ -366,3 +366,10 @@ def test_assets_stamped_with_content_fingerprint(client):
     assert m and m.group(1) == f"{__version__}-{hashlib.sha256((STATIC / 'app.js').read_bytes()).hexdigest()[:10]}"
     assert re.search(r'"/static/style\.css\?v=' + re.escape(__version__) + r'-[0-9a-f]{10}"', html)
     assert client.get(f"/static/app.js?v={m.group(1)}").status_code == 200
+
+
+def test_maintainer_flag(tmp_path, monkeypatch):
+    monkeypatch.setenv("BEAMLOG_MAINTAINER", "1")
+    with TestClient(create_app(tmp_path / "m.db", backup_interval_min=0)) as c:
+        info = c.get("/api/info").json()
+        assert info["maintainer"] is True and info["maintainer_blocked"] is False

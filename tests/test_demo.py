@@ -24,6 +24,7 @@ def admin(c):
 def test_demo_sample_data_and_info(client):
     info = client.get("/api/info").json()
     assert info["demo"]["admin_password"] == "demo" and info["admin_configured"] and not info["maintainer"]
+    assert info["maintainer_blocked"]  # MAINTAINER=1 gesetzt, aber in der Demo gesperrt – die Oberfläche zeigt einen Hinweis
     contests = client.get("/api/contests").json()
     assert len(contests) == 1 and len(contests[0]["stations"]) == len(demo.STATIONS)
     counts = sorted(len(client.get(f"/api/stations/{s['id']}/qsos").json()) for s in contests[0]["stations"])
