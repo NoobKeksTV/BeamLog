@@ -11,6 +11,7 @@ import os
 import secrets
 import re
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -173,12 +174,87 @@ def verify_password(pw: str, stored: str) -> bool:
     return hmac.compare_digest(hash_password(pw, salt), stored)
 
 
+class _Rows:
+    """Ergebnis einer Abfrage, schon vollständig gelesen (unter der Sperre) – verhält sich wie ein sqlite3-Cursor."""
+    __slots__ = ("_rows", "lastrowid", "rowcount", "description")
+
+    def __init__(self, cur: sqlite3.Cursor):
+        self._rows = cur.fetchall() if cur.description else []
+        self.lastrowid, self.rowcount, self.description = cur.lastrowid, cur.rowcount, cur.description
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+    def fetchall(self) -> list:
+        return list(self._rows)
+
+    def __iter__(self):
+        return iter(self._rows)
+
+
+class SafeConnection:
+    """Eine SQLite-Verbindung für alle Threads – Zugriffe laufen nacheinander. Ohne die Sperre kollidieren gleichzeitige
+    Anfragen (Web-Server-Threads und Hintergrundaufgaben) in derselben Verbindung: „sqlite3.InterfaceError: bad parameter
+    or other API misuse“. „with conn:“ hält die Sperre für die ganze Transaktion."""
+
+    def __init__(self, conn: sqlite3.Connection):
+        self._c = conn
+        self._lock = threading.RLock()
+
+    def execute(self, sql: str, params: Iterable[Any] = ()) -> _Rows:
+        with self._lock:
+            return _Rows(self._c.execute(sql, tuple(params)))
+
+    def executemany(self, sql: str, seq: Iterable[Iterable[Any]]) -> _Rows:
+        with self._lock:
+            return _Rows(self._c.executemany(sql, seq))
+
+    def executescript(self, script: str) -> None:
+        with self._lock:
+            self._c.executescript(script)
+
+    def commit(self) -> None:
+        with self._lock:
+            self._c.commit()
+
+    def rollback(self) -> None:
+        with self._lock:
+            self._c.rollback()
+
+    def backup(self, target: sqlite3.Connection, **kw: Any) -> None:
+        with self._lock:
+            self._c.backup(target, **kw)
+
+    def close(self) -> None:
+        with self._lock:
+            self._c.close()
+
+    def __enter__(self) -> "SafeConnection":
+        self._lock.acquire()
+        try:
+            self._c.__enter__()
+        except BaseException:
+            self._lock.release()
+            raise
+        return self
+
+    def __exit__(self, *exc: Any) -> bool:
+        try:
+            return bool(self._c.__exit__(*exc))
+        finally:
+            self._lock.release()
+
+    def __getattr__(self, name: str) -> Any:  # total_changes, in_transaction …
+        return getattr(self._c, name)
+
+
 class Database:
     def __init__(self, path: str | os.PathLike):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(self.path, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
+        raw = sqlite3.connect(self.path, check_same_thread=False)
+        raw.row_factory = sqlite3.Row
+        self.conn = SafeConnection(raw)
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")
         # FULL: jede Transaktion ist beim Rückgabezeitpunkt auf der Platte – ein Stromausfall

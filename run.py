@@ -242,6 +242,17 @@ def main() -> None:
         os.environ["BEAMLOG_NO_BROWSER"] = "1"
     if cfg_path:
         print(f"  Konfiguration: {cfg_path}")
+        # Dienst mit festem --config (z. B. /opt/beamlog/.env oder /etc/beamlog/beamlog.env aus 1.0.0): eine andere .env im
+        # Programm-/Startordner wird dann nicht gelesen – das sagen, statt Einstellungen still zu übergehen
+        for d in config_dirs():
+            other = d / CONFIG_NAME
+            try:
+                if other.is_file() and other.resolve() != cfg_path.resolve():
+                    print(f"  Hinweis:  {other} wird NICHT gelesen – es gilt {cfg_path}"
+                          + (" (vorgegeben mit --config, z. B. in der Dienst-Unit)" if pre_a.config or env("CONFIG") else "")
+                          + ". Einstellungen dort eintragen oder --config anpassen.")
+            except OSError:
+                pass
     elif not pre_a.config:
         print(f"  Konfiguration: keine {CONFIG_NAME} gefunden (gesucht in {', '.join(str(d) for d in config_dirs())}) – es gelten die Standardwerte;"
               f" Vorlage: {CONFIG_NAME}.example nach {CONFIG_NAME} kopieren")

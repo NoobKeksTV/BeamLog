@@ -94,3 +94,29 @@ def test_backups_old_and_new_names(tmp_path):
         (b / f"beamlog-20261002-{i:06d}-manual.db").write_text("x")
     db.prune_backups()
     assert len(db.list_backups()) == 50 and not (b / "contestlogger-20261001-120000-manual.db").exists()
+
+
+def test_database_survives_concurrent_requests(tmp_path):
+    """Viele gleichzeitige Zugriffe (wie Web-Server-Threads beim Speichern + Admin-Prüfung) auf die eine Verbindung:
+    ohne Sperre gab es „sqlite3.InterfaceError: bad parameter or other API misuse“."""
+    import threading
+    from contestlogger.db import Database
+    db = Database(tmp_path / "c.db")
+    errors: list[BaseException] = []
+
+    def worker(n: int) -> None:
+        try:
+            for i in range(300):
+                db.sign(f"tok{n}-{i}")
+                db.set_setting(f"k{n}", str(i))
+                assert db.get_setting(f"k{n}") == str(i)
+                db.rows("SELECT key, value FROM settings")
+        except BaseException as e:  # noqa: BLE001 – im Haupt-Thread prüfen
+            errors.append(e)
+
+    threads = [threading.Thread(target=worker, args=(n,)) for n in range(8)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert not errors, errors[:3]
