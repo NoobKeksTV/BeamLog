@@ -258,6 +258,9 @@ def main() -> None:
     if any(cfg.get(k, "").strip().lower() in on for k in ("MAINTAINER", "DEV")):
         print("  Betreuer:  AUS – MAINTAINER/DEV wird im Demo-Modus (DEMO=1) ignoriert" if demo_on else
               "  Betreuer:  an – Quellen-Importe und Ergebnislisten-Archiv unter Verwaltung → Stationsdatenbank & Import")
+    elif any(k in cfg for k in ("MAINTAINER", "DEV")):  # steht drin, aber nicht eingeschaltet (z. B. MAINTAINER=0 aus der Vorlage)
+        vals = ", ".join(f"{k}={cfg[k]}" for k in ("MAINTAINER", "DEV") if k in cfg)
+        print(f"  Betreuer:  aus ({vals}) – zum Einschalten MAINTAINER=1 eintragen und neu starten")
     print(f"  Daten:    {a.db}  " + ("(DEMO-MODUS: keine Backups, täglich zurückgesetzt)\n" if demo_on else f"(Backups alle {a.backup_min:g} min in backup/)\n"))
     if getattr(sys, "frozen", False) and os.name == "nt" and env("NO_BROWSER") != "1":
         import threading
