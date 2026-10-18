@@ -48,6 +48,12 @@ Statt jedes Mal Optionen anzugeben, `.env.example` nach `.env` kopieren (neben d
 Unter Windows im Explorer als `.env.` eingeben (der Punkt am Ende verschwindet) oder in der Eingabeaufforderung
 `copy .env.example .env`; unter macOS/Linux sind Dateien mit Punkt vorne versteckt (`ls -a`, im Finder `⌘⇧.`).
 
+Welche Datei gelesen wird, steht beim Start in der ersten Zeile („Konfiguration: …“); fehlt sie, sagt BeamLog
+„keine .env gefunden“ und nennt die durchsuchten Ordner. Gesucht wird neben dem Programm (portable Version) bzw. im
+aktuellen Ordner und im Programmordner (Quellcode, auch bei `python BeamLog/run.py` aus einem anderen Ordner); auf
+einem Server zuletzt in `/etc/beamlog/.env`. Hat der Windows-Editor die Datei als `.env.txt` gespeichert, benennt
+BeamLog sie beim Start selbst in `.env` um. Nach Änderungen BeamLog neu starten.
+
 > Bis Version 1.0.0 hieß die Datei `beamlog.env`. Eine vorhandene `beamlog.env` benennt BeamLog beim Start
 > automatisch in `.env` um. Auf dem Server holt `sudo ./beamlogctl update` außerdem alles in einen Ordner: `/etc/beamlog/beamlog.env`
 > → `/opt/beamlog/.env`, Daten aus `/var/lib/beamlog` → `/opt/beamlog/data`.

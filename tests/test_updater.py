@@ -181,3 +181,21 @@ def test_prepare_data_follows_moved_server_data(tmp_path, monkeypatch):
     monkeypatch.setattr(run, "portable_base", lambda: tmp_path)
     monkeypatch.setattr(run, "LEGACY_DATA_DIRS", (str(tmp_path / "varlib"),))
     assert run.prepare_data(str(tmp_path / "varlib" / "beamlog.db")) == str(tmp_path / "data" / "beamlog.db")
+
+
+def test_dotenv_found_next_to_program_and_txt_trap(tmp_path, monkeypatch):
+    """Quellcode aus einem anderen Ordner gestartet: die .env neben run.py wird trotzdem gefunden; eine vom Windows-Editor
+    als .env.txt gespeicherte Datei wird in .env umbenannt."""
+    import run
+    prog, elsewhere = tmp_path / "BeamLog", tmp_path / "anderswo"
+    prog.mkdir(); elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere); monkeypatch.delenv("BEAMLOG_CONFIG", raising=False); monkeypatch.delenv("CONTESTLOGGER_CONFIG", raising=False)
+    monkeypatch.setattr(run, "__file__", str(prog / "run.py"))
+    assert run.config_dirs() == [elsewhere, prog]
+    (prog / ".env.txt").write_text("MAINTAINER=1")
+    for d in run.config_dirs():
+        run.adopt_legacy_names(d)
+    assert (prog / ".env").read_text() == "MAINTAINER=1" and not (prog / ".env.txt").exists()
+    assert run.find_config(None) == prog / ".env"
+    (elsewhere / ".env").write_text("PORT=1")  # im aktuellen Ordner geht vor
+    assert run.find_config(None) == elsewhere / ".env"

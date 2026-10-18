@@ -75,6 +75,17 @@ def portable_base() -> Path:
     return Path.cwd()
 
 
+def config_dirs() -> list[Path]:
+    """Wo die .env gesucht wird: neben dem Programm (portabel) bzw. im aktuellen Ordner – beim Quellcode zusätzlich im
+    Programmordner, damit auch „python BeamLog/run.py“ aus einem anderen Ordner die .env daneben findet."""
+    dirs = [portable_base()]
+    if not getattr(sys, "frozen", False):
+        here = Path(__file__).resolve().parent
+        if here != dirs[0].resolve():
+            dirs.append(here)
+    return dirs
+
+
 def migrate_from_contestlogger(base: Path) -> None:
     """Umstieg von 0.9.x (hieß „ContestLogger“): liegt der neue BeamLog-Ordner neben dem alten Ordner ContestLogger
     (oder darin) und hat noch keine eigenen Daten, werden data/ und die Einstellungsdatei einmalig hinüberkopiert."""
@@ -96,6 +107,10 @@ def adopt_legacy_names(base: Path) -> None:
     """Alte Dateinamen umstellen: Einstellungen beamlog.env (bis 1.0.0) bzw. contestlogger.env (bis 0.9) -> .env,
     data/contestlogger.db -> data/beamlog.db (samt -wal/-shm). Nur wenn es die neue Datei noch nicht gibt; schlägt das
     Umbenennen fehl, bleibt alles wie es war."""
+    # Windows-Falle: der Editor speichert „.env“ gern als „.env.txt“ (Dateiendung ausgeblendet)
+    if (base / f"{CONFIG_NAME}.txt").is_file() and not (base / CONFIG_NAME).exists():
+        os.replace(base / f"{CONFIG_NAME}.txt", base / CONFIG_NAME)
+        print(f"  Einstellungen umbenannt: {CONFIG_NAME}.txt -> {CONFIG_NAME} (der Editor hatte .txt angehängt)")
     for name in LEGACY_CONFIG_NAMES:
         if (base / name).is_file() and not (base / CONFIG_NAME).exists():
             os.replace(base / name, base / CONFIG_NAME)
@@ -181,14 +196,13 @@ def find_config(explicit: str | None) -> Path | None:
     """Reihenfolge: --config, BEAMLOG_CONFIG, .env neben dem Programm, /etc/beamlog/.env – dazu die alten Namen
     beamlog.env (bis 1.0.0) und contestlogger.env (bis 0.9). Zeigt --config auf eine alte, inzwischen umbenannte Datei
     (z. B. eine eigene Dienst-Unit mit …/beamlog.env), wird die .env daneben genommen."""
-    base = portable_base()
     given = [c for c in (explicit, env("CONFIG")) if c]
     for c in given:
         if Path(c).exists():
             return Path(c)
         if Path(c).name in LEGACY_CONFIG_NAMES and (Path(c).parent / CONFIG_NAME).exists():
             return Path(c).parent / CONFIG_NAME
-    cands = [base / n for n in (CONFIG_NAME, *LEGACY_CONFIG_NAMES)]
+    cands = [d / n for d in config_dirs() for n in (CONFIG_NAME, *LEGACY_CONFIG_NAMES)]
     cands += [Path("/etc/beamlog") / CONFIG_NAME, Path("/etc/beamlog/beamlog.env"), Path("/etc/contestlogger/contestlogger.env")]
     for c in cands:
         if c.is_file():
@@ -203,7 +217,8 @@ def main() -> None:
     try:
         if getattr(sys, "frozen", False):
             migrate_from_contestlogger(portable_base())
-        adopt_legacy_names(portable_base())
+        for d in config_dirs():
+            adopt_legacy_names(d)
     except OSError as e:
         print(f"  Übernahme der alten Daten fehlgeschlagen: {e}")
     cfg_path = find_config(pre_a.config)
@@ -227,6 +242,9 @@ def main() -> None:
         os.environ["BEAMLOG_NO_BROWSER"] = "1"
     if cfg_path:
         print(f"  Konfiguration: {cfg_path}")
+    elif not pre_a.config:
+        print(f"  Konfiguration: keine {CONFIG_NAME} gefunden (gesucht in {', '.join(str(d) for d in config_dirs())}) – es gelten die Standardwerte;"
+              f" Vorlage: {CONFIG_NAME}.example nach {CONFIG_NAME} kopieren")
     url = a.public_url or (f"http://{lan_ip()}/" if a.host in ("127.0.0.1", "localhost") else f"http://{lan_ip()}:{a.port}/")
     if pre_a.config and not Path(pre_a.config).exists() and cfg_path is None:
         print(f"  Hinweis: Konfiguration {pre_a.config} nicht gefunden – es gelten die Standardwerte.")
