@@ -110,7 +110,7 @@ sudo ./beamlogctl update          # git pull, einspielen, neu starten
 
 | Datei | Zweck |
 |---|---|
-| `beamlog.service` | systemd-Dienst, läuft als Benutzer `beamlog`, liest `/opt/beamlog/.env` (Standard: nur 127.0.0.1:8000) |
+| `beamlog.service` | systemd-Dienst für `/opt/beamlog`, läuft als Benutzer `beamlog`, liest die `.env` daneben (Standard: nur 127.0.0.1:8000); anderer Ordner: siehe unten |
 | `portable/` | Dateien für die portable Version (Binary statt venv) inkl. `.env`-Vorlage und Port-80-Unit |
 | `nginx-beamlog.conf` | nginx-Site auf Port 80, Reverse-Proxy inkl. WebSocket, statische Dateien direkt |
 | `nginx-beamlog-ssl.conf` | optionale HTTPS-Variante mit selbstsigniertem Zertifikat |
@@ -118,6 +118,31 @@ sudo ./beamlogctl update          # git pull, einspielen, neu starten
 | `backup.sh` | Konsistentes SQLite-Backup (Cron) |
 
 Pfade: Code `/opt/beamlog`, Datenbank `/opt/beamlog/data/beamlog.db`.
+
+## Dienst in einem eigenen Ordner statt /opt/beamlog
+
+Die mitgelieferte Unit `deploy/beamlog.service` ist auf `/opt/beamlog` eingestellt. BeamLog liest seine Einstellungen
+aus der `.env` **neben dem Programm** (im Arbeitsordner des Dienstes) und schreibt die Datenbank nach `data/` daneben –
+ein `--config`-Pfad ist nicht nötig. Liegt BeamLog woanders, z. B. `/srv/beamlog`:
+
+- **Einfach:** im Ordner `sudo ./beamlogctl install --here` – das schreibt die Unit mit diesem Ordner und dem Besitzer
+  des Ordners als Benutzer.
+- **Von Hand:** in `/etc/systemd/system/beamlog.service` den Ordner an **allen** Stellen ändern –
+  `WorkingDirectory=`, `ExecStart=` und `ReadWritePaths=` (bei einem Ordner unter `/home` zusätzlich `ProtectHome=false`
+  und `User=`/`Group=` auf den Besitzer des Ordners); danach `sudo systemctl daemon-reload && sudo systemctl restart beamlog`.
+
+```ini
+WorkingDirectory=/srv/beamlog
+ExecStart=/srv/beamlog/BeamLog                  # Quellcode: /srv/beamlog/.venv/bin/python run.py
+ReadWritePaths=/srv/beamlog
+```
+
+Ältere Units (bis 1.0.1) hatten `--config /etc/beamlog/beamlog.env` bzw. `--config /opt/beamlog/.env` im `ExecStart` –
+dann gilt diese Datei und eine `.env` daneben wird **nicht** gelesen (die Startzeile „Konfiguration: …“ und ein Hinweis
+zeigen das). Im Programmordner `sudo ./beamlogctl update` (läuft der Dienst schon aus diesem Ordner, bleibt er dort)
+bzw. `sudo ./beamlogctl install --here` schreibt die Unit ohne `--config` neu und zieht eine Einrichtung mit
+`/etc/beamlog` und `/var/lib/beamlog` in den Ordner um: Daten werden kopiert (das Original bleibt liegen), fehlende
+Einstellungen in die vorhandene `.env` ergänzt, die alte Datei bleibt als `beamlog.env.migriert` liegen.
 
 ## Nützliche Befehle
 

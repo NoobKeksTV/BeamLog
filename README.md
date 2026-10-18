@@ -83,7 +83,10 @@ sudo ./beamlogctl update           # neuen Stand einspielen und neu starten
 Ohne Rückfragen mit Optionen, auch kombiniert: `--no-service`, `--no-nginx` (eigener Reverse-Proxy oder `PORT=80` direkt),
 `--no-backup`, `--here` (im Ordner bleiben), `--url http://contest.local/`, `--deps-only` (nur Python & Co.) und `-y`
 (nichts fragen), z. B. `sudo ./beamlogctl install --no-nginx -y`. Die Wahl wird für Updates gemerkt. Mit Dienst steuert
-`beamlogctl` den Dienst `beamlog`, ohne Dienst läuft BeamLog im Hintergrund aus dem Ordner. Anleitung im
+`beamlogctl` den Dienst `beamlog`, ohne Dienst läuft BeamLog im Hintergrund aus dem Ordner. Einstellungen (`.env`) und
+Datenbank (`data/`) liegen immer neben dem Programm. **Dienst von Hand in einem anderen Ordner als `/opt/beamlog`?** Dann in
+`deploy/beamlog.service` `WorkingDirectory`, `ExecStart` und `ReadWritePaths` auf den eigenen Ordner ändern – oder im Ordner
+`sudo ./beamlogctl install --here` nehmen, das schreibt die Unit passend. Anleitung im
 [Wiki › Server-Deploy](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy) (dort auch die [öffentliche Demo-Instanz](https://github.com/NoobKeksTV/BeamLog/wiki/Deploy#öffentliche-demo-instanz) mit `DEMO=1`).
 
 Aus dem Quellcode (Python 3.11+): `./start.sh` (Linux/macOS/Raspberry Pi) bzw. `start.bat` (Windows) – legt beim ersten Mal die virtuelle Umgebung `.venv` an, installiert die Pakete und hält sie nach `git pull` aktuell. Danach startet auch `python run.py` (nimmt `.venv` automatisch).

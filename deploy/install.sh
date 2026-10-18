@@ -59,6 +59,12 @@ done
 # Ort: /opt/beamlog (Standard) oder dieser Ordner (--here, wird im Ordner gemerkt)
 HERE=0
 if [ -f "$SRC_DIR/.install.options" ] && grep -qx 'HERE=1' "$SRC_DIR/.install.options"; then HERE=1; fi
+# Läuft der Dienst schon aus genau diesem Ordner (eigene Unit, ältere Einrichtung), bleibt er hier – nicht still nach /opt kopieren
+if [ -z "$CLI_HERE" ] && [ "$HERE" = 0 ] && [ ! -f "$SRC_DIR/.install.options" ] && [ -f /etc/systemd/system/beamlog.service ] \
+   && [ "$(sed -n 's/^WorkingDirectory=//p' /etc/systemd/system/beamlog.service | head -n 1)" = "$SRC_DIR" ] && [ "$SRC_DIR" != /opt/beamlog ]; then
+  HERE=1
+  echo "== Der Dienst beamlog läuft bereits aus $SRC_DIR – BeamLog bleibt in diesem Ordner (wie --here; nach /opt kopieren: --system)"
+fi
 [ -n "$CLI_HERE" ] && HERE=$CLI_HERE
 # Ohne Dienst gibt es keinen Grund zu kopieren: dann bleibt BeamLog automatisch in diesem Ordner (außer mit --system)
 AUTO_HERE=0
@@ -130,7 +136,7 @@ ensure_template() {
     service)
       printf '%s\n' "[Unit]" "Description=BeamLog – Amateurfunk-Contest-Logger" "After=network.target" "" "[Service]" "Type=simple" \
         "User=beamlog" "Group=beamlog" "WorkingDirectory=/opt/beamlog" "Environment=PYTHONUNBUFFERED=1" \
-        "ExecStart=/opt/beamlog/.venv/bin/python run.py --config /opt/beamlog/.env" "Restart=always" "RestartSec=3" \
+        "ExecStart=/opt/beamlog/.venv/bin/python run.py" "Restart=always" "RestartSec=3" \
         "AmbientCapabilities=CAP_NET_BIND_SERVICE" "CapabilityBoundingSet=CAP_NET_BIND_SERVICE" "NoNewPrivileges=true" \
         "PrivateTmp=true" "ProtectSystem=strict" "ProtectHome=true" "ReadWritePaths=/opt/beamlog" "" "[Install]" \
         "WantedBy=multi-user.target" > "$f" ;;
@@ -212,6 +218,21 @@ migrate_to_app_dir() {
     if [ -f "$f" ] && [ ! -f "$CONF" ]; then
       mv "$f" "$CONF"
       echo "== Umzug: Einstellungen $f -> $CONF"
+    elif [ -f "$f" ]; then
+      # Es gibt schon eine .env im Zielordner: fehlende Einstellungen aus der alten Datei ergänzen, die alte Datei bleibt
+      # als <name>.migriert liegen (sonst würde eine alte Unit mit --config … sie weiter lesen)
+      local line key merged=0
+      while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in "" | \#*) continue ;; esac
+        key=$(printf '%s' "${line%%=*}" | tr -d '[:space:]')
+        [ -n "$key" ] && [ "$key" != "$line" ] || continue
+        if ! grep -qE "^[[:space:]]*${key}[[:space:]]*=" "$CONF"; then
+          [ "$merged" = 1 ] || printf '\n# übernommen aus %s\n' "$f" >> "$CONF"
+          printf '%s\n' "$line" >> "$CONF"; merged=1
+        fi
+      done < "$f"
+      mv "$f" "$f.migriert"
+      echo "== Umzug: Einstellungen aus $f in $CONF ergänzt$( [ "$merged" = 1 ] || echo " (nichts zu ergänzen)") – alte Datei: $f.migriert"
     fi
   done
   if [ -f "$LEGACY_ETC/install.options" ]; then
@@ -222,6 +243,7 @@ migrate_to_app_dir() {
   if [ -f "$LEGACY_DATA/beamlog.db" ] && [ ! -f "$DATA_DIR/beamlog.db" ]; then
     systemctl stop beamlog >/dev/null 2>&1 || true   # konsistente Kopie: Dienst kurz anhalten (startet unten neu)
     cp -a "$LEGACY_DATA/." "$DATA_DIR/"
+    [ "$HERE" = 1 ] && chown -R "$RUN_USER:$RUN_GROUP" "$DATA_DIR"   # im Ordner gehört alles dem Besitzer des Ordners
     MOVED_DATA=1
     echo "== Umzug: Daten $LEGACY_DATA -> $DATA_DIR (das Original bleibt als Sicherung liegen)"
   fi
@@ -235,6 +257,12 @@ migrate_to_app_dir() {
 if [ "$HERE" = 0 ]; then
   migrate_from_contestlogger
   id beamlog >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin beamlog
+  migrate_to_app_dir
+elif [ -f /etc/systemd/system/beamlog.service ] && grep -qE "$LEGACY_ETC|$LEGACY_DATA|WorkingDirectory=$APP_DIR\$" /etc/systemd/system/beamlog.service; then
+  # Im Ordner (--here bzw. ohne Dienst): löst diese Installation den Dienst einer älteren Einrichtung ab (Unit mit
+  # /etc/beamlog bzw. /var/lib/beamlog oder aus diesem Ordner), ziehen Daten und Einstellungen hierher um. Ein zweites
+  # BeamLog daneben (z. B. eine Demo) bleibt unberührt.
+  echo "== Ältere Einrichtung des Dienstes gefunden – Daten und Einstellungen ziehen nach $APP_DIR um"
   migrate_to_app_dir
 fi
 
@@ -358,7 +386,7 @@ else
   if [ -e /etc/systemd/system/beamlog.service ]; then
     systemctl disable --now beamlog >/dev/null 2>&1 || true
     rm -f /etc/systemd/system/beamlog.service
-    systemctl daemon-reload
+    systemctl daemon-reload >/dev/null 2>&1 || true
     echo "   früheren Dienst „beamlog“ angehalten und entfernt"
   fi
 fi
@@ -376,7 +404,7 @@ else
 fi
 
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-START_CMD="sudo -u beamlog sh -c 'cd $APP_DIR && .venv/bin/python run.py --config $CONF'"
+START_CMD="sudo -u beamlog sh -c 'cd $APP_DIR && .venv/bin/python run.py'"
 [ "$HERE" = 1 ] && START_CMD="cd $APP_DIR && ./start.sh"
 CTL=""; [ -f "$APP_DIR/beamlogctl" ] && CTL="$APP_DIR/beamlogctl"   # ein Befehl für start/stop/status/log/update
 [ "$HERE" = 1 ] && [ -n "$CTL" ] && START_CMD="$CTL start"

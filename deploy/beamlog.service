@@ -10,9 +10,12 @@ User=beamlog
 Group=beamlog
 WorkingDirectory=/opt/beamlog
 Environment=PYTHONUNBUFFERED=1
-# Alle Einstellungen (Host, Port, Datenbank, Backup-Takt, öffentliche Adresse …) stehen in
-# /opt/beamlog/.env – nach Änderungen:  sudo systemctl restart beamlog
-ExecStart=/opt/beamlog/.venv/bin/python run.py --config /opt/beamlog/.env
+# Alle Einstellungen (Host, Port, Datenbank, Backup-Takt, öffentliche Adresse …) stehen in der .env neben dem Programm
+# (hier /opt/beamlog/.env) – BeamLog findet sie selbst, kein --config nötig. Nach Änderungen:  sudo systemctl restart beamlog
+# Liegt BeamLog nicht in /opt/beamlog, in WorkingDirectory, ExecStart und ReadWritePaths den eigenen Ordner eintragen
+# (bei einem Ordner unter /home zusätzlich ProtectHome=false und User/Group = Besitzer des Ordners) –
+# oder einfach im Ordner „sudo ./beamlogctl install --here“, das schreibt die Unit passend.
+ExecStart=/opt/beamlog/.venv/bin/python run.py
 Restart=always
 RestartSec=3
 
