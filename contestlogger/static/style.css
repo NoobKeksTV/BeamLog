@@ -420,7 +420,9 @@ kbd { display: inline-block; padding: 1px 6px; margin-right: 3px; border: 1px so
 .plane-legend i.line { width: 14px; height: 2px; background: #ff6b6b; }
 .plane-legend i.bar { width: 14px; height: 4px; background: #3ddc84; opacity: .8; }
 .plane-legend i.dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid rgba(0,0,0,.5); }
-.admin-grid > .card.wide-card { column-span: all; }
+/* über beide Spalten; eigener Abstand nach oben – der untere Rand der letzten Karte einer Spalte entfällt im Spaltenlayout */
+.admin-grid > .card.wide-card { column-span: all; margin-top: 12px; }
+@media (max-width: 1100px) { .admin-grid > .card.wide-card { margin-top: 0; } }  /* eine Spalte: normaler Abstand */
 .arch-tree { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin: 8px 0; }
 .arch-src-box { padding: 4px 0; border-bottom: 1px solid var(--line); } .arch-src-box:last-child { border-bottom: 0; }
 .arch-src-box > summary { cursor: pointer; padding: 3px 0; }
