@@ -3,7 +3,18 @@ name: Portable Builds
 on:
   push:
     tags: ["v*"]
+  # Von Hand: Release (Standard) oder Pre-Release = Testversion, z. B. aus development; wahlweise nur Linux
   workflow_dispatch:
+    inputs:
+      prerelease:
+        description: "Pre-Release (Testversion, Tag v<version>-pre.<lauf>) statt Release"
+        type: boolean
+        default: false
+      platforms:
+        description: "Plattformen"
+        type: choice
+        options: [alle, linux]
+        default: alle
 
 permissions:
   contents: write
@@ -14,7 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         # Linux auf Ubuntu 22.04 (glibc 2.35): das Binary läuft damit auch auf Debian 12 und neuer
-        os: [windows-latest, ubuntu-22.04, macos-latest]
+        os: ${{ fromJSON(inputs.platforms == 'linux' && '["ubuntu-22.04"]' || '["windows-latest", "ubuntu-22.04", "macos-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -28,15 +39,29 @@ jobs:
       - run: python build_tools/build.py   # erzeugt auch contestlogger/CHANGELOG.md aus der Git-Historie
       - id: ver
         shell: bash
-        run: echo "version=$(python -c 'import contestlogger;print(contestlogger.__version__)')" >> "$GITHUB_OUTPUT"
+        run: |
+          v=$(python -c 'import contestlogger;print(contestlogger.__version__)')
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.prerelease }}" = "true" ]; then
+            # Pre-Release: eigener Tag, damit kein echtes Release dieser Version belegt wird
+            echo "tag=v$v-pre.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+            echo "name=BeamLog $v – Testversion pre.${{ github.run_number }} (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7})" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v$v" >> "$GITHUB_OUTPUT"
+            echo "name=BeamLog $v" >> "$GITHUB_OUTPUT"
+          fi
       # Kein Artefakt-Upload: die ZIPs hängen am Release, Artefakte würden nur das Speicherkontingent füllen.
       - name: Release-Notes (Änderungen + Commit-Historie seit dem letzten Release)
         shell: bash
-        run: python build_tools/release_notes.py "v${{ steps.ver.outputs.version }}" > RELEASE_NOTES.md && cat RELEASE_NOTES.md
+        run: python build_tools/release_notes.py "${{ steps.ver.outputs.tag }}" > RELEASE_NOTES.md && cat RELEASE_NOTES.md
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
-          tag_name: v${{ steps.ver.outputs.version }}
-          name: BeamLog ${{ steps.ver.outputs.version }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}   # Tag auf genau den gebauten Stand (sonst Standard-Branch)
+          name: ${{ steps.ver.outputs.name }}
           body_path: RELEASE_NOTES.md
+          # Pre-Release: nicht „Latest“ – die Update-Prüfung im Programm (releases/latest) bietet es nicht an
+          prerelease: ${{ inputs.prerelease == true }}
+          make_latest: ${{ inputs.prerelease == true && 'false' || 'true' }}

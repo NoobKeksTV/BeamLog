@@ -39,9 +39,15 @@ def commits_between(a: str, b: str) -> list[tuple[str, str, list[str]]]:
     return out
 
 
+def release_tags() -> list[str]:
+    """Tags echter Releases, neueste zuerst – Pre-Releases (v1.0.2-pre.3) zählen nicht: Release-Notes und
+    Änderungsprotokoll reichen immer bis zum letzten echten Release."""
+    return [t for t in git("tag", "--list", "v*", "--sort=-v:refname").splitlines() if t and "-" not in t]
+
+
 def changelog(current_version: str = "") -> str:
     """Komplettes Änderungsprotokoll über alle Tags (neueste zuerst) – wird als contestlogger/CHANGELOG.md mitgeliefert."""
-    tags = [t for t in git("tag", "--list", "v*", "--sort=-v:refname").splitlines() if t]
+    tags = release_tags()
     out = ["# Änderungsprotokoll", ""]
     head_tag = f"v{current_version}" if current_version and f"v{current_version}" not in tags else ""
     seq = ([head_tag] if head_tag else []) + tags
@@ -68,7 +74,7 @@ def main() -> None:
         print(changelog(sys.argv[2] if len(sys.argv) > 2 else ""))
         return
     new_tag = sys.argv[1] if len(sys.argv) > 1 else ""
-    tags = [t for t in git("tag", "--list", "v*", "--sort=-v:refname").splitlines() if t and t != new_tag]
+    tags = [t for t in release_tags() if t != new_tag]
     prev = tags[0] if tags else ""
     rng = f"{prev}..HEAD" if prev else "HEAD"
     raw = git("log", rng, "--no-merges", "--format=%H%x1f%h%x1f%s%x1f%b%x1e")
@@ -85,6 +91,10 @@ def main() -> None:
         commits.append((short, subject.strip(), body_lines))
 
     out = []
+    if "-" in new_tag:  # Pre-Release: Testversion aus dem Entwicklungsstand
+        sha = git("rev-parse", "--short", "HEAD")
+        out += [f"> **Testversion (Pre-Release)** aus dem Entwicklungsstand (`development` @ `{sha}`) – zum Ausprobieren, "
+                "nicht für den Contest-Einsatz. Die Update-Prüfung im Programm bietet sie nicht an; Daten vorher sichern.", ""]
     # Optionaler Einleitungstext für besondere Releases (z. B. vollständige Funktionsliste zu 1.0): build_tools/release_intro/<tag>.md
     intro = Path(__file__).parent / "release_intro" / f"{new_tag}.md"
     if new_tag and intro.exists():
