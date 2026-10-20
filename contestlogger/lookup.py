@@ -6,6 +6,7 @@ vom Aufrufer in der Stationsdatenbank gecacht, damit jede Abfrage nur einmal nö
 from __future__ import annotations
 
 import re
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -44,6 +45,14 @@ class Lookup:
         self.user, self.password = user, password
         self._session: str = ""
         self._session_ts = 0.0
+        self._lock = threading.Lock()  # mehrere Abfragen gleichzeitig (Auffüllen) teilen sich eine Session
+        self.count = 0  # QRZ.com: Abfragen dieses Accounts in den letzten 24 h (meldet der Server bei jeder Antwort)
+
+    def _drop(self, sid: str) -> None:
+        """Abgelaufene Session vergessen – nur wenn nicht schon ein anderer Thread eine neue geholt hat."""
+        with self._lock:
+            if self._session == sid:
+                self._session = ""
 
     @property
     def enabled(self) -> bool:
@@ -51,6 +60,10 @@ class Lookup:
 
     # ------------------------------------------------------------ HamQTH
     def _hamqth_session(self) -> str:
+        with self._lock:
+            return self._hamqth_login()
+
+    def _hamqth_login(self) -> str:
         if self._session and time.time() - self._session_ts < 50 * 60:
             return self._session
         url = f"https://www.hamqth.com/xml.php?u={urllib.parse.quote(self.user)}&p={urllib.parse.quote(self.password)}"
@@ -67,7 +80,7 @@ class Lookup:
         err = _text(root, "error")
         if err:
             if "session" in err.lower() and retry:
-                self._session = ""
+                self._drop(sid)
                 return self._hamqth(call, retry=False)
             if _not_found(err):
                 return {}
@@ -77,6 +90,10 @@ class Lookup:
 
     # ------------------------------------------------------------ QRZ.com
     def _qrz_session(self) -> str:
+        with self._lock:
+            return self._qrz_login()
+
+    def _qrz_login(self) -> str:
         if self._session and time.time() - self._session_ts < 50 * 60:
             return self._session
         url = f"https://xmldata.qrz.com/xml/current/?username={urllib.parse.quote(self.user)}&password={urllib.parse.quote(self.password)}&agent=BeamLog"
@@ -90,10 +107,12 @@ class Lookup:
     def _qrz(self, call: str, retry: bool = True) -> dict:
         key = self._qrz_session()
         root = ET.fromstring(_get(f"https://xmldata.qrz.com/xml/current/?s={key}&callsign={urllib.parse.quote(call)}"))
+        if _text(root, "Count").isdigit():
+            self.count = int(_text(root, "Count"))
         err = _text(root, "Error")
         if err:
             if retry and ("session" in err.lower() or "invalid" in err.lower() and "key" in err.lower()):
-                self._session = ""
+                self._drop(key)
                 return self._qrz(call, retry=False)
             if _not_found(err):
                 return {}

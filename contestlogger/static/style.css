@@ -490,3 +490,9 @@ button.unlock-btn:hover { filter: brightness(1.08); }
 .fill-form label { display: inline-flex; flex-direction: row; align-items: center; gap: 5px; color: inherit; }
 .fill-form input[type=number] { font-size: 14px; padding: 4px 6px; }
 #fill-info { margin: 4px 0; }
+.fill-svc { width: 100%; }
+.fill-svc th { text-align: left; font-size: 12px; }
+.fill-svc input[type=number] { width: 68px; font-size: 14px; padding: 3px 6px; }
+.fill-svc tr.muted b { color: var(--muted); }
+.fill-svc .fs-state { min-width: 140px; white-space: normal; }
+.lookup-svc b { min-width: 70px; }

@@ -29,21 +29,39 @@ Regeln: Der neueste DOK gewinnt (ein Rufzeichen kann den OV wechseln). Der neues
 ## Aus HamQTH / QRZ.com auffüllen
 
 Die Karte „Aus HamQTH / QRZ.com auffüllen“ (Verwaltung → Stationsdatenbank & Import) fragt alle Stationen **ohne Locator**
-und alle **deutschen Stationen ohne DOK** nacheinander beim eingerichteten Dienst ab (Verwaltung → Einstellungen → Externe
-Rufzeichen-Abfrage). Übernommen wird nur, was noch fehlt: Locator, DOK (nur HamQTH liefert DOKs; QRZ.com nur Locator und Name)
-und Name. Vorhandene Angaben aus Logs und Ergebnislisten werden nie überschrieben.
+und alle **deutschen Stationen ohne DOK** online ab. Übernommen wird nur, was noch fehlt: Locator, DOK und Name. Vorhandene
+Angaben aus Logs und Ergebnislisten werden nie überschrieben. Die Zugangsdaten stehen unter Verwaltung → Einstellungen →
+Externe Rufzeichen-Abfrage – dort lassen sich **HamQTH und QRZ.com gleichzeitig** eintragen.
+
+So läuft es:
+
+- **Beide Dienste zugleich**, je Dienst mehrere Abfragen parallel (einstellbar 1–8).
+- **Deutsche Stationen gehen zuerst an HamQTH**, weil nur HamQTH DOKs kennt; ausländische Stationen nimmt, wer gerade frei ist.
+  Findet ein Dienst keinen Locator, fragt der andere nach. Stationen, denen nur der DOK fehlt, fragt QRZ.com nicht ab.
+- Die Antworten landen in einem **Puffer**; ein einzelner Schreiber übernimmt sie gesammelt (bis zu 200 je Transaktion) in die
+  Datenbank. Die Abfragen warten also nie auf die Datenbank, und die Oberfläche bleibt bedienbar.
+- Der Lauf findet **auf dem Server** statt – die Seite muss nicht offen bleiben. Ein Neustart des Servers bricht ihn ab; mit
+  „automatisch“ geht es danach von selbst weiter.
 
 | Einstellung | Standard | Bedeutung |
 |---|---|---|
-| Pause | 3 s | Wartezeit zwischen zwei Abfragen (1–60 s) – schont den Dienst; bei einem Fehler wird länger gewartet. |
-| Tageslimit | 1000 | Höchstens so viele Abfragen pro Tag (UTC); danach geht es am nächsten Tag weiter. |
+| nutzen | an | Dienst beim Auffüllen verwenden (nur wenn Zugangsdaten eingetragen sind). |
+| parallel | HamQTH 2, QRZ.com 4 | Abfragen gleichzeitig je Dienst (1–8). |
+| Pause | HamQTH 0,5 s, QRZ.com 0 s | Wartezeit je Abfrage-Strang nach jeder Abfrage. |
+| Tageslimit | 0 | Höchstens so viele Abfragen pro Tag (UTC) je Dienst; 0 = kein eigenes Limit. |
 | erneut nach | 180 Tagen | Eine schon abgefragte Station (auch ohne Treffer) kommt erst nach dieser Zeit wieder dran. |
-| automatisch | aus | Der Server startet das Auffüllen alle 30 Minuten selbst, solange es offene Stationen gibt und das Tageslimit nicht erreicht ist. |
+| automatisch | aus | Der Server startet das Auffüllen alle 30 Minuten selbst, solange es offene Stationen gibt. |
 
-Der Lauf findet **auf dem Server** statt – die Seite muss nicht offen bleiben, ein Neustart des Servers bricht ihn ab (mit
-„automatisch“ geht es danach von selbst weiter). Meldet der Dienst ein Limit, ein abgelaufenes Abo oder falsche Zugangsdaten,
-oder schlagen drei Abfragen nacheinander fehl, hört der Lauf auf. Fortschritt und Ergebnis („… gefunden – x Locator, y DOK,
-z Namen ergänzt“) stehen auf der Karte und im Aktionsprotokoll.
+Meldet ein Dienst ein Limit, ein abgelaufenes Abo, eine Sperre oder falsche Zugangsdaten, oder schlagen fünf Abfragen nacheinander
+fehl, hört **nur dieser Dienst** auf, der andere macht weiter. Bei einzelnen Fehlern wird kurz gewartet (2, 4, 8 … s). Die Karte
+zeigt je Dienst die Abfragen heute, die Antwortzeit und – bei QRZ.com – den Zähler, den QRZ selbst für die letzten 24 Stunden
+meldet; darunter Fortschritt, Abfragen je Minute, die geschätzte Restzeit und den Puffer.
+
+**Limits der Dienste:** HamQTH nennt für die XML-Abfrage kein Limit (nur ein Account ist nötig) – es ist aber ein kostenloser
+Dienst, deshalb die vorsichtigen Standardwerte. QRZ.com zählt die Abfragen je 24 Stunden und meldet bei Überschreitung
+„daily limit exceeded“, nennt die Grenze aber nicht; ohne XML-Abo liefert QRZ.com fast keine Daten. Wird ein Dienst zu stark
+belastet, kann er den Zugang sperren (QRZ.com: „Connection refused“ für mindestens 24 Stunden) – Parallelität also mit Augenmaß
+erhöhen.
 
 ## Export
 

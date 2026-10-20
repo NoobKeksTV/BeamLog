@@ -205,14 +205,26 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     def github_token() -> str:
         """Optionales GitHub-Token nur aus Umgebung/Config (BEAMLOG_GITHUB_TOKEN) – das Repo ist öffentlich, normalerweise leer."""
         return env("GITHUB_TOKEN")
-    lookup_state = {"client": None}
+    lookup_state: dict[str, lookup.Lookup] = {}
     lookup_cache: dict[str, float] = {}  # Call -> Zeitpunkt der letzten erfolglosen Abfrage
+    SERVICES = ("hamqth", "qrz")
+    # Zugangsdaten je Dienst (lookup_user_hamqth …); bis 1.0.2 gab es nur einen Satz für den gewählten Dienst
+    _old = db.get_setting("lookup_provider", "none") or "none"
+    if _old in SERVICES and db.get_setting("lookup_user", "") and not db.get_setting(f"lookup_user_{_old}", ""):
+        db.set_setting(f"lookup_user_{_old}", db.get_setting("lookup_user", ""))
+        db.set_setting(f"lookup_pass_{_old}", db.get_setting("lookup_pass", ""))
+
+    def service_client(provider: str) -> lookup.Lookup:
+        """Abfrage-Client eines Dienstes (HamQTH oder QRZ.com) mit dessen Zugangsdaten – bleibt samt Session erhalten."""
+        if provider not in SERVICES:
+            return lookup.Lookup("none", "", "")
+        if provider not in lookup_state:
+            lookup_state[provider] = lookup.Lookup(provider, db.get_setting(f"lookup_user_{provider}", "") or "", db.get_setting(f"lookup_pass_{provider}", "") or "")
+        return lookup_state[provider]
 
     def lookup_client() -> lookup.Lookup:
-        if lookup_state["client"] is None:
-            lookup_state["client"] = lookup.Lookup(db.get_setting("lookup_provider", "none") or "none",
-                                                   db.get_setting("lookup_user", "") or "", db.get_setting("lookup_pass", "") or "")
-        return lookup_state["client"]
+        """Dienst für das Nachschlagen beim Loggen und in der Log-Prüfung."""
+        return service_client(db.get_setting("lookup_provider", "none") or "none")
 
     # ------------------------------------------------------------ Auth-Helfer
     def is_admin(token: str | None) -> bool:
@@ -287,17 +299,28 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
 
     @app.post("/api/settings", dependencies=[Depends(require_admin)])
     def set_settings(body: dict):
-        for k in ("tile_url", "tile_cache", "lookup_provider", "lookup_user", "lookup_pass", "kst_macros", "repo_url", "adsb_source", "adsb_local_url", "adsb_corridor_km", "adsb_antenna_m", "update_check"):
+        prov = str(body.get("lookup_provider") or db.get_setting("lookup_provider", "none") or "none")
+        for k in ("lookup_user", "lookup_pass"):  # alte Form: Zugangsdaten des gewählten Dienstes
+            if k in body and prov in SERVICES:
+                body.setdefault(f"{k}_{prov}", body[k])
+        for p in SERVICES:
+            for k in (f"lookup_user_{p}", f"lookup_pass_{p}"):
+                if k in body:
+                    db.set_setting(k, str(body[k] or "").strip())
+        for k in ("tile_url", "tile_cache", "lookup_provider", "kst_macros", "repo_url", "adsb_source", "adsb_local_url", "adsb_corridor_km", "adsb_antenna_m", "update_check"):
             if k in body:
                 db.set_setting(k, json.dumps(body[k]) if k == "kst_macros" else str(body[k] or ""))
-        lookup_state["client"] = None
+        lookup_state.clear()
         lookup_cache.clear()
         return {"ok": True}
 
     @app.get("/api/settings", dependencies=[Depends(require_admin)])
     def get_settings():
         return {"tile_url": db.get_setting("tile_url", ""), "lookup_provider": db.get_setting("lookup_provider", "none") or "none",
-                "lookup_user": db.get_setting("lookup_user", ""), "lookup_pass_set": bool(db.get_setting("lookup_pass", "")),
+                **{f"lookup_user_{p}": db.get_setting(f"lookup_user_{p}", "") for p in SERVICES},
+                **{f"lookup_pass_{p}_set": bool(db.get_setting(f"lookup_pass_{p}", "")) for p in SERVICES},
+                "lookup_user": service_client(db.get_setting("lookup_provider", "none") or "none").user,
+                "lookup_pass_set": bool(service_client(db.get_setting("lookup_provider", "none") or "none").password),
                 "providers": lookup.PROVIDERS,
                 "kst_rooms": kst.ROOMS, "repo_url": db.get_setting("repo_url", "") or REPO_CALLBOOK_URL,
                 "adsb_source": db.get_setting("adsb_source", "adsb.fi") or "adsb.fi", "adsb_local_url": db.get_setting("adsb_local_url", "") or "",
@@ -351,9 +374,10 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return {"deleted": n}
 
     @app.post("/api/lookup/test", dependencies=[Depends(require_admin)])
-    async def lookup_test():
+    async def lookup_test(body: dict | None = None):
+        p = (body or {}).get("provider")
         try:
-            return {"ok": True, "msg": await asyncio.to_thread(lookup_client().test)}
+            return {"ok": True, "msg": await asyncio.to_thread((service_client(p) if p else lookup_client()).test)}
         except lookup.LookupError_ as e:
             return {"ok": False, "msg": str(e)}
 
@@ -692,98 +716,235 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         """Kennzahlen der Stationsdatenbank (gesamt und je Land) für die Verwaltung."""
         return await asyncio.to_thread(db.callbook_stats)
 
-    # ---- Stationsdatenbank aus HamQTH/QRZ.com auffüllen: alle Stationen ohne Locator bzw. (DL) ohne DOK nacheinander
-    # abfragen – im Hintergrund, mit Pause zwischen den Abfragen und Tageslimit, damit die Dienste nicht überlastet werden
-    FILL_DEFAULT = {"auto": False, "pause": 3.0, "daily": 1000, "redo_days": 180}
-    fill: dict[str, Any] = {"job": None, "task": None}
+    # ---- Stationsdatenbank aus HamQTH/QRZ.com auffüllen: alle Stationen ohne Locator bzw. (DL) ohne DOK abfragen – im
+    # Hintergrund, beide Dienste gleichzeitig mit je mehreren parallelen Abfragen. Die Antworten landen in einem Puffer,
+    # ein einzelner Schreiber übernimmt sie gesammelt (je bis zu 200 in einer Transaktion) in die Datenbank.
+    SVC_DEFAULT = {"hamqth": {"on": True, "par": 2, "pause": 0.5, "daily": 0}, "qrz": {"on": True, "par": 4, "pause": 0.0, "daily": 0}}
+    FILL_DEFAULT = {"auto": False, "redo_days": 180}
+    FILL_PAR_MAX = 8
+    fill: dict[str, Any] = {"job": None, "task": None, "open": 0}
 
     def fill_cfg() -> dict:
         try:
-            cfg = {**FILL_DEFAULT, **json.loads(db.get_setting("cb_fill", "") or "{}")}
+            raw = json.loads(db.get_setting("cb_fill", "") or "{}")
         except ValueError:
-            cfg = dict(FILL_DEFAULT)
-        cfg["pause"] = min(max(float(cfg["pause"]), 1.0), 60.0)
-        cfg["daily"] = min(max(int(cfg["daily"]), 1), 100000)
+            raw = {}
+        cfg = {**FILL_DEFAULT, **{k: raw[k] for k in FILL_DEFAULT if k in raw}}
+        cfg["auto"] = bool(cfg["auto"])
         cfg["redo_days"] = min(max(int(cfg["redo_days"]), 1), 3650)
+        for p in SERVICES:
+            c = {**SVC_DEFAULT[p], **(raw.get(p) if isinstance(raw.get(p), dict) else {})}
+            cfg[p] = {"on": bool(c["on"]), "par": min(max(int(c["par"]), 1), FILL_PAR_MAX),
+                      "pause": min(max(float(c["pause"]), 0.0), 60.0), "daily": min(max(int(c["daily"]), 0), 10_000_000)}
         return cfg
 
-    def fill_used_today() -> int:
+    def fill_used() -> dict[str, int]:
+        """Abfragen heute (UTC) je Dienst."""
         try:
             u = json.loads(db.get_setting("cb_fill_used", "") or "{}")
         except ValueError:
             u = {}
-        return int(u.get("n", 0)) if u.get("day") == utcnow_iso()[:10] else 0
+        return {p: int(u.get(p, 0)) for p in SERVICES} if u.get("day") == utcnow_iso()[:10] else {p: 0 for p in SERVICES}
 
-    def fill_count_one() -> int:
-        n = fill_used_today() + 1
-        db.set_setting("cb_fill_used", json.dumps({"day": utcnow_iso()[:10], "n": n}))
-        return n
+    def fill_save_used(used: dict[str, int]) -> None:
+        db.set_setting("cb_fill_used", json.dumps({"day": utcnow_iso()[:10], **used}))
 
-    def fill_candidates(cfg: dict) -> list[str]:
+    def fill_services(cfg: dict) -> list[str]:
+        """Eingerichtete und eingeschaltete Dienste, deren Tageslimit noch nicht erreicht ist."""
+        used = fill_used()
+        return [p for p in SERVICES if cfg[p]["on"] and service_client(p).enabled and not (cfg[p]["daily"] and used[p] >= cfg[p]["daily"])]
+
+    def fill_candidates(cfg: dict, services: list[str]) -> list[tuple[str, bool, bool]]:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=cfg["redo_days"])).strftime("%Y-%m-%dT%H:%M:%SZ")
-        return db.callbook_fill_candidates(cutoff)
+        cands = db.callbook_fill_candidates(cutoff)
+        if "hamqth" not in services:  # nur QRZ.com: liefert keinen DOK – Stationen, denen nur der DOK fehlt, bringen nichts
+            cands = [c for c in cands if c[1]]
+        return cands
 
     def fill_public(job: dict | None) -> dict:
-        return {k: v for k, v in job.items() if k != "cancel"} if job else {"running": False}
+        if not job:
+            return {"running": False}
+        out = {k: v for k, v in job.items() if k != "cancel" and not k.startswith("_")}
+        el = max(1.0, (datetime.now(timezone.utc).timestamp() if job["running"] else job.get("_t1", 0)) - job["_t0"])
+        out["rate"] = round(60 * job["done"] / el, 1)  # Abfragen je Minute
+        out["eta_min"] = round((job["total"] - job["done"]) / max(job["done"] / el, 1e-9) / 60) if job["running"] and job["done"] else None
+        return out
 
-    def start_fill(auto: bool = False) -> dict:
-        client = lookup_client()
-        if not client.enabled:
-            raise HTTPException(400, "Erst unter Einstellungen → Externe Rufzeichen-Abfrage HamQTH oder QRZ.com einrichten")
+    async def start_fill(auto: bool = False) -> dict:
         if fill["job"] and fill["job"]["running"]:
             raise HTTPException(409, "Das Auffüllen läuft bereits")
         cfg = fill_cfg()
-        job = {"running": True, "cancel": False, "auto": auto, "provider": client.provider, "total": 0, "done": 0, "found": 0, "locator": 0,
-               "dok": 0, "name": 0, "errors": 0, "last_error": "", "current": "", "stopped": "", "started": utcnow_iso(), "finished": ""}
+        configured = [p for p in SERVICES if cfg[p]["on"] and service_client(p).enabled]
+        if not configured:
+            raise HTTPException(400, "Erst unter Einstellungen → Externe Rufzeichen-Abfrage HamQTH und/oder QRZ.com eintragen (und hier einschalten)")
+        services = fill_services(cfg)
+        job: dict[str, Any] = {
+            "running": True, "cancel": False, "auto": auto, "total": 0, "done": 0, "found": 0, "locator": 0, "dok": 0, "name": 0,
+            "buffer": 0, "written": 0, "stopped": "", "started": utcnow_iso(), "finished": "", "_t0": datetime.now(timezone.utc).timestamp(),
+            "services": {p: {"active": p in services, "par": cfg[p]["par"], "done": 0, "found": 0, "errors": 0, "last_error": "", "stopped": "" if p in services else ("Tageslimit erreicht – geht morgen weiter" if p in configured else "aus"), "ms": 0, "count": 0} for p in SERVICES}}
         fill["job"] = job
+        used = fill_used()
+
+        class Item:
+            __slots__ = ("call", "need_loc", "need_dok", "tried", "res", "src")
+
+            def __init__(self, call: str, need_loc: bool, need_dok: bool):
+                self.call, self.need_loc, self.need_dok, self.tried, self.res, self.src = call, need_loc, need_dok, set(), {}, ""
 
         async def run():
-            fails = 0
+            from collections import deque
+            buf: asyncio.Queue = asyncio.Queue()
             try:
-                calls = await asyncio.to_thread(fill_candidates, cfg)
-                fill["open"] = len(calls)
-                left = cfg["daily"] - fill_used_today()
-                job["total"] = max(0, min(len(calls), left))
-                if left <= 0:
+                cands = await asyncio.to_thread(fill_candidates, cfg, services)
+                fill["open"] = len(cands)
+                job["total"] = len(cands)
+                if not services:
                     job["stopped"] = "Tageslimit erreicht – geht morgen weiter"
                     return
-                for call in calls[:left]:
-                    if job["cancel"]:
-                        job["stopped"] = "abgebrochen"
-                        break
-                    job["current"] = call
-                    try:
-                        res = await asyncio.to_thread(client.lookup, call)
+                shared: deque = deque()  # beide Dienste
+                own: dict[str, deque] = {p: deque() for p in SERVICES}  # nur dieser Dienst (DOK -> HamQTH; Nachfrage beim anderen Dienst)
+                for call, need_loc, need_dok in cands:
+                    (own["hamqth"] if need_dok and "hamqth" in services else shared).append(Item(call, need_loc, need_dok))
+                inflight = [0]
+
+                def take(p: str):
+                    for q in (own[p], shared):
+                        if q:
+                            return q.popleft()
+                    return None
+
+                def pending() -> bool:
+                    return any(own[p] for p in services if job["services"][p]["active"]) or (bool(shared) and any(job["services"][p]["active"] for p in services))
+
+                def requeue(p: str, it: Item) -> None:
+                    """Eintrag zurücklegen (Fehler, Tageslimit): beim selben Dienst, solange er läuft; sonst wie bei stop_service."""
+                    if job["services"][p]["active"]:
+                        (own[p] if (it.need_dok and p == "hamqth") or it.tried else shared).appendleft(it)
+                    elif it.tried:
+                        buf.put_nowait((it.call, it.res, it.src or next(iter(it.tried))))
+                    elif it.need_loc:
+                        shared.appendleft(it)
+
+                def stop_service(p: str, why: str) -> None:
+                    """Dienst fällt aus (Limit, Fehler): seine eigenen Einträge gehen an den anderen Dienst bzw. – schon einmal
+                    abgefragt – mit dem bisherigen Ergebnis in den Puffer."""
+                    st = job["services"][p]
+                    if not st["active"]:
+                        return
+                    st["active"], st["stopped"] = False, why
+                    while own[p]:
+                        it = own[p].popleft()
+                        if it.tried:
+                            buf.put_nowait((it.call, it.res, it.src or next(iter(it.tried))))
+                        elif it.need_loc:
+                            shared.append(it)
+
+                def finish(it: Item) -> None:
+                    """Fertig abgefragt: in den Puffer. Fehlt der Locator noch, fragt erst der andere Dienst nach."""
+                    other = [o for o in services if o not in it.tried and job["services"][o]["active"]]
+                    if it.need_loc and not it.res.get("locator") and other:
+                        own[other[0]].append(it)
+                        return
+                    buf.put_nowait((it.call, it.res, it.src or next(iter(it.tried))))
+                    job["buffer"] = buf.qsize()
+
+                async def worker(p: str) -> None:
+                    st, sc, client = job["services"][p], cfg[p], service_client(p)
+                    fails = 0
+                    while not job["cancel"] and st["active"]:
+                        it = take(p)
+                        if it is None:
+                            if inflight[0] == 0 and not pending():
+                                return
+                            await asyncio.sleep(0.3)  # andere Arbeiter können noch Nachfragen einreihen
+                            continue
+                        if sc["daily"] and used[p] >= sc["daily"]:
+                            stop_service(p, "Tageslimit erreicht – geht morgen weiter")
+                            requeue(p, it)
+                            return
+                        inflight[0] += 1
+                        t0 = datetime.now(timezone.utc).timestamp()
+                        try:
+                            res = await asyncio.to_thread(client.lookup, it.call)
+                        except lookup.LookupError_ as e:
+                            fails += 1
+                            st["errors"] += 1
+                            st["last_error"] = str(e)[:200]
+                            low = str(e).lower()
+                            if fails >= 5 or any(w in low for w in ("limit", "exceed", "subscription", "denied", "banned", "refused", "password", "anmeldung", "login")):
+                                stop_service(p, f"gestoppt: {str(e)[:160]}")
+                            requeue(p, it)  # zurück – ein anderer Arbeiter bzw. der andere Dienst versucht es
+                            if st["active"]:
+                                await asyncio.sleep(min(60, 2 ** fails))  # Dienst hakt: kurz warten, dann weiter
+                            continue
+                        finally:
+                            inflight[0] -= 1
                         fails = 0
-                    except lookup.LookupError_ as e:
-                        fails += 1
-                        job["errors"] += 1
-                        job["last_error"] = str(e)[:200]
-                        low = str(e).lower()
-                        if fails >= 3 or any(w in low for w in ("limit", "exceed", "subscription", "denied", "banned", "password", "anmeldung", "login")):
-                            job["stopped"] = f"gestoppt: {str(e)[:160]}"
-                            break
-                        await asyncio.sleep(max(cfg["pause"] * 5, 15))  # Dienst hakt: länger warten
-                        continue
-                    fill_count_one()
-                    got = await asyncio.to_thread(db.fill_from_lookup, call, res or {}, client.provider)
-                    job["done"] += 1
-                    job["found"] += bool(res)
-                    for k in ("locator", "dok", "name"):
-                        job[k] += got[k]
-                    await asyncio.sleep(cfg["pause"])
-                else:
-                    if len(calls) > left:
-                        job["stopped"] = "Tageslimit erreicht – geht morgen weiter"
+                        used[p] += 1
+                        st["done"] += 1
+                        st["ms"] = round(0.8 * st["ms"] + 0.2 * 1000 * (datetime.now(timezone.utc).timestamp() - t0)) if st["ms"] else round(1000 * (datetime.now(timezone.utc).timestamp() - t0))
+                        st["count"] = client.count
+                        it.tried.add(p)
+                        if res:
+                            st["found"] += 1
+                            it.src = it.src or p
+                            for k in ("locator", "dok", "name"):
+                                if res.get(k) and not it.res.get(k):
+                                    it.res[k] = res[k]
+                        finish(it)
+                        if sc["pause"]:
+                            await asyncio.sleep(sc["pause"])
+
+                async def writer() -> None:
+                    """Übernimmt den Puffer gesammelt: je bis zu 200 Ergebnisse oder alle 2 s in einer Transaktion."""
+                    end = False
+                    while not end:
+                        batch = []
+                        try:
+                            x = await asyncio.wait_for(buf.get(), 2)
+                            while True:
+                                if x is None:
+                                    end = True
+                                    break
+                                batch.append(x)
+                                if len(batch) >= 200 or buf.empty():
+                                    break
+                                x = buf.get_nowait()
+                        except asyncio.TimeoutError:
+                            pass
+                        if batch:
+                            got = await asyncio.to_thread(db.fill_many, batch)
+                            job["done"] += len(batch)
+                            job["written"] += len(batch)
+                            job["found"] += sum(1 for _, r, _ in batch if r)
+                            for g in got:
+                                for k in ("locator", "dok", "name"):
+                                    job[k] += g[k]
+                            await asyncio.to_thread(fill_save_used, dict(used))
+                        job["buffer"] = buf.qsize()
+
+                wtask = asyncio.create_task(writer())
+                try:
+                    await asyncio.gather(*(worker(p) for p in services for _ in range(cfg[p]["par"])))
+                finally:
+                    buf.put_nowait(None)
+                    await wtask
+                stops = [f"{lookup.PROVIDERS[p]}: {job['services'][p]['stopped']}" for p in services if job["services"][p]["stopped"]]
+                if job["cancel"]:
+                    job["stopped"] = "abgebrochen"
+                elif stops:
+                    job["stopped"] = " · ".join(stops)
             finally:
                 job["running"] = False
-                job["current"] = ""
                 job["finished"] = utcnow_iso()
-                if job["done"] or job["errors"]:
+                job["_t1"] = datetime.now(timezone.utc).timestamp()
+                for st in job["services"].values():
+                    st["active"] = False
+                if job["done"] or any(st["errors"] for st in job["services"].values()):
+                    per = ", ".join(f"{lookup.PROVIDERS[p]} {job['services'][p]['done']}" for p in services)
                     db.add_audit("Stationsdatenbank online aufgefüllt" + (" (automatisch)" if auto else ""),
-                                 details=f"{lookup.PROVIDERS.get(client.provider, client.provider)}: {job['done']} abgefragt, {job['found']} gefunden, "
-                                 f"{job['locator']} Locator, {job['dok']} DOK, {job['name']} Namen ergänzt, {job['errors']} Fehler"
-                                 + (f" – {job['stopped']}" if job["stopped"] else ""), nick="Server" if auto else "Admin", admin=True)
+                                 details=f"{job['done']} abgefragt ({per}), {job['found']} gefunden, {job['locator']} Locator, {job['dok']} DOK, "
+                                 f"{job['name']} Namen ergänzt" + (f" – {job['stopped']}" if job["stopped"] else ""), nick="Server" if auto else "Admin", admin=True)
 
         fill["task"] = asyncio.create_task(run())
         return fill_public(job)
@@ -793,9 +954,10 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         while True:
             try:
                 cfg = fill_cfg()
-                if cfg["auto"] and lookup_client().enabled and not (fill["job"] and fill["job"]["running"]) and fill_used_today() < cfg["daily"]:
-                    if await asyncio.to_thread(fill_candidates, cfg):
-                        start_fill(auto=True)
+                if cfg["auto"] and not (fill["job"] and fill["job"]["running"]):
+                    services = fill_services(cfg)
+                    if services and await asyncio.to_thread(fill_candidates, cfg, services):
+                        await start_fill(auto=True)
             except Exception as e:  # noqa: BLE001
                 print(f"Automatisches Auffüllen der Stationsdatenbank: {e}")
             await asyncio.sleep(1800)
@@ -807,18 +969,18 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     @app.get("/api/callbook/fill", dependencies=[Depends(require_admin)])
     async def fill_status():
         cfg = fill_cfg()
-        client = lookup_client()
         job = fill["job"]
+        services = fill_services(cfg)
         if job and job["running"]:  # während des Laufs nicht jedes Mal die ganze Datenbank durchsehen
-            n_open = max(0, fill.get("open", 0) - job["done"])
+            n_open = max(0, job["total"] - job["done"])
         else:
-            n_open = fill["open"] = len(await asyncio.to_thread(fill_candidates, cfg))
-        return {"cfg": cfg, "job": fill_public(job), "open": n_open, "used_today": fill_used_today(),
-                "provider": client.provider, "provider_name": lookup.PROVIDERS.get(client.provider, ""), "enabled": client.enabled}
+            n_open = fill["open"] = len(await asyncio.to_thread(fill_candidates, cfg, services or ["hamqth"]))
+        return {"cfg": cfg, "job": fill_public(job), "open": n_open, "used_today": fill_used(), "par_max": FILL_PAR_MAX,
+                "services": {p: {"name": lookup.PROVIDERS[p], "enabled": service_client(p).enabled} for p in SERVICES}}
 
     @app.post("/api/callbook/fill/start", dependencies=[Depends(require_admin), Depends(require_no_demo)])
     async def fill_start():
-        return start_fill()
+        return await start_fill()
 
     @app.post("/api/callbook/fill/cancel", dependencies=[Depends(require_admin)])
     def fill_cancel():
@@ -829,12 +991,16 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     @app.post("/api/callbook/fill/settings", dependencies=[Depends(require_admin), Depends(require_no_demo)])
     def fill_settings(body: dict):
         cfg = fill_cfg()
-        for k, conv in (("auto", bool), ("pause", float), ("daily", int), ("redo_days", int)):
-            if k in body:
-                try:
+        try:
+            for k, conv in (("auto", bool), ("redo_days", int)):
+                if k in body:
                     cfg[k] = conv(body[k])
-                except (TypeError, ValueError):
-                    raise HTTPException(400, f"Ungültiger Wert für {k}")
+            for p in SERVICES:
+                for k, conv in (("on", bool), ("par", int), ("pause", float), ("daily", int)):
+                    if isinstance(body.get(p), dict) and k in body[p]:
+                        cfg[p][k] = conv(body[p][k])
+        except (TypeError, ValueError):
+            raise HTTPException(400, "Ungültiger Wert")
         db.set_setting("cb_fill", json.dumps(cfg))
         cfg = fill_cfg()
         db.add_audit("Auffüllen der Stationsdatenbank eingestellt", details=json.dumps(cfg), nick="Admin", admin=True)

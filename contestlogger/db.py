@@ -1015,35 +1015,50 @@ class Database:
         self._stats_cache = (key, out)
         return out
 
-    def callbook_fill_candidates(self, checked_before: str) -> list[str]:
+    def callbook_fill_candidates(self, checked_before: str) -> list[tuple[str, bool, bool]]:
         """Rufzeichen, denen Locator oder (deutsche Stationen) DOK fehlt und die noch nie bzw. vor checked_before online
-        abgefragt wurden – nie abgefragte und solche ohne Locator zuerst."""
+        abgefragt wurden – nie abgefragte und solche ohne Locator zuerst. Liste von (Call, Locator fehlt, DOK fehlt)."""
         out = []
         for call, loc, dok in self.conn.execute(
                 "SELECT call, locator, dok FROM callbook WHERE (locator='' OR dok='') AND (ext_checked='' OR ext_checked<?) "
                 "ORDER BY ext_checked, locator<>'', call", (checked_before,)).fetchall():
             if not prefixes.is_plausible_call(call):
                 continue
-            if loc and prefixes.country(call) != "Deutschland":  # DOKs gibt es nur in Deutschland
+            need_dok = not dok and prefixes.country(call) == "Deutschland"  # DOKs gibt es nur in Deutschland
+            if loc and not need_dok:
                 continue
-            out.append(call)
+            out.append((call, not loc, need_dok))
         return out
 
     def fill_from_lookup(self, call: str, res: dict, source: str) -> dict:
-        """Ergebnis einer Online-Abfrage übernehmen: nur leere Felder füllen (Locator, DOK nur bei deutschen Stationen, Name),
-        die Abfrage merken (auch ohne Treffer). Rückgabe: welche Felder neu sind."""
-        core = prefixes.core_call(call)
-        row = self.row("SELECT locator, dok, name FROM callbook WHERE call=?", (core,)) or {"locator": "", "dok": "", "name": ""}
-        loc = geo.normalize_locator(res.get("locator", ""))
-        loc = loc if loc and geo.is_valid_locator(loc) else ""
-        dok = normalize_dok(res.get("dok")) if prefixes.country(core) == "Deutschland" else ""
-        name = (res.get("name") or "").strip()[:NAME_MAX]
-        got = {"locator": bool(loc and not row["locator"]), "dok": bool(dok and not row["dok"]), "name": bool(name and not row["name"])}
+        """Ergebnis einer Online-Abfrage übernehmen, siehe fill_many."""
+        return self.fill_many([(call, res, source)])[0]
+
+    def fill_many(self, items: list[tuple[str, dict, str]]) -> list[dict]:
+        """Ergebnisse von Online-Abfragen (Call, Ergebnis, Dienst) in einer Transaktion übernehmen: nur leere Felder füllen
+        (Locator, DOK nur bei deutschen Stationen, Name) und die Abfrage merken – auch ohne Treffer, damit die Station erst
+        nach einer Weile wieder drankommt. Rückgabe je Eintrag: welche Felder neu sind."""
+        out, now = [], utcnow()
         with self.conn:
-            self.conn.execute("UPDATE callbook SET locator=CASE WHEN locator='' THEN ? ELSE locator END, dok=CASE WHEN dok='' THEN ? ELSE dok END, "
-                              "name=CASE WHEN name='' THEN ? ELSE name END WHERE call=?", (loc, dok, name, core))
-        self.set_ext_lookup(core, loc, source)
-        return got
+            for call, res, source in items:
+                core = prefixes.core_call(call)
+                res = res or {}
+                row = self.conn.execute("SELECT locator, dok, name FROM callbook WHERE call=?", (core,)).fetchone()
+                have = {"locator": row[0], "dok": row[1], "name": row[2]} if row else {"locator": "", "dok": "", "name": ""}
+                loc = geo.normalize_locator(res.get("locator", ""))
+                loc = loc if loc and geo.is_valid_locator(loc) else ""
+                dok = normalize_dok(res.get("dok")) if prefixes.country(core) == "Deutschland" else ""
+                name = (res.get("name") or "").strip()[:NAME_MAX]
+                out.append({"locator": bool(loc and not have["locator"]), "dok": bool(dok and not have["dok"]), "name": bool(name and not have["name"])})
+                if row:
+                    self.conn.execute(
+                        "UPDATE callbook SET locator=CASE WHEN locator='' THEN ? ELSE locator END, dok=CASE WHEN dok='' THEN ? ELSE dok END, "
+                        "name=CASE WHEN name='' THEN ? ELSE name END, ext_locator=?, ext_source=?, ext_checked=? WHERE call=?",
+                        (loc, dok, name, loc, source, now, core))
+                else:
+                    self.conn.execute("INSERT OR IGNORE INTO callbook(call,locator,name,source,qso_count,last_seen,alt_locators,dok,ext_locator,ext_source,ext_checked) "
+                                      "VALUES(?,?,?,?,0,'','',?,?,?,?)", (core, loc, name, source, dok, loc, source, now))
+        return out
 
     # ----- Chat -----------------------------------------------------------
     def add_chat(self, nick: str, text: str, contest_id: int = 0) -> dict:

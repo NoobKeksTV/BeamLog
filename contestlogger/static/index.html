@@ -243,14 +243,21 @@
       </div>
       <div class="card" id="fill-card">
         <h3>Aus HamQTH / QRZ.com auffüllen</h3>
-        <p class="muted small">Fragt alle Stationen ohne Locator (und deutsche Stationen ohne DOK) nacheinander beim eingerichteten Dienst ab (Einstellungen → Externe Rufzeichen-Abfrage) und ergänzt nur leere Felder: Locator, DOK (nur HamQTH kennt DOKs), Name. Läuft auf dem Server im Hintergrund – die Seite muss nicht offen bleiben. Zwischen zwei Abfragen wird gewartet, pro Tag höchstens das Tageslimit; wer schon abgefragt wurde, kommt erst nach der eingestellten Zeit wieder dran.</p>
+        <p class="muted small">Fragt alle Stationen ohne Locator und deutsche Stationen ohne DOK bei HamQTH und QRZ.com ab – beide Dienste gleichzeitig, je Dienst mehrere Abfragen parallel – und ergänzt nur leere Felder: Locator, DOK (nur HamQTH kennt DOKs, deutsche Stationen gehen daher zuerst an HamQTH), Name. Findet ein Dienst keinen Locator, fragt der andere nach. Die Antworten sammelt ein Puffer, der Server schreibt sie gesammelt in die Datenbank. Läuft auf dem Server im Hintergrund – die Seite muss nicht offen bleiben. Zugangsdaten unter Einstellungen → Externe Rufzeichen-Abfrage.</p>
         <div id="fill-info" class="small"></div>
-        <form id="fill-form" class="row fill-form">
-          <label class="small">Pause <input id="fill-pause" type="number" min="1" max="60" step="0.5" style="width:70px"> s</label>
-          <label class="small">Tageslimit <input id="fill-daily" type="number" min="1" max="100000" style="width:90px"></label>
-          <label class="small">erneut nach <input id="fill-redo" type="number" min="1" max="3650" style="width:70px"> Tagen</label>
-          <label class="row small"><input type="checkbox" id="fill-auto"> automatisch (alle 30 min, bis das Tageslimit erreicht ist)</label>
-          <button class="ghost small">Speichern</button>
+        <form id="fill-form" class="stack fill-form">
+          <div class="table-wrap"><table class="compact fill-svc">
+            <thead><tr><th>Dienst</th><th>nutzen</th><th>parallel</th><th>Pause (s)</th><th title="0 = ohne eigenes Limit – der Lauf hört auf, sobald der Dienst ein Limit meldet">Tageslimit</th><th>Stand</th></tr></thead>
+            <tbody>
+              <tr data-svc="hamqth"><td><b>HamQTH</b></td><td><input type="checkbox" class="fs-on"></td><td><input type="number" class="fs-par" min="1" max="8"></td><td><input type="number" class="fs-pause" min="0" max="60" step="0.1"></td><td><input type="number" class="fs-daily" min="0"></td><td class="fs-state muted small"></td></tr>
+              <tr data-svc="qrz"><td><b>QRZ.com</b></td><td><input type="checkbox" class="fs-on"></td><td><input type="number" class="fs-par" min="1" max="8"></td><td><input type="number" class="fs-pause" min="0" max="60" step="0.1"></td><td><input type="number" class="fs-daily" min="0"></td><td class="fs-state muted small"></td></tr>
+            </tbody>
+          </table></div>
+          <div class="row">
+            <label class="small">erneut nach <input id="fill-redo" type="number" min="1" max="3650" style="width:70px"> Tagen</label>
+            <label class="row small"><input type="checkbox" id="fill-auto"> automatisch (alle 30 min, solange etwas offen ist)</label>
+            <button class="ghost small">Speichern</button>
+          </div>
         </form>
         <div class="row">
           <button type="button" id="btn-fill-start" class="primary">Jetzt auffüllen</button>
@@ -363,15 +370,24 @@
       <div class="admin-grid admin-sec hidden" data-asec="settings">
       <div class="card">
         <h3>Externe Rufzeichen-Abfrage</h3>
-        <p class="muted small">Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH oder QRZ.com nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. <b>HamQTH ist kostenlos, die Abfrage-Schnittstelle verlangt aber zwingend einen HamQTH-Account</b> (auf hamqth.com registrieren, dann hier Benutzername und Passwort eintragen und „Testen“ drücken). QRZ.com braucht ein XML-Abo. Ohne Internet oder Zugangsdaten bleibt alles lokal.</p>
+        <p class="muted small">Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH oder QRZ.com nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. <b>HamQTH ist kostenlos, die Abfrage-Schnittstelle verlangt aber zwingend einen HamQTH-Account</b> (auf hamqth.com registrieren, dann hier Benutzername und Passwort eintragen und „Testen“ drücken). QRZ.com braucht ein XML-Abo. Beide lassen sich eintragen – das Auffüllen der Stationsdatenbank nutzt dann beide. Ohne Internet oder Zugangsdaten bleibt alles lokal.</p>
         <form id="lookup-form" class="stack">
-          <div class="row">
+          <label class="small">Beim Loggen und in der Log-Prüfung nachschlagen bei
             <select id="lookup-provider"><option value="none">aus</option><option value="hamqth">HamQTH</option><option value="qrz">QRZ.com (XML-Abo)</option></select>
-            <input id="lookup-user" placeholder="Benutzername / Rufzeichen" autocomplete="off">
-            <input id="lookup-pass" type="password" placeholder="Passwort" autocomplete="new-password">
-            <button class="ghost">Speichern</button>
-            <button type="button" id="btn-lookup-test" class="ghost">Testen</button>
+          </label>
+          <div class="row lookup-svc" data-svc="hamqth">
+            <b class="small">HamQTH</b>
+            <input class="lk-user" placeholder="Benutzername / Rufzeichen" autocomplete="off">
+            <input class="lk-pass" type="password" placeholder="Passwort" autocomplete="new-password">
+            <button type="button" class="ghost lk-test">Testen</button>
           </div>
+          <div class="row lookup-svc" data-svc="qrz">
+            <b class="small">QRZ.com</b>
+            <input class="lk-user" placeholder="Benutzername / Rufzeichen" autocomplete="off">
+            <input class="lk-pass" type="password" placeholder="Passwort" autocomplete="new-password">
+            <button type="button" class="ghost lk-test">Testen</button>
+          </div>
+          <div class="row"><button class="ghost">Speichern</button></div>
           <div id="lookup-result" class="muted small"></div>
         </form>
       </div>

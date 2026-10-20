@@ -49,7 +49,7 @@ Jede Änderung (QSOs, Stationen, Contests, Importe, Einstellungen, KST, Backups,
 
 ![Externe Rufzeichen-Abfrage](img/rufzeichen-abfrage.png)
 
-HamQTH (kostenlos, aber Account nötig) oder QRZ.com (XML-Abo) für unbekannte Rufzeichen und den Online-Abgleich in der Log-Prüfung. „Testen“ prüft die Zugangsdaten. Mit denselben Zugangsdaten füllt „Aus HamQTH / QRZ.com auffüllen“ (Stationsdatenbank & Import) fehlende Locator, DOKs und Namen der ganzen Stationsdatenbank im Hintergrund auf, siehe [Stationsdatenbank](Stationsdatenbank.md#aus-hamqth--qrzcom-auffüllen).
+Zugangsdaten für HamQTH (kostenlos, aber Account nötig) und QRZ.com (XML-Abo) – einer oder beide, „Testen“ prüft sie je Dienst. Darüber wird gewählt, welcher Dienst beim Loggen und im Online-Abgleich der Log-Prüfung unbekannte Rufzeichen nachschlägt. Mit denselben Zugangsdaten füllt „Aus HamQTH / QRZ.com auffüllen“ (Stationsdatenbank & Import) fehlende Locator, DOKs und Namen der ganzen Stationsdatenbank im Hintergrund auf – mit beiden Diensten gleichzeitig und parallelen Abfragen, siehe [Stationsdatenbank](Stationsdatenbank.md#aus-hamqth--qrzcom-auffüllen).
 
 ## Karte
 Kachel-URL für die Karten (Standard OpenStreetMap). **Offline-Cache**: mit „Kacheln über den Server laden und speichern“ holt der Server die Kacheln und legt sie unter `data/tiles/` ab – alles, was einmal angezeigt wurde, bleibt ohne Internet verfügbar. „Region vorab laden“ lädt vor dem Contest einen Umkreis (Locator, Radius, Zoom bis 7–10) im Hintergrund; der öffentliche OpenStreetMap-Server erlaubt keine Massen-Downloads, daher sind Zoom ≤ 10 und ca. 4000 Kacheln je Lauf die Grenze. Für große Gebiete einen eigenen Kachelserver eintragen. „Cache leeren“ löscht die gespeicherten Kacheln.

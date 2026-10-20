@@ -86,31 +86,86 @@ def test_callbook_stats_and_name_limit(tmp_path):
         assert all(len(r["name"]) <= 32 for r in rows) and "qso_count" not in rows[0]
 
 
-def test_callbook_fill_job(monkeypatch, tmp_path):
-    answers = {"DL1ABC": HAMQTH_DL, "PA3XYZ": HAMQTH_CALL}
-    monkeypatch.setattr(lookup, "_get", lambda url: HAMQTH_LOGIN if "&p=" in url else next((v for k, v in answers.items() if k in url), HAMQTH_MISS))
+def qrz_xml(body: str) -> bytes:
+    return f'<?xml version="1.0"?><QRZDatabase version="1.34" xmlns="http://xmldata.qrz.com">{body}<Session><Key>k1</Key><Count>42</Count></Session></QRZDatabase>'.encode()
+
+
+def fake_services(hamqth: dict, qrz: dict, hamqth_error: str = ""):
+    """HamQTH und QRZ.com zugleich nachbilden: je Call die Antwort, sonst „nicht gefunden“."""
+    import threading
+    lock, calls = threading.Lock(), []
+
+    def get(url):
+        with lock:
+            calls.append(url)
+        if "hamqth.com" in url:
+            if "&p=" in url:
+                return HAMQTH_LOGIN
+            if hamqth_error:
+                return f'<?xml version="1.0"?><HamQTH xmlns="https://www.hamqth.com"><session><error>{hamqth_error}</error></session></HamQTH>'.encode()
+            return next((v for k, v in hamqth.items() if f"callsign={k}" in url), HAMQTH_MISS)
+        if "password=" in url:
+            return qrz_xml("")
+        return next((qrz_xml(v) for k, v in qrz.items() if f"callsign={k}" in url), qrz_xml("").replace(b"<Key>", b"<Error>Not found: X</Error><Key>"))
+    return get, calls
+
+
+def fill_setup(c, H, tmp_path, rows):
+    from contestlogger.db import Database
+    c.post("/api/settings", json={"lookup_provider": "hamqth", "lookup_user_hamqth": "dn2lh", "lookup_pass_hamqth": "pw",
+                                  "lookup_user_qrz": "dn2lh", "lookup_pass_qrz": "pw2"}, headers=H)
+    db = Database(tmp_path / "t.db")
+    with db.conn:
+        db.conn.execute("DELETE FROM callbook")  # ohne die mitgelieferte Startdatenbank
+    for call, loc, dok in rows:
+        db.learn_call(call, loc, source="import", dok=dok)
+    c.post("/api/callbook/fill/settings", json={"hamqth": {"par": 2, "pause": 0}, "qrz": {"par": 3, "pause": 0}}, headers=H)
+
+
+def fill_wait(c, H):
+    end = time.time() + 30
+    while (j := c.get("/api/callbook/fill", headers=H).json()["job"])["running"] and time.time() < end:
+        time.sleep(0.05)
+    return j
+
+
+def test_callbook_fill_both_services(monkeypatch, tmp_path):
+    get, calls = fake_services({"DL1ABC": HAMQTH_DL, "DL3DOK": HAMQTH_DL.replace(b"G 01", b"B05")},
+                               {"DL2QRZ": "<Callsign><call>DL2QRZ</call><grid>JO40AB</grid><fname>Udo</fname></Callsign>",
+                                "OK1ZZZ": "<Callsign><call>OK1ZZZ</call><grid>JN79AA</grid></Callsign>"})
+    monkeypatch.setattr(lookup, "_get", get)
     app = create_app(tmp_path / "t.db", backup_interval_min=0)
     with TestClient(app) as c:
         H = {"X-Admin-Token": c.post("/api/setup", json={"password": "admin1"}).json()["token"]}
         assert c.post("/api/callbook/fill/start", headers=H).status_code == 400  # ohne Zugangsdaten
-        c.post("/api/settings", json={"lookup_provider": "hamqth", "lookup_user": "dn2lh", "lookup_pass": "pw"}, headers=H)
-        from contestlogger.db import Database
-        db = Database(tmp_path / "t.db")
-        with db.conn:
-            db.conn.execute("DELETE FROM callbook")
-        db.learn_call("DL1ABC", "", source="import")          # ohne Locator und DOK
-        db.learn_call("DL9NIX", "", source="import")          # unbekannt bei HamQTH
-        db.learn_call("PA3XYZ", "JO22EC", source="import")    # hat Locator, Ausland: braucht keinen DOK -> nicht abfragen
-        db.learn_call("DK5FUL", "JO50AA", source="import", dok="Z99")  # vollständig
+        fill_setup(c, H, tmp_path, [("DL1ABC", "", ""), ("DL2QRZ", "", ""), ("PA9NIX", "", ""), ("DL3DOK", "JO50AA", ""),
+                                    ("OK1ZZZ", "", ""), ("PA3XYZ", "JO22EC", ""), ("DK5FUL", "JO50AA", "Z99")])
         st = c.get("/api/callbook/fill", headers=H).json()
-        assert st["open"] == 2 and st["enabled"] and st["cfg"]["pause"] >= 1
-        c.post("/api/callbook/fill/settings", json={"pause": 1, "daily": 5}, headers=H)
+        assert st["open"] == 5 and st["services"]["qrz"]["enabled"] and st["cfg"]["qrz"]["par"] == 3
         assert c.post("/api/callbook/fill/start", headers=H).status_code == 200
-        end = time.time() + 20
-        while (j := c.get("/api/callbook/fill", headers=H).json()["job"])["running"] and time.time() < end:
-            time.sleep(0.1)
-        assert (j["done"], j["found"], j["locator"], j["dok"]) == (2, 1, 1, 1)
-        row = c.get("/api/callbook", params={"q": "DL1ABC"}).json()["rows"][0]
-        assert (row["locator"], row["dok"], row["name"]) == ("JO31AA", "G01", "Peter")
-        st = c.get("/api/callbook/fill", headers=H).json()
-        assert st["open"] == 0 and st["used_today"] == 2     # abgefragt (auch ohne Treffer) -> erst nach redo_days wieder
+        j = fill_wait(c, H)
+        assert (j["done"], j["found"], j["locator"], j["dok"], j["buffer"]) == (5, 4, 3, 2, 0)
+        assert j["services"]["qrz"]["count"] == 42 and j["services"]["hamqth"]["done"] >= 2
+        cb = {r["call"]: r for r in c.get("/api/callbook").json()["rows"]}
+        assert (cb["DL1ABC"]["locator"], cb["DL1ABC"]["dok"]) == ("JO31AA", "G01")
+        assert (cb["DL2QRZ"]["locator"], cb["DL2QRZ"]["name"]) == ("JO40AB", "Udo")       # HamQTH kannte ihn nicht -> QRZ.com
+        assert (cb["DL3DOK"]["locator"], cb["DL3DOK"]["dok"]) == ("JO50AA", "B05")         # Locator bleibt, DOK nur von HamQTH
+        assert not any("qrz.com" in u and "DL3DOK" in u for u in calls)                    # QRZ.com liefert keinen DOK
+        assert sum("callsign=PA9NIX" in u for u in calls) == 2                             # bei beiden nachgefragt, dann gemerkt
+        assert c.get("/api/callbook/fill", headers=H).json()["open"] == 0
+        assert c.get("/api/callbook/fill", headers=H).json()["used_today"]["hamqth"] >= 2
+
+
+def test_callbook_fill_service_stops(monkeypatch, tmp_path):
+    get, _ = fake_services({}, {"DL2QRZ": "<Callsign><call>DL2QRZ</call><grid>JO40AB</grid></Callsign>"}, hamqth_error="Daily limit exceeded")
+    monkeypatch.setattr(lookup, "_get", get)
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        H = {"X-Admin-Token": c.post("/api/setup", json={"password": "admin1"}).json()["token"]}
+        fill_setup(c, H, tmp_path, [("DL2QRZ", "", ""), ("DL3DOK", "JO50AA", ""), ("DL4AAA", "", "")])
+        c.post("/api/callbook/fill/start", headers=H)
+        j = fill_wait(c, H)
+        assert j["services"]["hamqth"]["stopped"].startswith("gestoppt") and not j["services"]["qrz"]["stopped"]
+        assert j["done"] == 2 and j["locator"] == 1                    # QRZ.com macht ohne HamQTH weiter
+        assert "HamQTH" in j["stopped"]
+        assert c.get("/api/callbook/fill", headers=H).json()["open"] == 1   # DL3DOK (nur DOK fehlt) bleibt für HamQTH offen

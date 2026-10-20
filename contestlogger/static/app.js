@@ -1230,14 +1230,17 @@
   });
   $("#lookup-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const body = { lookup_provider: $("#lookup-provider").value, lookup_user: $("#lookup-user").value.trim() };
-    if ($("#lookup-pass").value) body.lookup_pass = $("#lookup-pass").value;
-    try { await api("POST", "/api/settings", body); $("#lookup-pass").value = ""; toast(t("Einstellungen gespeichert"), "ok"); } catch (err) { toast(err.message, "err"); }
+    const body = { lookup_provider: $("#lookup-provider").value };
+    $$(".lookup-svc").forEach((r) => {
+      const p = r.dataset.svc; body[`lookup_user_${p}`] = r.querySelector(".lk-user").value.trim();
+      if (r.querySelector(".lk-pass").value) body[`lookup_pass_${p}`] = r.querySelector(".lk-pass").value;
+    });
+    try { await api("POST", "/api/settings", body); $$(".lookup-svc .lk-pass").forEach((x) => { x.value = ""; }); toast(t("Einstellungen gespeichert"), "ok"); fillPoll(); } catch (err) { toast(err.message, "err"); }
   });
-  $("#btn-lookup-test")?.addEventListener("click", async () => {
-    $("#lookup-result").textContent = "…";
-    try { const r = await api("POST", "/api/lookup/test"); $("#lookup-result").textContent = r.msg; $("#lookup-result").style.color = r.ok ? "var(--ok)" : "var(--bad)"; } catch (err) { $("#lookup-result").textContent = err.message; }
-  });
+  $$(".lookup-svc .lk-test").forEach((b) => b.addEventListener("click", async () => {
+    const out = $("#lookup-result"); out.textContent = "…";
+    try { const r = await api("POST", "/api/lookup/test", { provider: b.closest(".lookup-svc").dataset.svc }); out.textContent = r.msg; out.style.color = r.ok ? "var(--ok)" : "var(--bad)"; } catch (err) { out.textContent = err.message; }
+  }));
   async function tilesStatus() {
     try {
       const s = await GET("/api/tiles/status"); const j = s.job;
@@ -1911,7 +1914,8 @@
     const inf = await GET("/api/info"); $("#cb-count").textContent = inf.callbook_count; $("#tile-url").value = inf.tile_url || ""; $("#tile-cache").checked = !!inf.tile_cache;
     if (!$("#tc-loc").value) $("#tc-loc").value = station()?.locator || S.templates?.[0]?.locator || ""; tilesStatus();
     try {
-      const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider; $("#lookup-user").value = cfg.lookup_user || ""; $("#lookup-pass").placeholder = cfg.lookup_pass_set ? t("Passwort (gespeichert)") : t("Passwort");
+      const cfg = await GET("/api/settings"); $("#lookup-provider").value = cfg.lookup_provider;
+      $$(".lookup-svc").forEach((r) => { const p = r.dataset.svc; r.querySelector(".lk-user").value = cfg[`lookup_user_${p}`] || ""; r.querySelector(".lk-pass").placeholder = cfg[`lookup_pass_${p}_set`] ? t("Passwort (gespeichert)") : t("Passwort"); });
       S.kstRooms = cfg.kst_rooms || {};
       $("#adsb-source").value = cfg.adsb_source || "adsb.fi"; $("#adsb-local").value = cfg.adsb_local_url || ""; $("#adsb-corridor").value = cfg.adsb_corridor_km ?? 12; $("#adsb-antenna").value = cfg.adsb_antenna_m ?? 15;
       $("#upd-auto").checked = cfg.update_check !== false; $("#upd-current").textContent = `v${S.info.version}`;
@@ -2143,17 +2147,27 @@
     if (!$("#fill-card") || !S.adminToken) return;
     let r; try { r = await GET("/api/callbook/fill"); } catch (_) { return; }
     const n = (v) => Number(v || 0).toLocaleString(), c = r.cfg, j = r.job || {};
-    if (!again) { $("#fill-pause").value = c.pause; $("#fill-daily").value = c.daily; $("#fill-redo").value = c.redo_days; $("#fill-auto").checked = !!c.auto; }
-    $("#fill-info").textContent = r.enabled
-      ? t("Dienst: {p} · noch offen: {n} Stationen · heute abgefragt: {u} von {d}", { p: r.provider_name, n: n(r.open), u: n(r.used_today), d: n(c.daily) })
-      : t("Kein Dienst eingerichtet – erst unter Einstellungen → Externe Rufzeichen-Abfrage HamQTH oder QRZ.com eintragen.");
-    $("#btn-fill-start").disabled = !r.enabled || !!j.running;
+    const anyOn = Object.values(r.services).some((x) => x.enabled);
+    $$("#fill-form tr[data-svc]").forEach((row) => {
+      const p = row.dataset.svc, sc = c[p], sv = r.services[p], js = j.services?.[p];
+      if (!again) { row.querySelector(".fs-on").checked = sc.on; row.querySelector(".fs-par").value = sc.par; row.querySelector(".fs-pause").value = sc.pause; row.querySelector(".fs-daily").value = sc.daily; }
+      row.classList.toggle("muted", !sv.enabled);
+      const today = `${t("heute")} ${n(r.used_today[p])}${sc.daily ? ` / ${n(sc.daily)}` : ""}`;
+      row.querySelector(".fs-state").textContent = !sv.enabled ? t("keine Zugangsdaten")
+        : js && (j.running || j.finished) ? [today, js.ms ? `${js.ms} ms` : "", js.count ? `${t("QRZ zählt")} ${n(js.count)}` : "", js.errors ? `${js.errors} ${t("Fehler")}` : "",
+          js.stopped && js.stopped !== "aus" ? (js.stopped.startsWith("gestoppt: ") ? `${t("gestoppt")}: ${js.stopped.slice(10)}` : t(js.stopped)) : (js.active ? "⟳" : "")].filter(Boolean).join(" · ")
+        : today;
+    });
+    if (!again) { $("#fill-redo").value = c.redo_days; $("#fill-auto").checked = !!c.auto; }
+    $("#fill-info").textContent = anyOn ? t("Noch offen: {n} Stationen", { n: n(r.open) })
+      : t("Kein Dienst eingerichtet – erst unter Einstellungen → Externe Rufzeichen-Abfrage HamQTH und/oder QRZ.com eintragen.");
+    $("#btn-fill-start").disabled = !anyOn || !!j.running;
     $("#btn-fill-cancel").classList.toggle("hidden", !j.running);
     $("#fill-status").textContent = j.running || j.finished
-      ? (j.running ? `⟳ ${j.current || "…"} · ${n(j.done)}/${n(j.total)}` : `${t("Zuletzt")} ${fmtDate(j.finished)}${j.auto ? ` (${t("automatisch")})` : ""}: ${n(j.done)} ${t("abgefragt")}`) +
+      ? (j.running ? `⟳ ${n(j.done)}/${n(j.total)} · ${n(j.rate)} ${t("je Minute")}${j.eta_min != null ? ` · ${t("noch etwa {m}", { m: j.eta_min >= 120 ? `${Math.round(j.eta_min / 60)} h` : `${j.eta_min} min` })}` : ""} · ${t("Puffer")} ${n(j.buffer)}`
+        : `${t("Zuletzt")} ${fmtDate(j.finished)}${j.auto ? ` (${t("automatisch")})` : ""}: ${n(j.done)} ${t("abgefragt")}`) +
         " · " + t("{f} gefunden – {l} Locator, {d} DOK, {m} Namen ergänzt", { f: n(j.found), l: n(j.locator), d: n(j.dok), m: n(j.name) }) +
-        (j.errors ? ` · ${j.errors} ${t("Fehler")}${j.last_error && !j.stopped ? ` (${j.last_error})` : ""}` : "") +
-        (j.stopped ? ` · ${j.stopped.startsWith("gestoppt: ") ? `${t("gestoppt")}: ${j.stopped.slice(10)}` : t(j.stopped)}` : "")
+        (!j.running && j.stopped === "abgebrochen" ? ` · ${t("abgebrochen")}` : "")
       : "";
     if (Fill.running && !j.running) renderCallbook();
     Fill.running = !!j.running;
@@ -2161,10 +2175,9 @@
   }
   $("#fill-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    try {
-      await api("POST", "/api/callbook/fill/settings", { pause: Number($("#fill-pause").value), daily: Number($("#fill-daily").value), redo_days: Number($("#fill-redo").value), auto: $("#fill-auto").checked });
-      toast(t("Gespeichert"), "ok"); fillPoll();
-    } catch (err) { toast(err.message, "err"); }
+    const body = { redo_days: Number($("#fill-redo").value), auto: $("#fill-auto").checked };
+    $$("#fill-form tr[data-svc]").forEach((row) => { body[row.dataset.svc] = { on: row.querySelector(".fs-on").checked, par: Number(row.querySelector(".fs-par").value), pause: Number(row.querySelector(".fs-pause").value), daily: Number(row.querySelector(".fs-daily").value) }; });
+    try { await api("POST", "/api/callbook/fill/settings", body); toast(t("Gespeichert"), "ok"); fillPoll(); } catch (err) { toast(err.message, "err"); }
   });
   $("#btn-fill-start")?.addEventListener("click", async () => { try { await api("POST", "/api/callbook/fill/start", {}); fillPoll(true); } catch (err) { toast(err.message, "err"); } });
   $("#btn-fill-cancel")?.addEventListener("click", () => api("POST", "/api/callbook/fill/cancel", {}).then(() => fillPoll(true)).catch(() => {}));
