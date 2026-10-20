@@ -1,6 +1,6 @@
 """Externe Rufzeichen-Abfrage (optional, braucht Internet): HamQTH oder QRZ.com.
 
-Liefert Locator, Name und QTH zu einem vollständigen Rufzeichen. Ergebnisse werden
+Liefert Locator, Name, QTH und (HamQTH) DOK zu einem vollständigen Rufzeichen. Ergebnisse werden
 vom Aufrufer in der Stationsdatenbank gecacht, damit jede Abfrage nur einmal nötig ist.
 """
 from __future__ import annotations
@@ -19,6 +19,10 @@ PROVIDERS = {"none": "aus", "hamqth": "HamQTH", "qrz": "QRZ.com (XML-Abo)"}
 
 class LookupError_(Exception):
     pass
+
+
+def _not_found(err: str) -> bool:
+    return "not found" in err.lower()
 
 
 def _get(url: str) -> bytes:
@@ -57,16 +61,19 @@ class Lookup:
         self._session, self._session_ts = sid, time.time()
         return sid
 
-    def _hamqth(self, call: str) -> dict:
+    def _hamqth(self, call: str, retry: bool = True) -> dict:
         sid = self._hamqth_session()
         root = ET.fromstring(_get(f"https://www.hamqth.com/xml.php?id={sid}&callsign={urllib.parse.quote(call)}&prg=BeamLog"))
         err = _text(root, "error")
         if err:
-            if "session" in err.lower():
+            if "session" in err.lower() and retry:
                 self._session = ""
-                return self._hamqth(call)
-            return {}
-        return {"locator": _text(root, "grid"), "name": _text(root, "nick") or _text(root, "name"), "qth": _text(root, "qth"), "country": _text(root, "country")}
+                return self._hamqth(call, retry=False)
+            if _not_found(err):
+                return {}
+            raise LookupError_(f"HamQTH: {err}")  # z. B. gesperrt / Limit – der Aufrufer hört dann auf
+        return {"locator": _text(root, "grid"), "name": _text(root, "nick") or _text(root, "adr_name"), "qth": _text(root, "qth"),
+                "country": _text(root, "country"), "dok": _text(root, "dok")}
 
     # ------------------------------------------------------------ QRZ.com
     def _qrz_session(self) -> str:
@@ -80,15 +87,17 @@ class Lookup:
         self._session, self._session_ts = key, time.time()
         return key
 
-    def _qrz(self, call: str) -> dict:
+    def _qrz(self, call: str, retry: bool = True) -> dict:
         key = self._qrz_session()
         root = ET.fromstring(_get(f"https://xmldata.qrz.com/xml/current/?s={key}&callsign={urllib.parse.quote(call)}"))
         err = _text(root, "Error")
         if err:
-            if "session" in err.lower() or "invalid" in err.lower() and "key" in err.lower():
+            if retry and ("session" in err.lower() or "invalid" in err.lower() and "key" in err.lower()):
                 self._session = ""
-                return self._qrz(call)
-            return {}
+                return self._qrz(call, retry=False)
+            if _not_found(err):
+                return {}
+            raise LookupError_(f"QRZ.com: {err}")  # z. B. Tageslimit oder Abo abgelaufen
         name = " ".join(x for x in (_text(root, "fname"), _text(root, "name")) if x)
         return {"locator": _text(root, "grid"), "name": _text(root, "nickname") or name, "qth": _text(root, "addr2"), "country": _text(root, "country")}
 
@@ -106,8 +115,9 @@ class Lookup:
         if loc and not geo.is_valid_locator(loc):
             loc = loc[:6] if geo.is_valid_locator(loc[:6]) else ""
         res["locator"] = loc
+        res["dok"] = re.sub(r"\s+", "", res.get("dok") or "").upper()[:8]
         res["source"] = self.provider
-        return res if (loc or res.get("name")) else {}
+        return res if (loc or res.get("name") or res["dok"]) else {}
 
     def test(self) -> str:
         """Verbindungstest: Anmeldung + Abfrage des eigenen Rufzeichens."""

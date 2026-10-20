@@ -223,11 +223,12 @@
       <div class="admin-grid admin-sec hidden" data-asec="callbook">
       <div class="card">
         <h3>Stationsdatenbank (Call-Buch)</h3>
-        <p class="muted"><span id="cb-count">0</span> Rufzeichen mit Locator bekannt. Wächst automatisch mit jedem geloggten QSO und jedem Import; beim ersten Start wird die mitgelieferte Startdatenbank geladen.</p>
+        <p class="muted small"><span id="cb-count">0</span> Rufzeichen. Wächst automatisch mit jedem geloggten QSO und jedem Import; beim ersten Start wird die mitgelieferte Startdatenbank geladen.</p>
+        <div id="cb-stats" class="cb-stats"></div>
         <input id="cb-search" placeholder="Suchen (Call, Locator, Name) …" class="small">
         <div class="table-wrap" style="max-height:260px"><table id="cb-table" class="compact"><tbody></tbody></table></div>
         <form id="cb-form" class="cb-form">
-          <input id="cb-call" placeholder="Rufzeichen" required><input id="cb-loc" placeholder="Locator" required><input id="cb-name" placeholder="Name"><input id="cb-dok" placeholder="DOK" maxlength="8"><button class="ghost">Speichern</button>
+          <input id="cb-call" placeholder="Rufzeichen" required><input id="cb-loc" placeholder="Locator" required><input id="cb-name" placeholder="Name" maxlength="32"><input id="cb-dok" placeholder="DOK" maxlength="8"><button class="ghost">Speichern</button>
         </form>
         <div class="row cb-actions">
           <a href="/api/callbook/export.csv" class="button ghost" download>Stationsdatenbank exportieren (CSV)</a>
@@ -239,6 +240,23 @@
           <span class="tag">Betreuer</span><input type="file" id="cb-list-file" accept=".csv,.txt" required><button class="ghost small">Stationsliste einpflegen</button><span id="cb-list-result" class="muted small"></span>
         </form>
         <p class="muted small maint-only">Ablauf: „Export im Repo-Format“ herunterladen und als <code>contestlogger/seed/stationsdatenbank.csv</code> ins Repo einchecken; alle Installationen holen sie mit „Nach neuen suchen (Repo)“.</p>
+      </div>
+      <div class="card" id="fill-card">
+        <h3>Aus HamQTH / QRZ.com auffüllen</h3>
+        <p class="muted small">Fragt alle Stationen ohne Locator (und deutsche Stationen ohne DOK) nacheinander beim eingerichteten Dienst ab (Einstellungen → Externe Rufzeichen-Abfrage) und ergänzt nur leere Felder: Locator, DOK (nur HamQTH kennt DOKs), Name. Läuft auf dem Server im Hintergrund – die Seite muss nicht offen bleiben. Zwischen zwei Abfragen wird gewartet, pro Tag höchstens das Tageslimit; wer schon abgefragt wurde, kommt erst nach der eingestellten Zeit wieder dran.</p>
+        <div id="fill-info" class="small"></div>
+        <form id="fill-form" class="row fill-form">
+          <label class="small">Pause <input id="fill-pause" type="number" min="1" max="60" step="0.5" style="width:70px"> s</label>
+          <label class="small">Tageslimit <input id="fill-daily" type="number" min="1" max="100000" style="width:90px"></label>
+          <label class="small">erneut nach <input id="fill-redo" type="number" min="1" max="3650" style="width:70px"> Tagen</label>
+          <label class="row small"><input type="checkbox" id="fill-auto"> automatisch (alle 30 min, bis das Tageslimit erreicht ist)</label>
+          <button class="ghost small">Speichern</button>
+        </form>
+        <div class="row">
+          <button type="button" id="btn-fill-start" class="primary">Jetzt auffüllen</button>
+          <button type="button" id="btn-fill-cancel" class="ghost hidden">Abbrechen</button>
+          <span id="fill-status" class="muted small grow"></span>
+        </div>
       </div>
       <div class="card">
         <h3>WinContest-Ordner (DD3KU) übernehmen</h3>
@@ -284,7 +302,7 @@
         <p class="muted small">Lädt die veröffentlichten Ergebnislisten direkt von den Veranstaltern und übernimmt Rufzeichen, Locator und DOK in die Stationsdatenbank:
           <b>DARC UKW</b> (Contest-Hub ab 2017, Archiv 2008–2016), <b>DARC KW</b> (WAG, WAE, 10 m, Fieldday, Oster-, Weihnachts-, Ausbildungs-, FT4-, RTTY-, Hell-Contest ab 2014 – Rufzeichen und DOK; ab 2017 auch alle Einzel-Logs mit eigenem Locator und den DOKs der QSO-Partner)
           und die <b>IARU-Region-1-UKW-Conteste</b> (Contest-Robot ab 2019 mit Ergebnislisten und auf Wunsch allen Einzel-Logs, Archiv OK2KKW ab 1985).
-          Neuere Angaben gewinnen; ältere Locatoren bleiben als Alternative erhalten. Bis zu sechs Listen werden gleichzeitig geladen (je Server höchstens vier Abrufe zugleich). Einzel-Logs brauchen je Contest einige Minuten.</p>
+          Neuere Angaben gewinnen; ältere Locatoren bleiben als Alternative erhalten. Bis zu sechs Listen werden gleichzeitig geladen (je Server höchstens acht Abrufe zugleich). Der Import läuft auf dem Server weiter, auch wenn die Seite geschlossen wird (ein Neustart bricht ihn ab). Einzel-Logs brauchen je Contest einige Minuten: der IARU-Robot liefert jedes Teilnehmer-Log als eigene Seite (bei 2000 Teilnehmern 2000 Abrufe zu je 0,5–2 s), eine Gesamtdatei gibt es nicht.</p>
         <div class="row">
           <button type="button" id="btn-arch-scan" class="ghost">Verfügbare Listen suchen</button>
           <span id="arch-summary" class="muted small"></span>
@@ -300,6 +318,14 @@
           <div class="progress"><div id="arch-bar"></div></div>
           <div id="arch-active" class="arch-active small"></div>
           <div class="row"><span id="arch-status" class="small grow"></span><button type="button" id="btn-arch-cancel" class="ghost small">Abbrechen</button></div>
+        </div>
+        <div class="row arch-auto">
+          <b class="small">Automatisch:</b>
+          <label class="row small" title="Sucht einmal am Tag in allen Quellen nach Listen, die noch nicht (mit diesen Regeln) übernommen wurden, und importiert sie – auf dem Server, ohne offene Seite."><input type="checkbox" id="arch-auto-on"> neue Listen täglich übernehmen</label>
+          <label class="row small" title="Auch die Einzel-Logs (IARU-Robot, DARC KW) – das dauert je Contest einige Minuten."><input type="checkbox" id="arch-auto-logs"> mit Einzel-Logs</label>
+          <label class="row small"><input type="checkbox" id="arch-auto-bare"> Stationen ohne Locator neu aufnehmen</label>
+          <button type="button" id="btn-arch-auto-run" class="ghost small">Jetzt prüfen</button>
+          <span id="arch-auto-last" class="muted small"></span>
         </div>
       </div>
       </div>

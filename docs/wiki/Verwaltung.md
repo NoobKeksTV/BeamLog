@@ -7,7 +7,7 @@ Der Reiter **Verwaltung** ist nur mit Admin-Passwort zugänglich und enthält al
 | Bereich | Karten |
 |---|---|
 | **Contests & Stationen** | Stationen (global), Contests (mit den Stationen je Contest im ✎-Dialog), Export / Abgabe |
-| **Stationsdatenbank & Import** | Stationsdatenbank, WinContest-Ordner, Einzelne Datei; im Betreuer-Modus zusätzlich Ergebnislisten und DARC-Contest-Hub |
+| **Stationsdatenbank & Import** | Stationsdatenbank mit Kennzahlen, Auffüllen aus HamQTH/QRZ.com, WinContest-Ordner, Einzelne Datei; im Betreuer-Modus zusätzlich Ergebnislisten, DARC-Contest-Hub und Ergebnislisten-Archiv (auch automatisch) |
 | **Server & Updates** | Updates (auch „Nach neuen suchen“ für die Stationsdatenbank), Backups, Aktionsprotokoll |
 | **Einstellungen** | Externe Rufzeichen-Abfrage, Karte (mit Offline-Cache), Flugzeug-Scatter, Sprachen, Admin-Passwort |
 
@@ -31,7 +31,7 @@ Je Station mit QSO-Zahl und Punkten: EDI (mit Prüfung – öffnet das Prüferge
 WinContest-Ordner, Ergebnislisten, DARC-Contest-Hub, einzelne Datei. Siehe [Import und Export](Import-Export.md).
 
 ## Stationsdatenbank (Callbuch)
-Suche, Bearbeiten (auch DOK), Löschen, Export (CSV; Repo-Format nur im Betreuer-Modus). Der Abgleich mit dem Repo („Nach neuen suchen“) steht unter **Updates**. Siehe [Stationsdatenbank](Stationsdatenbank.md).
+Kennzahlen (Rufzeichen mit Locator/DOK/Name, je Land), Suche, Bearbeiten (auch DOK), Löschen, Export (CSV; Repo-Format nur im Betreuer-Modus). Der Abgleich mit dem Repo („Nach neuen suchen“) steht unter **Updates**. Siehe [Stationsdatenbank](Stationsdatenbank.md).
 
 ## Backups auf dem Server
 Der Server sichert die Datenbank automatisch (nur bei Änderungen) in den Ordner `backup/` neben der Datenbank, zusätzlich beim Beenden und vor jedem Update. „Jetzt sichern“ erzeugt eine Sicherung sofort. Die Liste zeigt die vorhandenen Sicherungen. Es gibt bewusst keine Sicherung im Browser und keinen Offline-Modus: die Daten liegen nur auf dem Server.
@@ -49,7 +49,7 @@ Jede Änderung (QSOs, Stationen, Contests, Importe, Einstellungen, KST, Backups,
 
 ![Externe Rufzeichen-Abfrage](img/rufzeichen-abfrage.png)
 
-HamQTH (kostenlos, aber Account nötig) oder QRZ.com (XML-Abo) für unbekannte Rufzeichen und den Online-Abgleich in der Log-Prüfung. „Testen“ prüft die Zugangsdaten.
+HamQTH (kostenlos, aber Account nötig) oder QRZ.com (XML-Abo) für unbekannte Rufzeichen und den Online-Abgleich in der Log-Prüfung. „Testen“ prüft die Zugangsdaten. Mit denselben Zugangsdaten füllt „Aus HamQTH / QRZ.com auffüllen“ (Stationsdatenbank & Import) fehlende Locator, DOKs und Namen der ganzen Stationsdatenbank im Hintergrund auf, siehe [Stationsdatenbank](Stationsdatenbank.md#aus-hamqth--qrzcom-auffüllen).
 
 ## Karte
 Kachel-URL für die Karten (Standard OpenStreetMap). **Offline-Cache**: mit „Kacheln über den Server laden und speichern“ holt der Server die Kacheln und legt sie unter `data/tiles/` ab – alles, was einmal angezeigt wurde, bleibt ohne Internet verfügbar. „Region vorab laden“ lädt vor dem Contest einen Umkreis (Locator, Radius, Zoom bis 7–10) im Hintergrund; der öffentliche OpenStreetMap-Server erlaubt keine Massen-Downloads, daher sind Zoom ≤ 10 und ca. 4000 Kacheln je Lauf die Grenze. Für große Gebiete einen eigenen Kachelserver eintragen. „Cache leeren“ löscht die gespeicherten Kacheln.

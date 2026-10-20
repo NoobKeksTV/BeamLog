@@ -49,7 +49,7 @@ Ein kleiner Server (portable Datei, kein Python nötig) ist der zentrale Speiche
 | **Statistik** | Contest gesamt und je Station: Stundenverlauf, Entfernungs- und Richtungsverteilung, Großfelder, Länder, ODX, Großanzeige |
 | **Import** | WinContest-Ordner (`.mdb` ohne Zusatzsoftware, `.txt`, `.EXP`), EDI, ADIF, Ergebnislisten (DARC/IARU), DARC-Contest-Hub direkt |
 | **Export / Abgabe** | EDI (REG1TEST) mit Pflicht-Log-Prüfung und Online-Abgleich (HamQTH/QRZ), Cabrillo, ADIF, CSV, alle Bänder als ZIP; Wertung je Contest (km oder Punkte je QSO, Multiplikator Großfelder/DOKs) |
-| **Stationsdatenbank** | Rufzeichen, Locator, Name, DOK; wächst mit jedem QSO, der KST-Nutzerliste, Importen (DARC-Hub mit DOK) und Online-Abfragen; Export und Abgleich mit dem Repo |
+| **Stationsdatenbank** | Rufzeichen, Locator, Name, DOK; wächst mit jedem QSO, der KST-Nutzerliste, Importen (DARC-Hub mit DOK) und Online-Abfragen; Kennzahlen je Land (wie viele mit Locator/DOK); Lücken im Hintergrund aus HamQTH/QRZ.com auffüllen (mit Pause und Tageslimit); Export und Abgleich mit dem Repo |
 | **CAT** | Frequenz vom Funkgerät (Hamlib, flrig) |
 | **Betrieb** | Backups auf dem Server (crash-sicher), Aktionsprotokoll, Update-Prüfung mit Selbst-Aktualisierung, „Was ist neu“, mehrsprachig, hell/dunkel, ⚙ Einstellungen je Browser (Nutzername, Sprache, Schnelleingabe und ihre Position), Hilfe mit F1 |
 

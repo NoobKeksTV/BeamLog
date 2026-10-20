@@ -102,6 +102,17 @@ def test_archive_import_job(tmp_path, monkeypatch):
         c.post("/api/results/import", json={"ids": ["darc-kw:waglog:2024"], "without_locator": True}, headers=H)
         j = wait_job(c, H)
         assert j["new"] == 2
+        done = c.get("/api/results/sources", headers=H).json()["done"]
+        assert done["darc-kw:waglog:2025"]["bare"] is False and done["darc-kw:waglog:2024"]["bare"] is True
+        # automatischer Import: mit geänderter Regel („ohne Locator aufnehmen“) kommt die 2025er-Liste erneut dran
+        c.post("/api/results/auto", json={"on": True, "bare": True}, headers=H)
+        r = c.post("/api/results/auto/run", headers=H).json()["result"]
+        assert r.startswith("1 neue Listen gestartet")
+        j = wait_job(c, H)
+        assert j["auto"] and j["bare"] and j["done"] == 1 and j["new"] == 0
+        assert c.get("/api/results/sources", headers=H).json()["done"]["darc-kw:waglog:2025"]["bare"] is True
+        assert c.post("/api/results/auto/run", headers=H).json()["result"].startswith("keine neuen Listen")
+        assert c.get("/api/results/auto", headers=H).json()["on"] is True
 
 
 IARU_LIST = """<tr><td>2025 IARU Reg. 1 145 MHz Contest</td><td>2025-09-06 14:00</td><td>2025-09-07 14:00</td>

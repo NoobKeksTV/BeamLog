@@ -427,7 +427,7 @@ kbd { display: inline-block; padding: 1px 6px; margin-right: 3px; border: 1px so
 .arch-src-box { padding: 4px 0; border-bottom: 1px solid var(--line); } .arch-src-box:last-child { border-bottom: 0; }
 .arch-src-box > summary { cursor: pointer; padding: 3px 0; }
 .arch-group { margin: 6px 0 6px 18px; }
-.arch-tree label, #arch-actions label { display: inline-flex; flex-direction: row; gap: 5px; align-items: center; cursor: pointer; margin: 0; font-size: inherit; color: inherit; }
+.arch-tree label, #arch-actions label, .arch-auto label { display: inline-flex; flex-direction: row; gap: 5px; align-items: center; cursor: pointer; margin: 0; font-size: inherit; color: inherit; }
 .arch-tree input[type=checkbox], #arch-actions input[type=checkbox] { width: auto; margin: 0; }
 .arch-gl { font-size: 13px; }
 .arch-items { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 3px 0 0 20px; font-size: 12.5px; }
@@ -469,3 +469,24 @@ button.unlock-btn:hover { filter: brightness(1.08); }
 #settings-form label.check .muted { flex-basis: 100%; padding-left: 22px; }
 .quick-row.below { margin: 12px 0 4px; }
 .quick-parsed .qp-state { color: var(--muted); margin-left: 4px; }
+
+/* Kennzahlen der Stationsdatenbank */
+.cb-stats { margin: 6px 0 10px; }
+.cb-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
+.cb-kpi { background: var(--card2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; }
+.cb-kpi b { font-family: var(--mono); font-size: 18px; color: var(--text); }
+.cb-kpi span { font-size: 12px; color: var(--muted); }
+.cb-country-wrap { margin-top: 8px; }
+.cb-country-wrap summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.cb-country { margin-top: 6px; width: 100%; }
+.cb-country th { text-align: right; } .cb-country th:first-child { text-align: left; }
+.cb-country td.num { text-align: right; white-space: nowrap; }
+.cb-country td.warn { color: var(--warn); }
+.cb-country tr.cb-home td { font-weight: 700; }
+
+/* Archiv: Automatik, Auffüllen aus HamQTH/QRZ */
+.arch-auto { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+.fill-form { margin: 8px 0; }
+.fill-form label { display: inline-flex; flex-direction: row; align-items: center; gap: 5px; color: inherit; }
+.fill-form input[type=number] { font-size: 14px; padding: 4px 6px; }
+#fill-info { margin: 4px 0; }

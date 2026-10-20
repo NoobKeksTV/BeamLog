@@ -174,6 +174,9 @@ def verify_password(pw: str, stored: str) -> bool:
     return hmac.compare_digest(hash_password(pw, salt), stored)
 
 
+NAME_MAX = 32  # Name in der Stationsdatenbank (Vorname bzw. kurzer Name, wie aus HamQTH/QRZ)
+
+
 class _Rows:
     """Ergebnis einer Abfrage, schon vollständig gelesen (unter der Sperre) – verhält sich wie ein sqlite3-Cursor."""
     __slots__ = ("_rows", "lastrowid", "rowcount", "description")
@@ -262,6 +265,8 @@ class Database:
         self.conn.execute("PRAGMA synchronous = FULL")
         self.conn.executescript(SCHEMA)
         self._migrate()
+        with self.conn:  # Namen in der Stationsdatenbank sind höchstens NAME_MAX Zeichen lang (ältere Importe waren länger)
+            self.conn.execute(f"UPDATE callbook SET name=substr(name,1,{NAME_MAX}) WHERE length(name)>{NAME_MAX}")
         if self.get_setting("secret") is None:
             self.set_setting("secret", secrets.token_hex(32))
 
@@ -903,6 +908,7 @@ class Database:
         core = prefixes.core_call(call)
         if not core:
             return ""
+        name = (name or "").strip()[:NAME_MAX]
         locator = geo.normalize_locator(locator)
         if locator and not geo.is_valid_locator(locator):
             locator = ""
@@ -982,6 +988,62 @@ class Database:
     def callbook_count(self) -> int:
         r = self.row("SELECT COUNT(*) AS n FROM callbook")
         return r["n"] if r else 0
+
+    _stats_cache: tuple[Any, dict] | None = None
+
+    def callbook_stats(self) -> dict:
+        """Kennzahlen der Stationsdatenbank: Rufzeichen gesamt, mit Locator/DOK/Name, je Land (Deutschland zuerst).
+        Zwischengespeichert, bis sich in der Datenbank etwas ändert."""
+        key = (self.conn.total_changes, self.callbook_count())
+        if self._stats_cache and self._stats_cache[0] == key:
+            return self._stats_cache[1]
+        def empty() -> dict:
+            return {"total": 0, "locator": 0, "dok": 0, "both": 0, "none": 0, "name": 0}
+        tot, by_country = empty(), {}
+        for call, loc, dok, name in self.conn.execute("SELECT call, locator, dok, name FROM callbook").fetchall():
+            c = by_country.setdefault(prefixes.country(call), empty())
+            for d in (tot, c):
+                d["total"] += 1
+                d["locator"] += bool(loc)
+                d["dok"] += bool(dok)
+                d["both"] += bool(loc and dok)
+                d["none"] += not (loc or dok)
+                d["name"] += bool(name)
+        countries = sorted(({"country": k, **v} for k, v in by_country.items()),
+                           key=lambda c: (c["country"] != "Deutschland", -c["total"], c["country"]))
+        out = {**tot, "countries": countries}
+        self._stats_cache = (key, out)
+        return out
+
+    def callbook_fill_candidates(self, checked_before: str) -> list[str]:
+        """Rufzeichen, denen Locator oder (deutsche Stationen) DOK fehlt und die noch nie bzw. vor checked_before online
+        abgefragt wurden – nie abgefragte und solche ohne Locator zuerst."""
+        out = []
+        for call, loc, dok in self.conn.execute(
+                "SELECT call, locator, dok FROM callbook WHERE (locator='' OR dok='') AND (ext_checked='' OR ext_checked<?) "
+                "ORDER BY ext_checked, locator<>'', call", (checked_before,)).fetchall():
+            if not prefixes.is_plausible_call(call):
+                continue
+            if loc and prefixes.country(call) != "Deutschland":  # DOKs gibt es nur in Deutschland
+                continue
+            out.append(call)
+        return out
+
+    def fill_from_lookup(self, call: str, res: dict, source: str) -> dict:
+        """Ergebnis einer Online-Abfrage übernehmen: nur leere Felder füllen (Locator, DOK nur bei deutschen Stationen, Name),
+        die Abfrage merken (auch ohne Treffer). Rückgabe: welche Felder neu sind."""
+        core = prefixes.core_call(call)
+        row = self.row("SELECT locator, dok, name FROM callbook WHERE call=?", (core,)) or {"locator": "", "dok": "", "name": ""}
+        loc = geo.normalize_locator(res.get("locator", ""))
+        loc = loc if loc and geo.is_valid_locator(loc) else ""
+        dok = normalize_dok(res.get("dok")) if prefixes.country(core) == "Deutschland" else ""
+        name = (res.get("name") or "").strip()[:NAME_MAX]
+        got = {"locator": bool(loc and not row["locator"]), "dok": bool(dok and not row["dok"]), "name": bool(name and not row["name"])}
+        with self.conn:
+            self.conn.execute("UPDATE callbook SET locator=CASE WHEN locator='' THEN ? ELSE locator END, dok=CASE WHEN dok='' THEN ? ELSE dok END, "
+                              "name=CASE WHEN name='' THEN ? ELSE name END WHERE call=?", (loc, dok, name, core))
+        self.set_ext_lookup(core, loc, source)
+        return got
 
     # ----- Chat -----------------------------------------------------------
     def add_chat(self, nick: str, text: str, contest_id: int = 0) -> dict:

@@ -1628,7 +1628,19 @@
   }
   // Verwaltung: Ergebnislisten-Archiv – alle Quellen (DARC UKW/KW, IARU über OK2KKW), alle Jahre; Import läuft im Hintergrund
   const Arch = { entries: {}, timer: null };
-  const archIds = () => { const onlyNew = $("#arch-only-new").checked; return $$(".arch-sel:checked").filter((c) => !(onlyNew && c.dataset.done)).map((c) => c.dataset.id); };
+  // „schon importiert“ gilt nur für dieselben Importregeln: wurde eine Liste ohne „Stationen ohne Locator neu aufnehmen“
+  // importiert und ist das jetzt eingeschaltet, ist sie wieder offen (die Stationen ohne Locator kamen damals nicht mit)
+  const archDone = (c) => !!c.dataset.done && (c.dataset.bare === "1" || !$("#arch-bare").checked);
+  const archIds = () => { const onlyNew = $("#arch-only-new").checked; return $$(".arch-sel:checked").filter((c) => !(onlyNew && archDone(c))).map((c) => c.dataset.id); };
+  function archRefreshDone() {
+    $$(".arch-sel").forEach((c) => {
+      const lab = c.closest("label"), d = archDone(c);
+      lab.classList.toggle("done", d);
+      const mark = lab.querySelector(".arch-mark");
+      if (mark) mark.textContent = c.dataset.done ? (d ? ` ✓ ${c.dataset.at}` : ` ✓ ${c.dataset.at} – ${t("ohne Stationen ohne Locator, wird erneut importiert")}`) : "";
+    });
+    archCount();
+  }
   const archCount = () => { const n = archIds().length; $("#btn-arch-import").textContent = n ? t("{n} Listen importieren", { n }) : t("Ausgewählte importieren"); $("#btn-arch-import").disabled = !n; };
   function archSourceBlock(src, entries) {
     const groups = {}; entries.forEach((e) => (groups[e.group] ||= []).push(e));
@@ -1641,8 +1653,8 @@
     for (const [g, list] of Object.entries(groups)) {
       const gcb = el("input", { type: "checkbox", class: "arch-grp" });
       const items = el("div", { class: "arch-items" }, list.map((e) => el("label", { class: "arch-item" + (e.done ? " done" : ""), title: e.url },
-        el("input", { type: "checkbox", class: "arch-sel", "data-id": e.id, "data-done": e.done ? "1" : "" }), " ", e.label.startsWith(g) ? e.label.slice(g.length).trim() || e.label : e.label,
-        e.done ? el("span", { class: "muted small" }, ` ✓ ${e.done.at}`) : null)));
+        el("input", { type: "checkbox", class: "arch-sel", "data-id": e.id, "data-done": e.done ? "1" : "", "data-bare": e.done?.bare ? "1" : "", "data-at": e.done?.at || "" }), " ", e.label.startsWith(g) ? e.label.slice(g.length).trim() || e.label : e.label,
+        el("span", { class: "muted small arch-mark" }, e.done ? ` ✓ ${e.done.at}` : ""))));
       gcb.addEventListener("change", () => { items.querySelectorAll(".arch-sel").forEach((c) => { c.checked = gcb.checked; }); archCount(); });
       box.append(el("div", { class: "arch-group" }, el("label", { class: "arch-gl" }, gcb, " ", el("b", {}, g), el("span", { class: "muted small" }, ` (${list.length})`)), items));
     }
@@ -1665,10 +1677,11 @@
       }));
       const all = Object.values(Arch.entries).flat();
       sum.textContent = t("{n} Listen gefunden, {d} davon schon importiert", { n: all.length, d: all.filter((e) => e.done).length });
-      $("#arch-actions").classList.remove("hidden"); archCount();
+      $("#arch-actions").classList.remove("hidden"); archRefreshDone();
     } catch (err) { sum.textContent = err.message; toast(err.message, "err"); }
   });
   $("#arch-only-new")?.addEventListener("change", archCount);
+  $("#arch-bare")?.addEventListener("change", archRefreshDone);
   $("#btn-arch-import")?.addEventListener("click", async () => {
     const ids = archIds(); if (!ids.length) return;
     if (ids.length > 40 && !confirm(t("{n} Listen laden? Das dauert etwa {m} Minuten und läuft im Hintergrund weiter.", { n: ids.length, m: Math.max(1, Math.round(ids.length * 1.5 / 60)) }))) return;
@@ -1693,12 +1706,27 @@
       // erledigte Listen gleich als importiert markieren (abgebrochene/fehlerhafte bleiben offen)
       const failed = new Set((j.errors || []).map((e) => e.id)); const today = new Date().toISOString().slice(0, 10);
       (j.done_ids || []).filter((id) => !failed.has(id)).forEach((id) => {
-        const cb = $(`.arch-sel[data-id="${CSS.escape(id)}"]`); if (!cb || cb.dataset.done) return;
-        cb.dataset.done = "1"; cb.checked = false; cb.closest("label").classList.add("done"); cb.closest("label").append(el("span", { class: "muted small" }, ` ✓ ${today}`));
+        const cb = $(`.arch-sel[data-id="${CSS.escape(id)}"]`); if (!cb) return;
+        cb.dataset.done = "1"; cb.dataset.at = today; cb.dataset.bare = j.bare ? "1" : ""; cb.checked = false;
       });
-      archCount();
+      archRefreshDone();
     }
   }
+
+  // automatischer Archiv-Import (einmal am Tag auf dem Server)
+  async function archAutoLoad() {
+    if (!S.info?.maintainer || !S.adminToken || !$("#arch-auto-on")) return;
+    let c; try { c = await GET("/api/results/auto"); } catch (_) { return; }
+    $("#arch-auto-on").checked = !!c.on; $("#arch-auto-logs").checked = !!c.logs; $("#arch-auto-bare").checked = !!c.bare;
+    $("#arch-auto-last").textContent = c.last ? `${t("zuletzt")} ${fmtDate(c.last)}: ${c.last_result}` : "";
+  }
+  ["#arch-auto-on", "#arch-auto-logs", "#arch-auto-bare"].forEach((id) => $(id)?.addEventListener("change", async () => {
+    try { await api("POST", "/api/results/auto", { on: $("#arch-auto-on").checked, logs: $("#arch-auto-logs").checked, bare: $("#arch-auto-bare").checked }); toast(t("Gespeichert"), "ok"); }
+    catch (err) { toast(err.message, "err"); }
+  }));
+  $("#btn-arch-auto-run")?.addEventListener("click", async () => {
+    try { const r = await api("POST", "/api/results/auto/run", {}); toast(r.result); await archAutoLoad(); archPoll(); } catch (err) { toast(err.message, "err"); }
+  });
 
   // ------------------------------------------------------------ Statistik
   async function renderStats() {
@@ -1889,7 +1917,7 @@
       $("#upd-auto").checked = cfg.update_check !== false; $("#upd-current").textContent = `v${S.info.version}`;
       if (S.update?.available) { $("#upd-result").textContent = t("Neue Version {v} verfügbar", { v: S.update.latest }); $("#btn-upd-apply").classList.toggle("hidden", !S.update.can_self_update); }
     } catch (_) { /* */ }
-    renderBackups(); renderCallbook(); renderAudit();
+    renderBackups(); renderCallbook(); renderAudit(); fillPoll(); archAutoLoad();
   }
   $("#admin-login-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -2082,7 +2110,66 @@
       await loadContests(); renderAdmin();
     } catch (err) { out.textContent = "Fehler: " + err.message; toast(err.message, "err"); }
   });
+  // Kennzahlen der Stationsdatenbank: gesamt und je Land (Deutschland zuerst), mit/ohne Locator und DOK
+  async function renderCallbookStats() {
+    const box = $("#cb-stats"); if (!box) return;
+    let st; try { st = await GET("/api/callbook/stats"); } catch (_) { return; }
+    const n = (v) => Number(v || 0).toLocaleString();
+    const pct = (v, of) => (of ? ` (${Math.round((100 * v) / of)} %)` : "");
+    box.innerHTML = "";
+    box.append(el("div", { class: "cb-kpis" },
+      ...[[t("Rufzeichen"), st.total, ""], [t("mit Locator"), st.locator, st.total], [t("mit DOK"), st.dok, st.total],
+        [t("Locator und DOK"), st.both, st.total], [t("ohne Locator und DOK"), st.none, st.total], [t("mit Name"), st.name, st.total]]
+        .map(([label, v, of]) => el("div", { class: "cb-kpi" }, el("b", {}, n(v)), el("span", {}, label + pct(v, of))))));
+    const rows = st.countries || [];
+    const top = rows.slice(0, 12), rest = rows.slice(12);
+    const cell = (v, of, cls = "") => el("td", { class: "num " + cls }, n(v), of ? el("span", { class: "muted small" }, pct(v, of)) : null);
+    const line = (c) => el("tr", { class: c.country === "Deutschland" ? "cb-home" : "" }, el("td", {}, c.country === "?" ? t("unbekannt") : c.country),
+      cell(c.total), cell(c.locator, c.total), cell(c.dok, c.total), cell(c.both, c.total), cell(c.none, c.total, c.none ? "warn" : ""));
+    const table = el("table", { class: "compact cb-country" },
+      el("thead", {}, el("tr", {}, ...[t("Land"), t("Stationen"), t("mit Locator"), t("mit DOK"), t("beides"), t("ohne beides")].map((h) => el("th", {}, h)))),
+      el("tbody", {}, ...top.map(line)));
+    if (rest.length) {
+      const sum = rest.reduce((a, c) => { for (const k of ["total", "locator", "dok", "both", "none"]) a[k] += c[k]; return a; }, { country: t("{n} weitere Länder", { n: rest.length }), total: 0, locator: 0, dok: 0, both: 0, none: 0 });
+      table.tBodies[0].append(line(sum));
+    }
+    box.append(el("details", { class: "cb-country-wrap", open: localStorage.getItem("cl.cbStats") === "1" ? 1 : null, ontoggle: (e) => localStorage.setItem("cl.cbStats", e.target.open ? "1" : "0") },
+      el("summary", {}, t("Nach Ländern")), el("div", { class: "table-wrap" }, table)));
+  }
+  // Stationsdatenbank aus HamQTH/QRZ.com auffüllen – läuft als Hintergrundjob auf dem Server, die Seite zeigt nur den Stand
+  const Fill = { timer: null, running: false };
+  async function fillPoll(again) {
+    clearTimeout(Fill.timer);
+    if (!$("#fill-card") || !S.adminToken) return;
+    let r; try { r = await GET("/api/callbook/fill"); } catch (_) { return; }
+    const n = (v) => Number(v || 0).toLocaleString(), c = r.cfg, j = r.job || {};
+    if (!again) { $("#fill-pause").value = c.pause; $("#fill-daily").value = c.daily; $("#fill-redo").value = c.redo_days; $("#fill-auto").checked = !!c.auto; }
+    $("#fill-info").textContent = r.enabled
+      ? t("Dienst: {p} · noch offen: {n} Stationen · heute abgefragt: {u} von {d}", { p: r.provider_name, n: n(r.open), u: n(r.used_today), d: n(c.daily) })
+      : t("Kein Dienst eingerichtet – erst unter Einstellungen → Externe Rufzeichen-Abfrage HamQTH oder QRZ.com eintragen.");
+    $("#btn-fill-start").disabled = !r.enabled || !!j.running;
+    $("#btn-fill-cancel").classList.toggle("hidden", !j.running);
+    $("#fill-status").textContent = j.running || j.finished
+      ? (j.running ? `⟳ ${j.current || "…"} · ${n(j.done)}/${n(j.total)}` : `${t("Zuletzt")} ${fmtDate(j.finished)}${j.auto ? ` (${t("automatisch")})` : ""}: ${n(j.done)} ${t("abgefragt")}`) +
+        " · " + t("{f} gefunden – {l} Locator, {d} DOK, {m} Namen ergänzt", { f: n(j.found), l: n(j.locator), d: n(j.dok), m: n(j.name) }) +
+        (j.errors ? ` · ${j.errors} ${t("Fehler")}${j.last_error && !j.stopped ? ` (${j.last_error})` : ""}` : "") +
+        (j.stopped ? ` · ${j.stopped.startsWith("gestoppt: ") ? `${t("gestoppt")}: ${j.stopped.slice(10)}` : t(j.stopped)}` : "")
+      : "";
+    if (Fill.running && !j.running) renderCallbook();
+    Fill.running = !!j.running;
+    if (j.running) Fill.timer = setTimeout(() => fillPoll(true), 2000);
+  }
+  $("#fill-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await api("POST", "/api/callbook/fill/settings", { pause: Number($("#fill-pause").value), daily: Number($("#fill-daily").value), redo_days: Number($("#fill-redo").value), auto: $("#fill-auto").checked });
+      toast(t("Gespeichert"), "ok"); fillPoll();
+    } catch (err) { toast(err.message, "err"); }
+  });
+  $("#btn-fill-start")?.addEventListener("click", async () => { try { await api("POST", "/api/callbook/fill/start", {}); fillPoll(true); } catch (err) { toast(err.message, "err"); } });
+  $("#btn-fill-cancel")?.addEventListener("click", () => api("POST", "/api/callbook/fill/cancel", {}).then(() => fillPoll(true)).catch(() => {}));
   async function renderCallbook() {
+    renderCallbookStats();
     const tb = $("#cb-table tbody"); tb.innerHTML = "";
     try {
       const r = await GET(`/api/callbook?q=${encodeURIComponent($("#cb-search").value.trim())}&limit=300`);
@@ -2090,7 +2177,7 @@
       for (const c of r.rows) tb.append(el("tr", {},
         el("td", {}, el("b", {}, c.call)), el("td", {}, c.locator, c.alt_locators ? el("span", { class: "muted small", title: t("weitere bekannte Standorte") }, ` (${c.alt_locators.split(",").join(", ")})`) : null), el("td", { class: "muted small" }, c.name || ""),
         el("td", { class: "small", title: "DOK / OV" }, c.dok || ""),
-        el("td", { class: "num muted small" }, c.qso_count ? `${c.qso_count}×` : ""), el("td", { class: "muted small" }, c.last_seen ? fmtDate(c.last_seen) : ""),
+        el("td", { class: "muted small" }, c.last_seen ? fmtDate(c.last_seen) : ""),
         el("td", { class: "actions" }, el("button", { class: "ghost", onclick: () => { $("#cb-call").value = c.call; $("#cb-loc").value = c.locator; $("#cb-name").value = c.name || ""; $("#cb-dok").value = c.dok || ""; } }, "✎"), " ",
           el("button", { class: "ghost danger", onclick: async () => { if (confirm(t("{call} aus der Stationsdatenbank löschen?", c))) { await api("DELETE", `/api/callbook/${encodeURIComponent(c.call)}`); renderCallbook(); } } }, "✕"))));
       if (!r.rows.length) tb.append(el("tr", {}, el("td", { class: "muted" }, t("Keine Einträge."))));

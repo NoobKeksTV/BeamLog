@@ -10,7 +10,7 @@ import re
 import time
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -84,6 +84,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         task = asyncio.create_task(backup_loop()) if interval > 0 else None
         update_task = asyncio.create_task(update_loop())
         demo_task = asyncio.create_task(demo_loop()) if DEMO else None
+        bg_tasks = [] if DEMO else [asyncio.create_task(results_auto_loop()), asyncio.create_task(fill_auto_loop())]
         for st in db.rows("SELECT id FROM stations WHERE kst_autostart=1 AND kst_user<>'' AND kst_pass<>''"):
             try:
                 await kst_start(st["id"])
@@ -96,6 +97,10 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if task:
             task.cancel()
         update_task.cancel()
+        for t in bg_tasks:
+            t.cancel()
+        if fill["task"]:
+            fill["task"].cancel()
         if demo_task:
             demo_task.cancel()
         try:
@@ -373,7 +378,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if not res:
             lookup_cache[core] = _t.time()
             return {"source": "none"}
-        db.learn_call(core, res.get("locator", ""), source=res["source"], name=res.get("name", ""))
+        db.learn_call(core, res.get("locator", ""), source=res["source"], name=res.get("name", ""), dok=res.get("dok", ""))
         return {"call": core, **res}
 
     @app.post("/api/setup")
@@ -674,13 +679,166 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     @app.get("/api/callbook")
     def callbook_list(q: str = "", limit: int = 200):
         q = q.strip().upper()
-        sql = "SELECT call, locator, name, qso_count, last_seen, alt_locators, source, dok FROM callbook"
+        sql = "SELECT call, locator, name, last_seen, alt_locators, source, dok FROM callbook"
         params: list = []
         if q:
             sql += " WHERE call LIKE ? OR locator LIKE ? OR name LIKE ? OR dok=?"
             params = [f"%{q}%", f"{q}%", f"%{q}%", q]
         rows = db.rows(sql + " ORDER BY call LIMIT ?", params + [min(int(limit), 2000)])
         return {"total": db.callbook_count(), "rows": rows}
+
+    @app.get("/api/callbook/stats")
+    async def callbook_stats():
+        """Kennzahlen der Stationsdatenbank (gesamt und je Land) für die Verwaltung."""
+        return await asyncio.to_thread(db.callbook_stats)
+
+    # ---- Stationsdatenbank aus HamQTH/QRZ.com auffüllen: alle Stationen ohne Locator bzw. (DL) ohne DOK nacheinander
+    # abfragen – im Hintergrund, mit Pause zwischen den Abfragen und Tageslimit, damit die Dienste nicht überlastet werden
+    FILL_DEFAULT = {"auto": False, "pause": 3.0, "daily": 1000, "redo_days": 180}
+    fill: dict[str, Any] = {"job": None, "task": None}
+
+    def fill_cfg() -> dict:
+        try:
+            cfg = {**FILL_DEFAULT, **json.loads(db.get_setting("cb_fill", "") or "{}")}
+        except ValueError:
+            cfg = dict(FILL_DEFAULT)
+        cfg["pause"] = min(max(float(cfg["pause"]), 1.0), 60.0)
+        cfg["daily"] = min(max(int(cfg["daily"]), 1), 100000)
+        cfg["redo_days"] = min(max(int(cfg["redo_days"]), 1), 3650)
+        return cfg
+
+    def fill_used_today() -> int:
+        try:
+            u = json.loads(db.get_setting("cb_fill_used", "") or "{}")
+        except ValueError:
+            u = {}
+        return int(u.get("n", 0)) if u.get("day") == utcnow_iso()[:10] else 0
+
+    def fill_count_one() -> int:
+        n = fill_used_today() + 1
+        db.set_setting("cb_fill_used", json.dumps({"day": utcnow_iso()[:10], "n": n}))
+        return n
+
+    def fill_candidates(cfg: dict) -> list[str]:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=cfg["redo_days"])).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return db.callbook_fill_candidates(cutoff)
+
+    def fill_public(job: dict | None) -> dict:
+        return {k: v for k, v in job.items() if k != "cancel"} if job else {"running": False}
+
+    def start_fill(auto: bool = False) -> dict:
+        client = lookup_client()
+        if not client.enabled:
+            raise HTTPException(400, "Erst unter Einstellungen → Externe Rufzeichen-Abfrage HamQTH oder QRZ.com einrichten")
+        if fill["job"] and fill["job"]["running"]:
+            raise HTTPException(409, "Das Auffüllen läuft bereits")
+        cfg = fill_cfg()
+        job = {"running": True, "cancel": False, "auto": auto, "provider": client.provider, "total": 0, "done": 0, "found": 0, "locator": 0,
+               "dok": 0, "name": 0, "errors": 0, "last_error": "", "current": "", "stopped": "", "started": utcnow_iso(), "finished": ""}
+        fill["job"] = job
+
+        async def run():
+            fails = 0
+            try:
+                calls = await asyncio.to_thread(fill_candidates, cfg)
+                fill["open"] = len(calls)
+                left = cfg["daily"] - fill_used_today()
+                job["total"] = max(0, min(len(calls), left))
+                if left <= 0:
+                    job["stopped"] = "Tageslimit erreicht – geht morgen weiter"
+                    return
+                for call in calls[:left]:
+                    if job["cancel"]:
+                        job["stopped"] = "abgebrochen"
+                        break
+                    job["current"] = call
+                    try:
+                        res = await asyncio.to_thread(client.lookup, call)
+                        fails = 0
+                    except lookup.LookupError_ as e:
+                        fails += 1
+                        job["errors"] += 1
+                        job["last_error"] = str(e)[:200]
+                        low = str(e).lower()
+                        if fails >= 3 or any(w in low for w in ("limit", "exceed", "subscription", "denied", "banned", "password", "anmeldung", "login")):
+                            job["stopped"] = f"gestoppt: {str(e)[:160]}"
+                            break
+                        await asyncio.sleep(max(cfg["pause"] * 5, 15))  # Dienst hakt: länger warten
+                        continue
+                    fill_count_one()
+                    got = await asyncio.to_thread(db.fill_from_lookup, call, res or {}, client.provider)
+                    job["done"] += 1
+                    job["found"] += bool(res)
+                    for k in ("locator", "dok", "name"):
+                        job[k] += got[k]
+                    await asyncio.sleep(cfg["pause"])
+                else:
+                    if len(calls) > left:
+                        job["stopped"] = "Tageslimit erreicht – geht morgen weiter"
+            finally:
+                job["running"] = False
+                job["current"] = ""
+                job["finished"] = utcnow_iso()
+                if job["done"] or job["errors"]:
+                    db.add_audit("Stationsdatenbank online aufgefüllt" + (" (automatisch)" if auto else ""),
+                                 details=f"{lookup.PROVIDERS.get(client.provider, client.provider)}: {job['done']} abgefragt, {job['found']} gefunden, "
+                                 f"{job['locator']} Locator, {job['dok']} DOK, {job['name']} Namen ergänzt, {job['errors']} Fehler"
+                                 + (f" – {job['stopped']}" if job["stopped"] else ""), nick="Server" if auto else "Admin", admin=True)
+
+        fill["task"] = asyncio.create_task(run())
+        return fill_public(job)
+
+    async def fill_auto_loop():
+        await asyncio.sleep(300)
+        while True:
+            try:
+                cfg = fill_cfg()
+                if cfg["auto"] and lookup_client().enabled and not (fill["job"] and fill["job"]["running"]) and fill_used_today() < cfg["daily"]:
+                    if await asyncio.to_thread(fill_candidates, cfg):
+                        start_fill(auto=True)
+            except Exception as e:  # noqa: BLE001
+                print(f"Automatisches Auffüllen der Stationsdatenbank: {e}")
+            await asyncio.sleep(1800)
+
+    def require_no_demo() -> None:
+        if DEMO:
+            raise HTTPException(403, "In der Demo nicht verfügbar")
+
+    @app.get("/api/callbook/fill", dependencies=[Depends(require_admin)])
+    async def fill_status():
+        cfg = fill_cfg()
+        client = lookup_client()
+        job = fill["job"]
+        if job and job["running"]:  # während des Laufs nicht jedes Mal die ganze Datenbank durchsehen
+            n_open = max(0, fill.get("open", 0) - job["done"])
+        else:
+            n_open = fill["open"] = len(await asyncio.to_thread(fill_candidates, cfg))
+        return {"cfg": cfg, "job": fill_public(job), "open": n_open, "used_today": fill_used_today(),
+                "provider": client.provider, "provider_name": lookup.PROVIDERS.get(client.provider, ""), "enabled": client.enabled}
+
+    @app.post("/api/callbook/fill/start", dependencies=[Depends(require_admin), Depends(require_no_demo)])
+    async def fill_start():
+        return start_fill()
+
+    @app.post("/api/callbook/fill/cancel", dependencies=[Depends(require_admin)])
+    def fill_cancel():
+        if fill["job"]:
+            fill["job"]["cancel"] = True
+        return {"ok": True}
+
+    @app.post("/api/callbook/fill/settings", dependencies=[Depends(require_admin), Depends(require_no_demo)])
+    def fill_settings(body: dict):
+        cfg = fill_cfg()
+        for k, conv in (("auto", bool), ("pause", float), ("daily", int), ("redo_days", int)):
+            if k in body:
+                try:
+                    cfg[k] = conv(body[k])
+                except (TypeError, ValueError):
+                    raise HTTPException(400, f"Ungültiger Wert für {k}")
+        db.set_setting("cb_fill", json.dumps(cfg))
+        cfg = fill_cfg()
+        db.add_audit("Auffüllen der Stationsdatenbank eingestellt", details=json.dumps(cfg), nick="Admin", admin=True)
+        return cfg
 
     @app.delete("/api/callbook/{call}", dependencies=[Depends(require_admin)])
     def callbook_delete(call: str):
@@ -1075,27 +1233,36 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         ids = [i for i in body.get("ids") or [] if i in archive["entries"]]
         if not ids:
             raise HTTPException(400, "Keine Listen ausgewählt (vorher „Listen laden“)")
+        return start_results_import(ids, bool(body.get("without_locator")))
+
+    def start_results_import(ids: list[str], add_bare: bool, auto: bool = False) -> dict:
+        """Import im Hintergrund starten (läuft auf dem Server weiter, auch ohne offene Seite). Laden und Einlesen laufen in
+        Threads – der Server bleibt währenddessen bedienbar."""
         job = {"running": True, "cancel": False, "total": len(ids), "done": 0, "current": "", "active": [], "done_ids": [], "new": 0, "known": 0,
-               "dok": 0, "skipped": 0, "rows": 0, "errors": [], "started": utcnow_iso(), "finished": ""}
+               "dok": 0, "skipped": 0, "rows": 0, "errors": [], "started": utcnow_iso(), "finished": "", "bare": add_bare, "auto": auto}
         archive["job"] = job
-        add_bare = bool(body.get("without_locator"))
         active: dict[str, str] = {}  # id -> Anzeige (Name · Fortschritt) der gerade laufenden Listen
+        learn_lock = _threading.Lock()  # immer nur eine Liste zugleich in die Datenbank (Zähler, „DOK ergänzt“)
 
         def show() -> None:
             job["active"] = list(active.values())
             job["current"] = " | ".join(job["active"])
 
         def learn(e, parsed) -> int:
-            """Ergebnis einer Liste übernehmen – läuft im Event-Loop, also immer nur eine Liste zugleich in der Datenbank."""
+            """Ergebnis einer Liste übernehmen (im Thread). Jeder Eintrag ist eine eigene kurze Transaktion – andere Anfragen
+            kommen dazwischen dran, statt bei großen Einzel-Log-Listen (100 000 Zeilen) zu warten."""
             when = f"{e.when}T00:00:00Z" if e.when else ""
             n = 0
             uniq = list(dict.fromkeys(parsed.rows))  # Einzel-Logs: dieselbe Station steht in Hunderten Logs
-            with db.bulk():
-                for call, loc, dok in uniq:
-                    if not loc and not add_bare and not db.lookup_call(call):
+            with learn_lock, db.bulk():
+                for k, (call, loc, dok) in enumerate(uniq):
+                    if job["cancel"]:
+                        break
+                    core = prefixes.core_call(call)
+                    before = db.row("SELECT dok FROM callbook WHERE call=?", (core,))
+                    if not loc and not add_bare and before is None:
                         job["skipped"] += 1
                         continue
-                    before = db.row("SELECT dok FROM callbook WHERE call=?", (prefixes.core_call(call),))
                     r = db.learn_call(call, loc, source=e.source, when=when, dok=dok)
                     if r == "new":
                         job["new"] += 1
@@ -1104,6 +1271,9 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                         if dok and before is not None and not before.get("dok"):
                             job["dok"] += 1
                     n += 1
+                    if k % 2000 == 0 and len(uniq) > 5000:
+                        active[e.id] = f"{e.label} · einlesen {k}/{len(uniq)}"
+                        show()
             job["rows"] += len(parsed.rows)
             return n
 
@@ -1133,8 +1303,12 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                         active.pop(i, None)
                         show()
                         continue
-                    n = learn(e, parsed)
-                    done[i] = {"at": utcnow_iso()[:10], "n": n}
+                    n = await asyncio.to_thread(learn, e, parsed)
+                    if job["cancel"]:
+                        active.pop(i, None)
+                        break
+                    # mit den Importregeln merken: wer später „ohne Locator neu aufnehmen“ einschaltet, bekommt die Liste wieder angeboten
+                    done[i] = {"at": utcnow_iso()[:10], "n": n, "bare": add_bare}
                     db.set_setting("results_done", json.dumps(done))
                     job["done"] += 1
                     job["done_ids"].append(i)
@@ -1148,11 +1322,78 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 active.clear()
                 show()
                 job["finished"] = utcnow_iso()
-                db.add_audit("Ergebnislisten importiert", details=f"{job['done']}/{job['total']} Listen, {job['new']} neu, {job['known']} bekannt, "
-                             f"{job['dok']} DOK ergänzt, {len(job['errors'])} Fehler", nick="Admin", admin=True)
+                db.add_audit("Ergebnislisten importiert" + (" (automatisch)" if auto else ""),
+                             details=f"{job['done']}/{job['total']} Listen, {job['new']} neu, {job['known']} bekannt, "
+                             f"{job['dok']} DOK ergänzt, {len(job['errors'])} Fehler", nick="Server" if auto else "Admin", admin=True)
 
         archive["task"] = asyncio.create_task(run())
         return {k: v for k, v in job.items() if k != "cancel"}
+
+    # ---- automatischer Archiv-Import (Betreuer): täglich neue Listen suchen und übernehmen, ganz im Hintergrund
+    AUTO_DEFAULT = {"on": False, "logs": False, "bare": False, "last": "", "last_result": ""}
+
+    def results_auto_cfg() -> dict:
+        try:
+            return {**AUTO_DEFAULT, **json.loads(db.get_setting("results_auto", "") or "{}")}
+        except ValueError:
+            return dict(AUTO_DEFAULT)
+
+    def archive_open(entries, done: dict, bare: bool) -> list[str]:
+        """Listen, die mit diesen Regeln noch nicht übernommen wurden."""
+        return [e.id for e in entries if e.id not in done or (bare and not done[e.id].get("bare"))]
+
+    async def results_auto_run(force: bool = False) -> str:
+        cfg = results_auto_cfg()
+        if not (cfg["on"] or force) or not is_maintainer():
+            return "aus"
+        if archive["job"] and archive["job"]["running"]:
+            return "es läuft bereits ein Import"
+        if not force and cfg["last"] and cfg["last"] > (datetime.now(timezone.utc) - timedelta(hours=20)).strftime("%Y-%m-%dT%H:%M:%SZ"):
+            return "heute schon gelaufen"
+        done, ids, errors = archive_done(), [], []
+        for key in results_archive.SOURCES:
+            if key.endswith("-logs") and not cfg["logs"]:
+                continue
+            try:
+                entries = await asyncio.to_thread(results_archive.list_entries, archive_fetch, key, datetime.now(timezone.utc).year)
+            except Exception as e:  # noqa: BLE001 – eine nicht erreichbare Quelle hält die anderen nicht auf
+                errors.append(f"{key}: {str(e)[:80]}")
+                continue
+            archive["entries"].update({e.id: e for e in entries})
+            ids += archive_open(entries, done, cfg["bare"])
+        cfg["last"] = utcnow_iso()
+        cfg["last_result"] = (f"{len(ids)} neue Listen gestartet" if ids else "keine neuen Listen") + (f" · nicht erreichbar: {', '.join(errors)}" if errors else "")
+        db.set_setting("results_auto", json.dumps(cfg))
+        if ids:
+            start_results_import(ids, cfg["bare"], auto=True)
+        return cfg["last_result"]
+
+    async def results_auto_loop():
+        await asyncio.sleep(600)  # erst 10 min nach dem Start – der Server soll zuerst normal laufen
+        while True:
+            try:
+                await results_auto_run()
+            except Exception as e:  # noqa: BLE001
+                print(f"Automatischer Archiv-Import: {e}")
+            await asyncio.sleep(3 * 3600)  # alle 3 h prüfen, gelaufen wird höchstens einmal am Tag
+
+    @app.get("/api/results/auto", dependencies=[Depends(require_maintainer)])
+    def results_auto_get():
+        return results_auto_cfg()
+
+    @app.post("/api/results/auto", dependencies=[Depends(require_maintainer)])
+    def results_auto_set(body: dict):
+        cfg = results_auto_cfg()
+        for k in ("on", "logs", "bare"):
+            if k in body:
+                cfg[k] = bool(body[k])
+        db.set_setting("results_auto", json.dumps(cfg))
+        db.add_audit("Automatischer Archiv-Import geändert", details=json.dumps({k: cfg[k] for k in ("on", "logs", "bare")}), nick="Admin", admin=True)
+        return cfg
+
+    @app.post("/api/results/auto/run", dependencies=[Depends(require_maintainer)])
+    async def results_auto_now():
+        return {"result": await results_auto_run(force=True)}
 
     @app.get("/api/results/job", dependencies=[Depends(require_maintainer)])
     def results_job():

@@ -47,10 +47,23 @@ jede veröffentlichte Ergebnisliste zum Anhaken – einzeln, je Contest/Jahrgang
 | IARU-Region-1-UKW-Conteste, Contest-Robot `iaru.oevsv.at` (Ergebnis-CSV je Contest, dazu die Gesamtliste `vhf.csv`) | ab 2019 | Rufzeichen und Locator |
 | IARU-Contest-Robot: **Einzel-Logs** aller Teilnehmer (je Teilnehmer alle QSOs) | ab 2019 | Rufzeichen und Locator aller QSO-Partner – auch Stationen ohne eigenes Log; als „unique“ (vermutlich verhört) oder ungültig markierte QSOs werden ausgelassen. Dauert 10–30 Minuten je Contest. |
 
-Zusammen rund 950 Listen (davon rund 170 mit Einzel-Logs). Die Suche fragt alle Quellen gleichzeitig ab. Der Import läuft im Hintergrund (Fortschrittsbalken, abbrechbar, läuft auch nach dem
-Neuladen der Seite weiter) und lädt bis zu sechs Listen gleichzeitig – je Server höchstens vier Abrufe zugleich, um die Veranstalter
-zu schonen. Die Anzeige zeigt jede gerade laufende Liste mit ihrem Fortschritt.
-Bereits importierte Listen sind markiert und werden mit „nur noch nicht importierte“ übersprungen.
+Zusammen rund 950 Listen (davon rund 170 mit Einzel-Logs). Die Suche fragt alle Quellen gleichzeitig ab. Der Import läuft
+**auf dem Server** im Hintergrund (Fortschrittsbalken, abbrechbar) – die Seite muss dafür nicht offen bleiben; beim nächsten
+Öffnen steht der Stand wieder da. Ein Neustart des Servers bricht ihn ab. Er lädt bis zu sechs Listen gleichzeitig – je Server
+höchstens acht Abrufe zugleich, um die Veranstalter zu schonen. Die Anzeige zeigt jede gerade laufende Liste mit ihrem Fortschritt.
+Bereits importierte Listen sind markiert und werden mit „nur noch nicht importierte“ übersprungen. Das gilt **je Importregel**:
+wurde eine Liste ohne „Stationen ohne Locator neu aufnehmen“ übernommen und ist der Haken jetzt gesetzt, gilt sie wieder als
+offen („wird erneut importiert“) – die Stationen ohne Locator kamen beim ersten Mal ja nicht mit.
+
+**Warum dauern Einzel-Logs so lange?** Die Ergebnisliste selbst ist schnell geladen. Für die Einzel-Logs gibt es aber keine
+Gesamtdatei: der IARU-Contest-Robot liefert jedes Teilnehmer-Log als eigene Seite – beim September-Contest über 2000 Seiten zu
+je 0,5–2 Sekunden Antwortzeit (der Robot rechnet jede Seite frisch). Das Einlesen der danach über 100 000 Zeilen läuft in einem
+eigenen Thread, der Server bleibt währenddessen bedienbar.
+
+**Automatisch:** Mit „neue Listen täglich übernehmen“ sucht der Server einmal am Tag (erstmals 10 Minuten nach dem Start) in
+allen Quellen nach Listen, die mit den eingestellten Regeln noch nicht übernommen wurden, und importiert sie im Hintergrund.
+„mit Einzel-Logs“ nimmt die Einzel-Log-Quellen dazu (dauert entsprechend), „Stationen ohne Locator neu aufnehmen“ gilt wie
+beim Import von Hand. „Jetzt prüfen“ startet die Suche sofort; daneben steht das Ergebnis des letzten Laufs.
 
 - Neuere Angaben gewinnen (das Datum der Liste zählt); ein älterer Locator bleibt als Alternative erhalten.
 - KW-Listen ergänzen standardmäßig nur den **DOK** bereits bekannter Stationen. Mit „Stationen ohne Locator neu aufnehmen“
