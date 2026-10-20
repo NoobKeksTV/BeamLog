@@ -270,20 +270,89 @@ class FairSlots:
             self.cv.notify_all()
 
 
-def fetch_many(fetch: Fetch, urls: list[str], progress=None, workers: int = 0) -> list[str]:
+class PageCache:
+    """Zwischenspeicher für Einzel-Logs: je Seiten-URL die daraus gelesenen Zeilen (Call, Locator, DOK). Einzel-Logs abgeschlossener
+    Conteste ändern sich nicht mehr – einmal gelesen, muss die Seite nie wieder geladen werden (nach Abbruch oder Neustart geht es
+    dort weiter, ein erneuter Import läuft sofort durch). Eigene SQLite-Datei neben der Datenbank (nicht in den Backups); löschen
+    schadet nicht, dann wird neu geladen."""
+
+    def __init__(self, path):
+        import sqlite3
+        import threading
+        self.path = path
+        self._lock = threading.Lock()
+        self._c = sqlite3.connect(str(path), check_same_thread=False)
+        with self._lock, self._c:
+            self._c.execute("PRAGMA journal_mode=WAL")
+            self._c.execute("CREATE TABLE IF NOT EXISTS pages (url TEXT PRIMARY KEY, rows TEXT NOT NULL, at TEXT NOT NULL)")
+
+    def get(self, url: str) -> list[tuple[str, str, str]] | None:
+        import json
+        with self._lock:
+            r = self._c.execute("SELECT rows FROM pages WHERE url=?", (url,)).fetchone()
+        return [tuple(x) for x in json.loads(r[0])] if r else None
+
+    def put(self, url: str, rows: list[tuple[str, str, str]]) -> None:
+        import json
+        import time as _time
+        with self._lock, self._c:
+            self._c.execute("INSERT OR REPLACE INTO pages(url, rows, at) VALUES(?,?,?)",
+                            (url, json.dumps(rows, separators=(",", ":")), _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())))
+
+    def count(self) -> int:
+        with self._lock:
+            return self._c.execute("SELECT COUNT(*) FROM pages").fetchone()[0]
+
+
+def fetch_rows(fetch: Fetch, urls: list[str], parse, progress=None, cache: PageCache | None = None) -> list[tuple[str, str, str]]:
+    """Viele Einzelseiten laden und mit parse(page) lesen – schon gelesene Seiten kommen aus dem Zwischenspeicher. Nur erfolgreich
+    geladene Seiten werden gespeichert (eine fehlgeschlagene wird beim nächsten Mal erneut versucht)."""
+    rows: list[tuple[str, str, str]] = []
+    todo = []
+    for u in urls:
+        hit = cache.get(u) if cache else None
+        if hit is None:
+            todo.append(u)
+        else:
+            rows += hit
+    done = len(urls) - len(todo)
+    if progress and done and progress(done, len(urls)) is False:
+        raise Cancelled
+
+    def prog(n: int, total: int):
+        return progress(done + n, len(urls)) if progress else True
+
+    def load(u: str) -> tuple[str, list | None]:
+        try:
+            page = _text(fetch(u))
+        except Exception:  # noqa: BLE001 – eine fehlende Einzelseite soll nicht die ganze Liste kippen
+            return u, None
+        got = parse(page)
+        if cache is not None and got:  # leere Ergebnisse nicht merken – könnte eine Fehlerseite gewesen sein
+            cache.put(u, got)
+        return u, got
+    for _u, got in fetch_many(lambda u: u, todo, prog, loader=load):
+        rows += got or []
+    return rows
+
+
+def fetch_many(fetch: Fetch, urls: list[str], progress=None, workers: int = 0, loader=None) -> list:
     """Viele Einzelseiten gleichzeitig laden (jede braucht auf den Servern rund eine Sekunde); Ergebnisse in der Reihenfolge der URLs.
     progress(n, gesamt) nach jeder Seite – gibt er False zurück, wird abgebrochen (Cancelled)."""
     from concurrent.futures import ThreadPoolExecutor
     import threading
     lock, state = threading.Lock(), {"n": 0, "stop": False}
 
-    def one(url: str) -> str:
+    def one(url: str):
         if state["stop"]:
-            return ""
-        try:
-            page = _text(fetch(url))
-        except Exception:  # noqa: BLE001 – eine fehlende Einzelseite soll nicht die ganze Liste kippen
-            page = ""
+            return (url, None) if loader else ""
+        if loader:
+            page = loader(url)
+        else:
+            try:
+                page = _text(fetch(url))
+            except Exception:  # noqa: BLE001 – eine fehlende Einzelseite soll nicht die ganze Liste kippen
+                page = ""
         with lock:
             state["n"] += 1
             n = state["n"]
@@ -298,7 +367,7 @@ def fetch_many(fetch: Fetch, urls: list[str], progress=None, workers: int = 0) -
     return pages
 
 
-def parse_iaru_logs(fetch: Fetch, cid: str, progress=None) -> Parsed:
+def parse_iaru_logs(fetch: Fetch, cid: str, progress=None, cache: PageCache | None = None) -> Parsed:
     """Alle Teilnehmer eines Contests (eigene Station + Locator) und deren QSO-Partner."""
     part = _text(fetch(f"{IARU_ROBOT}/v_part/prg_list.php?reset=1&start=1&master_v_part_cont_id={cid}&master_v_part_vw=v_upld"))
     rows: list[tuple[str, str, str]] = []
@@ -314,8 +383,7 @@ def parse_iaru_logs(fetch: Fetch, cid: str, progress=None) -> Parsed:
         if call and loc:
             rows.append((call, loc, ""))
     urls = [f"{IARU_ROBOT}/v_qsos/prg_list.php?reset=1&start=1&master_v_qsos_part_id={pid}&master_v_qsos_vw=v_part" for pid in pids]
-    for page in fetch_many(fetch, urls, progress):
-        rows += parse_iaru_qsos(page)
+    rows += fetch_rows(fetch, urls, parse_iaru_qsos, progress, cache)
     return Parsed(rows, 1 + len(pids))
 
 
@@ -400,7 +468,7 @@ def parse_cabrillo(text: str) -> list[tuple[str, str, str]]:
     return rows
 
 
-def parse_darc_kw_logs(fetch: Fetch, e: Entry, progress=None) -> Parsed:
+def parse_darc_kw_logs(fetch: Fetch, e: Entry, progress=None, cache: PageCache | None = None) -> Parsed:
     """Teilnehmer aus der Ergebnisliste des Jahres (bei mehreren Durchgängen je Durchgang), dann je Teilnehmer das Open Log."""
     key = e.id.split(":")[1]
     base, _, eds = e.url.partition("&editions=")
@@ -409,10 +477,7 @@ def parse_darc_kw_logs(fetch: Fetch, e: Entry, progress=None) -> Parsed:
     for ed in editions:
         calls = list(dict.fromkeys(c for c, _, _ in parse_html_tables(_text(fetch(kw_url(key, e.year, ed))))))
         urls += [f"{base}&edition={ed or 2000}&call={c}&Show=1" for c in calls]
-    rows: list[tuple[str, str, str]] = []
-    for page in fetch_many(fetch, urls, progress):
-        if "QSO:" in page:
-            rows += parse_cabrillo(importers.html_to_text(page.encode("utf-8")))
+    rows = fetch_rows(fetch, urls, lambda page: parse_cabrillo(importers.html_to_text(page.encode("utf-8"))) if "QSO:" in page else [], progress, cache)
     return Parsed(rows, len(urls) + len(editions))
 
 
@@ -486,8 +551,9 @@ def parse_text_pairs(text: str) -> list[tuple[str, str, str]]:
     return rows
 
 
-def parse_entry(fetch: Fetch, e: Entry, progress=None) -> Parsed:
-    """progress(n, gesamt) bei Listen aus vielen Einzelseiten; gibt er False zurück, wird mit Cancelled abgebrochen."""
+def parse_entry(fetch: Fetch, e: Entry, progress=None, cache: PageCache | None = None) -> Parsed:
+    """progress(n, gesamt) bei Listen aus vielen Einzelseiten; gibt er False zurück, wird mit Cancelled abgebrochen.
+    cache: Zwischenspeicher für die Einzel-Logs (IARU-Robot, DARC KW)."""
     if e.source == "darc-ukw":
         res = importers.parse_darc_csv(_text(fetch(e.url)))
         return Parsed([(c, loc, res.doks.get(prefixes.core_call(c), "")) for c, loc, _ in res.callbook])
@@ -519,7 +585,7 @@ def parse_entry(fetch: Fetch, e: Entry, progress=None) -> Parsed:
     if e.source == "iaru-robot":
         return Parsed(parse_iaru_csv(fetch(e.url).decode("iso-8859-1")))
     if e.source == "iaru-robot-logs":
-        return parse_iaru_logs(fetch, e.id.split(":", 1)[1], progress)
+        return parse_iaru_logs(fetch, e.id.split(":", 1)[1], progress, cache)
     if e.source == "darc-kw-logs":
-        return parse_darc_kw_logs(fetch, e, progress)
+        return parse_darc_kw_logs(fetch, e, progress, cache)
     raise ValueError(f"Unbekannte Quelle: {e.source}")

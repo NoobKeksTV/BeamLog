@@ -158,6 +158,34 @@ def test_iaru_robot_list_csv_and_logs():
     assert ra.parse_iaru_csv('"DF0MU";"JO31PC"\n"";"JN19BQ"\n"0DF5TV";"JN48OL"\n') == [("DF0MU", "JO31PC", "")]
 
 
+def test_logs_page_cache(tmp_path):
+    """Einzel-Logs: einmal gelesene Seiten kommen aus dem Zwischenspeicher; fehlgeschlagene werden beim nächsten Mal erneut geladen."""
+    qso = lambda pid: f"{ra.IARU_ROBOT}/v_qsos/prg_list.php?reset=1&start=1&master_v_qsos_part_id={pid}&master_v_qsos_vw=v_part"  # noqa: E731
+    part = IARU_PART + IARU_PART.replace("111", "222").replace("IO4R", "S51A")
+    pages = {f"{ra.IARU_ROBOT}/v_part/prg_list.php?reset=1&start=1&master_v_part_cont_id=75&master_v_part_vw=v_upld": part,
+             qso(111): IARU_QSOS, qso(222): IARU_QSOS_MGM}
+    loaded, broken = [], {qso(222)}
+
+    def fetch(u):
+        loaded.append(u)
+        if u in broken:
+            raise RuntimeError("HTTP 502")
+        return pages[u].encode("iso-8859-1")
+    cache = ra.PageCache(tmp_path / "cache.db")
+    e = ra.list_iaru_robot_logs(lambda u: (IARU_LIST if "v_upld" in u else "").encode())[0]
+    first = ra.parse_entry(fetch, e, None, cache)
+    assert ("S52OR", "JN76MM", "") not in first.rows and cache.count() == 1      # 222 fehlgeschlagen: nicht gespeichert
+    broken.clear(); loaded.clear()
+    seen = []
+    second = ra.parse_entry(fetch, e, lambda n, t: seen.append((n, t)) or True, cache)
+    assert qso(111) not in loaded and qso(222) in loaded                          # nur die fehlende Seite neu
+    assert ("S52OR", "JN76MM", "") in second.rows and ("OK5W", "JO60OK", "") in second.rows
+    assert seen[0] == (1, 2) and seen[-1] == (2, 2)
+    loaded.clear()
+    third = ra.parse_entry(fetch, e, None, ra.PageCache(tmp_path / "cache.db"))   # auch nach einem Neustart
+    assert sorted(third.rows) == sorted(second.rows) and not any("v_qsos" in u for u in loaded)
+
+
 CAB = """<pre>START-OF-LOG: 3.0
 CONTEST: WAG
 SPECIFIC: X36

@@ -53,12 +53,23 @@ Zusammen rund 950 Listen (davon rund 170 mit Einzel-Logs). Die Suche fragt alle 
 höchstens acht Abrufe zugleich, um die Veranstalter zu schonen. Die Anzeige zeigt jede gerade laufende Liste mit ihrem Fortschritt.
 Bereits importierte Listen sind markiert und werden mit „nur noch nicht importierte“ übersprungen. Das gilt **je Importregel**:
 wurde eine Liste ohne „Stationen ohne Locator neu aufnehmen“ übernommen und ist der Haken jetzt gesetzt, gilt sie wieder als
-offen („wird erneut importiert“) – die Stationen ohne Locator kamen beim ersten Mal ja nicht mit.
+offen („wird erneut importiert“) – die Stationen ohne Locator kamen beim ersten Mal ja nicht mit. Listen, in denen gar keine
+Station ohne Locator stand (z. B. alle IARU-Listen), bleiben erledigt.
 
 **Warum dauern Einzel-Logs so lange?** Die Ergebnisliste selbst ist schnell geladen. Für die Einzel-Logs gibt es aber keine
-Gesamtdatei: der IARU-Contest-Robot liefert jedes Teilnehmer-Log als eigene Seite – beim September-Contest über 2000 Seiten zu
-je 0,5–2 Sekunden Antwortzeit (der Robot rechnet jede Seite frisch). Das Einlesen der danach über 100 000 Zeilen läuft in einem
-eigenen Thread, der Server bleibt währenddessen bedienbar.
+Gesamtdatei und keine Exportfunktion: der IARU-Contest-Robot liefert jedes Teilnehmer-Log als eigene Seite, und jede Seite rechnet
+er frisch (Gegencheck, Punkte). Gemessen beim September-Contest 2025 (2224 Teilnehmer): die Teilnehmerliste allein ist 2 MB groß
+und braucht rund 20 Sekunden, danach schafft der Robot 3–4,5 Logs pro Sekunde – egal ob BeamLog 8, 16 oder 24 Seiten gleichzeitig
+anfordert (mehr gleichzeitig macht jede einzelne Seite nur langsamer). Das sind knapp 10 Minuten für diesen einen Contest; schneller
+geht es nur auf Kosten des Robots, der mit Erlaubnis des Betreibers abgerufen wird. Die DARC-KW-Einzel-Logs funktionieren genauso
+(ein Cabrillo-Log je Teilnehmer).
+
+Damit nichts doppelt geladen wird, merkt sich BeamLog jedes gelesene Einzel-Log in `data/archive_cache.db` (neben der
+Datenbank, nicht in den Backups; rund 1 KB je Log). Wird ein Import abgebrochen oder der Server neu gestartet, geht es beim
+nächsten Start an derselben Stelle weiter; ein erneuter Import derselben Liste (z. B. nach geänderter Importregel) dauert nur noch
+Sekunden. Die Datei darf jederzeit gelöscht werden – dann wird eben neu geladen. Das Einlesen der danach oft über 100 000 Zeilen
+läuft in einem eigenen Thread, der Server bleibt währenddessen bedienbar. Direkt nach dem Start zeigt die Anzeige „Teilnehmerliste
+laden …“ – die ersten Sekunden bis zum Zähler sind also kein Hänger.
 
 **Automatisch:** Mit „neue Listen täglich übernehmen“ sucht der Server einmal am Tag (erstmals 10 Minuten nach dem Start) in
 allen Quellen nach Listen, die mit den eingestellten Regeln noch nicht übernommen wurden, und importiert sie im Hintergrund.

@@ -1364,6 +1364,15 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 time.sleep(1 + 2 * attempt)
         return b""
 
+    page_cache: dict[str, results_archive.PageCache] = {}
+
+    def archive_cache() -> results_archive.PageCache:
+        """Zwischenspeicher der Einzel-Logs neben der Datenbank (data/archive_cache.db) – erst bei Bedarf angelegt."""
+        with host_lock:
+            if "c" not in page_cache:
+                page_cache["c"] = results_archive.PageCache(db.path.parent / "archive_cache.db")
+            return page_cache["c"]
+
     def archive_done() -> dict:
         try:
             return json.loads(db.get_setting("results_done", "") or "{}")
@@ -1412,11 +1421,11 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             job["active"] = list(active.values())
             job["current"] = " | ".join(job["active"])
 
-        def learn(e, parsed) -> int:
+        def learn(e, parsed) -> tuple[int, int]:
             """Ergebnis einer Liste übernehmen (im Thread). Jeder Eintrag ist eine eigene kurze Transaktion – andere Anfragen
             kommen dazwischen dran, statt bei großen Einzel-Log-Listen (100 000 Zeilen) zu warten."""
             when = f"{e.when}T00:00:00Z" if e.when else ""
-            n = 0
+            n = skipped = 0
             uniq = list(dict.fromkeys(parsed.rows))  # Einzel-Logs: dieselbe Station steht in Hunderten Logs
             with learn_lock, db.bulk():
                 for k, (call, loc, dok) in enumerate(uniq):
@@ -1426,6 +1435,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                     before = db.row("SELECT dok FROM callbook WHERE call=?", (core,))
                     if not loc and not add_bare and before is None:
                         job["skipped"] += 1
+                        skipped += 1
                         continue
                     r = db.learn_call(call, loc, source=e.source, when=when, dok=dok)
                     if r == "new":
@@ -1439,7 +1449,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                         active[e.id] = f"{e.label} · einlesen {k}/{len(uniq)}"
                         show()
             job["rows"] += len(parsed.rows)
-            return n
+            return n, skipped
 
         async def run():
             done = archive_done()
@@ -1449,7 +1459,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 while queue and not job["cancel"]:
                     i = queue.pop(0)
                     e = archive["entries"][i]
-                    active[i] = e.label
+                    active[i] = f"{e.label} · {'Teilnehmerliste laden …' if e.source.endswith('-logs') else 'laden …'}"
                     show()
 
                     def progress(n: int, total: int, i: str = i, label: str = e.label) -> bool:
@@ -1457,7 +1467,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                         show()
                         return not job["cancel"]
                     try:
-                        parsed = await asyncio.to_thread(results_archive.parse_entry, archive_fetch, e, progress)
+                        parsed = await asyncio.to_thread(results_archive.parse_entry, archive_fetch, e, progress, archive_cache())
                     except results_archive.Cancelled:
                         active.pop(i, None)
                         break
@@ -1467,12 +1477,13 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                         active.pop(i, None)
                         show()
                         continue
-                    n = await asyncio.to_thread(learn, e, parsed)
+                    n, skipped = await asyncio.to_thread(learn, e, parsed)
                     if job["cancel"]:
                         active.pop(i, None)
                         break
-                    # mit den Importregeln merken: wer später „ohne Locator neu aufnehmen“ einschaltet, bekommt die Liste wieder angeboten
-                    done[i] = {"at": utcnow_iso()[:10], "n": n, "bare": add_bare}
+                    # mit den Importregeln merken: wer später „ohne Locator neu aufnehmen“ einschaltet, bekommt die Liste wieder angeboten –
+                    # aber nur, wenn die Regel etwas ausgemacht hat (IARU-Listen haben immer Locatoren, da wurde nichts übersprungen)
+                    done[i] = {"at": utcnow_iso()[:10], "n": n, "bare": add_bare or skipped == 0}
                     db.set_setting("results_done", json.dumps(done))
                     job["done"] += 1
                     job["done_ids"].append(i)
