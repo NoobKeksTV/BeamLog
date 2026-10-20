@@ -241,8 +241,8 @@
         </form>
         <p class="muted small maint-only">Ablauf: „Export im Repo-Format“ herunterladen und als <code>contestlogger/seed/stationsdatenbank.csv</code> ins Repo einchecken; alle Installationen holen sie mit „Nach neuen suchen (Repo)“.</p>
       </div>
-      <div class="card" id="fill-card">
-        <h3>Aus HamQTH / QRZ.com auffüllen</h3>
+      <div class="card maint-only" id="fill-card">
+        <h3>Aus HamQTH / QRZ.com auffüllen <span class="tag">Betreuer</span></h3>
         <p class="muted small">Fragt alle Stationen ohne Locator und deutsche Stationen ohne DOK bei HamQTH und QRZ.com ab – beide Dienste gleichzeitig, je Dienst mehrere Abfragen parallel – und ergänzt nur leere Felder: Locator, DOK (nur HamQTH kennt DOKs, deutsche Stationen gehen daher zuerst an HamQTH), Name. Findet ein Dienst keinen Locator, fragt der andere nach. Die Antworten sammelt ein Puffer, der Server schreibt sie gesammelt in die Datenbank. Läuft auf dem Server im Hintergrund – die Seite muss nicht offen bleiben. Zugangsdaten unter Einstellungen → Externe Rufzeichen-Abfrage.</p>
         <div id="fill-info" class="small"></div>
         <form id="fill-form" class="stack fill-form">
@@ -370,7 +370,7 @@
       <div class="admin-grid admin-sec hidden" data-asec="settings">
       <div class="card">
         <h3>Externe Rufzeichen-Abfrage</h3>
-        <p class="muted small">Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH oder QRZ.com nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. <b>HamQTH ist kostenlos, die Abfrage-Schnittstelle verlangt aber zwingend einen HamQTH-Account</b> (auf hamqth.com registrieren, dann hier Benutzername und Passwort eintragen und „Testen“ drücken). QRZ.com braucht ein XML-Abo. Beide lassen sich eintragen – das Auffüllen der Stationsdatenbank nutzt dann beide. Ohne Internet oder Zugangsdaten bleibt alles lokal.</p>
+        <p class="muted small">Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH oder QRZ.com nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. <b>HamQTH ist kostenlos, die Abfrage-Schnittstelle verlangt aber zwingend einen HamQTH-Account</b> (auf hamqth.com registrieren, dann hier Benutzername und Passwort eintragen und „Testen“ drücken). QRZ.com braucht ein XML-Abo. Beide lassen sich eintragen – das Auffüllen der Stationsdatenbank (Betreuer-Modus) nutzt dann beide. Ohne Internet oder Zugangsdaten bleibt alles lokal.</p>
         <form id="lookup-form" class="stack">
           <label class="small">Beim Loggen und in der Log-Prüfung nachschlagen bei
             <select id="lookup-provider"><option value="none">aus</option><option value="hamqth">HamQTH</option><option value="qrz">QRZ.com (XML-Abo)</option></select>

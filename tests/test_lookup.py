@@ -134,6 +134,7 @@ def test_callbook_fill_both_services(monkeypatch, tmp_path):
                                {"DL2QRZ": "<Callsign><call>DL2QRZ</call><grid>JO40AB</grid><fname>Udo</fname></Callsign>",
                                 "OK1ZZZ": "<Callsign><call>OK1ZZZ</call><grid>JN79AA</grid></Callsign>"})
     monkeypatch.setattr(lookup, "_get", get)
+    monkeypatch.setenv("BEAMLOG_MAINTAINER", "1")
     app = create_app(tmp_path / "t.db", backup_interval_min=0)
     with TestClient(app) as c:
         H = {"X-Admin-Token": c.post("/api/setup", json={"password": "admin1"}).json()["token"]}
@@ -159,6 +160,7 @@ def test_callbook_fill_both_services(monkeypatch, tmp_path):
 def test_callbook_fill_service_stops(monkeypatch, tmp_path):
     get, _ = fake_services({}, {"DL2QRZ": "<Callsign><call>DL2QRZ</call><grid>JO40AB</grid></Callsign>"}, hamqth_error="Daily limit exceeded")
     monkeypatch.setattr(lookup, "_get", get)
+    monkeypatch.setenv("BEAMLOG_MAINTAINER", "1")
     app = create_app(tmp_path / "t.db", backup_interval_min=0)
     with TestClient(app) as c:
         H = {"X-Admin-Token": c.post("/api/setup", json={"password": "admin1"}).json()["token"]}
@@ -169,3 +171,17 @@ def test_callbook_fill_service_stops(monkeypatch, tmp_path):
         assert j["done"] == 2 and j["locator"] == 1                    # QRZ.com macht ohne HamQTH weiter
         assert "HamQTH" in j["stopped"]
         assert c.get("/api/callbook/fill", headers=H).json()["open"] == 1   # DL3DOK (nur DOK fehlt) bleibt für HamQTH offen
+
+
+def test_callbook_fill_maintainer_only(tmp_path, monkeypatch):
+    """Auffüllen gibt es nur im Betreuer-Modus – normale Installationen holen die gepflegte Liste aus dem Repo."""
+    monkeypatch.delenv("BEAMLOG_MAINTAINER", raising=False)
+    monkeypatch.delenv("BEAMLOG_DEV", raising=False)
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        H = {"X-Admin-Token": c.post("/api/setup", json={"password": "admin1"}).json()["token"]}
+        c.post("/api/settings", json={"lookup_user_hamqth": "dn2lh", "lookup_pass_hamqth": "pw"}, headers=H)
+        assert c.get("/api/callbook/fill", headers=H).status_code == 403
+        assert c.post("/api/callbook/fill/start", headers=H).status_code == 403
+        assert c.post("/api/callbook/fill/settings", json={"auto": True}, headers=H).status_code == 403
+        assert c.post("/api/callbook/fill/cancel", headers=H).status_code == 403

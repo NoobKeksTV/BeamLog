@@ -716,7 +716,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         """Kennzahlen der Stationsdatenbank (gesamt und je Land) für die Verwaltung."""
         return await asyncio.to_thread(db.callbook_stats)
 
-    # ---- Stationsdatenbank aus HamQTH/QRZ.com auffüllen: alle Stationen ohne Locator bzw. (DL) ohne DOK abfragen – im
+    # ---- Stationsdatenbank aus HamQTH/QRZ.com auffüllen (nur Betreuer – die zentrale Liste kommt über das Repo zu allen):
+    # alle Stationen ohne Locator bzw. (DL) ohne DOK abfragen – im
     # Hintergrund, beide Dienste gleichzeitig mit je mehreren parallelen Abfragen. Die Antworten landen in einem Puffer,
     # ein einzelner Schreiber übernimmt sie gesammelt (je bis zu 200 in einer Transaktion) in die Datenbank.
     SVC_DEFAULT = {"hamqth": {"on": True, "par": 2, "pause": 0.5, "daily": 0}, "qrz": {"on": True, "par": 4, "pause": 0.0, "daily": 0}}
@@ -771,6 +772,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return out
 
     async def start_fill(auto: bool = False) -> dict:
+        """Nur im Betreuer-Modus (Endpunkte und automatischer Lauf prüfen das)."""
         if fill["job"] and fill["job"]["running"]:
             raise HTTPException(409, "Das Auffüllen läuft bereits")
         cfg = fill_cfg()
@@ -954,7 +956,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         while True:
             try:
                 cfg = fill_cfg()
-                if cfg["auto"] and not (fill["job"] and fill["job"]["running"]):
+                if cfg["auto"] and is_maintainer() and not (fill["job"] and fill["job"]["running"]):
                     services = fill_services(cfg)
                     if services and await asyncio.to_thread(fill_candidates, cfg, services):
                         await start_fill(auto=True)
@@ -962,11 +964,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 print(f"Automatisches Auffüllen der Stationsdatenbank: {e}")
             await asyncio.sleep(1800)
 
-    def require_no_demo() -> None:
-        if DEMO:
-            raise HTTPException(403, "In der Demo nicht verfügbar")
-
-    @app.get("/api/callbook/fill", dependencies=[Depends(require_admin)])
+    @app.get("/api/callbook/fill", dependencies=[Depends(require_maintainer)])
     async def fill_status():
         cfg = fill_cfg()
         job = fill["job"]
@@ -978,17 +976,17 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         return {"cfg": cfg, "job": fill_public(job), "open": n_open, "used_today": fill_used(), "par_max": FILL_PAR_MAX,
                 "services": {p: {"name": lookup.PROVIDERS[p], "enabled": service_client(p).enabled} for p in SERVICES}}
 
-    @app.post("/api/callbook/fill/start", dependencies=[Depends(require_admin), Depends(require_no_demo)])
+    @app.post("/api/callbook/fill/start", dependencies=[Depends(require_maintainer)])
     async def fill_start():
         return await start_fill()
 
-    @app.post("/api/callbook/fill/cancel", dependencies=[Depends(require_admin)])
+    @app.post("/api/callbook/fill/cancel", dependencies=[Depends(require_maintainer)])
     def fill_cancel():
         if fill["job"]:
             fill["job"]["cancel"] = True
         return {"ok": True}
 
-    @app.post("/api/callbook/fill/settings", dependencies=[Depends(require_admin), Depends(require_no_demo)])
+    @app.post("/api/callbook/fill/settings", dependencies=[Depends(require_maintainer)])
     def fill_settings(body: dict):
         cfg = fill_cfg()
         try:

@@ -2144,7 +2144,7 @@
   const Fill = { timer: null, running: false };
   async function fillPoll(again) {
     clearTimeout(Fill.timer);
-    if (!$("#fill-card") || !S.adminToken) return;
+    if (!$("#fill-card") || !S.adminToken || !S.info?.maintainer) return;  // nur im Betreuer-Modus
     let r; try { r = await GET("/api/callbook/fill"); } catch (_) { return; }
     const n = (v) => Number(v || 0).toLocaleString(), c = r.cfg, j = r.job || {};
     const anyOn = Object.values(r.services).some((x) => x.enabled);

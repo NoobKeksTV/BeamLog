@@ -20,13 +20,17 @@ oder nichts haben – so sieht man sofort, wo noch Lücken sind.
 | KST-Nutzerliste | Alle 10 Minuten je Verbindung; jeder Nutzer mit Locator. |
 | Ergebnislisten / Archiv | Nur im **Betreuer-Modus** (`MAINTAINER=1` in `.env`): einzelne Listen oder das ganze Ergebnislisten-Archiv (DARC UKW/KW, IARU, siehe [Import](Import-Export.md#ergebnislisten-archiv-alle-conteste-alle-jahre)); enthält die Liste eine DOK-Spalte (DARC-Hub `result.csv`) oder einen DOK wie `G01` in der Zeile, wird er übernommen. |
 | Stationslisten anderer Nutzer | Nur im Betreuer-Modus: der CSV-Export einer anderen Installation wird mit „Stationsliste einpflegen“ in die zentrale Liste übernommen. |
-| HamQTH / QRZ | Online-Abfrage beim Loggen und in der Log-Prüfung (Ergebnis wird gespeichert) – und gezielt mit „Aus HamQTH / QRZ.com auffüllen“, siehe unten. |
+| HamQTH / QRZ | Online-Abfrage beim Loggen und in der Log-Prüfung (Ergebnis wird gespeichert) – im Betreuer-Modus auch gezielt mit „Aus HamQTH / QRZ.com auffüllen“, siehe unten. |
 | Von Hand | Formular unter der Tabelle in der Verwaltung. |
 | Repo-Abgleich | „Nach neuen suchen (Repo)“, siehe unten. |
 
 Regeln: Der neueste DOK gewinnt (ein Rufzeichen kann den OV wechseln). Der neueste Locator wird zum Hauptlocator, ältere wandern in „weitere Standorte“ (bis zu 5) und erscheinen im Logger zur Auswahl. Zusätze wie `/P`, `-2` oder `-23CM` werden entfernt, das Rufzeichen wird als Kern (`DN2LH`) gespeichert.
 
 ## Aus HamQTH / QRZ.com auffüllen
+
+*Nur im Betreuer-Modus* (`MAINTAINER=1` in `.env`), wie die übrigen Quellen-Importe: die aufgefüllte Liste kommt über das Repo
+(„Nach neuen suchen“) zu allen Installationen, statt dass jede Installation selbst Hunderttausende Abfragen stellt. Das
+Nachschlagen einzelner unbekannter Rufzeichen beim Loggen und in der Log-Prüfung bleibt für alle.
 
 Die Karte „Aus HamQTH / QRZ.com auffüllen“ (Verwaltung → Stationsdatenbank & Import) fragt alle Stationen **ohne Locator**
 und alle **deutschen Stationen ohne DOK** online ab. Übernommen wird nur, was noch fehlt: Locator, DOK und Name. Vorhandene
