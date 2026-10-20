@@ -20,7 +20,7 @@ aber ohne DOK“).
 
 | Quelle | Wann |
 |---|---|
-| Startdatenbank | Beim ersten Start wird `contestlogger/seed/stationsdatenbank.csv` geladen. |
+| Startdatenbank | Beim ersten Start wird `contestlogger/seed/stationsdatenbank.csv` geladen – rund 127 000 Stationen mit Locator, davon 18 000 mit DOK (Ergebnislisten DARC/IARU 1985–2026, Einzel-Logs, HamQTH/QRZ.com). Das dauert beim allerersten Start einige Sekunden. Bestehende Installationen holen sie mit „Nach neuen suchen (Repo)“. |
 | Eigene QSOs | Jedes geloggte QSO (auch importierte Logs); bei DOK-Contests auch der empfangene DOK. |
 | KST-Nutzerliste | Alle 10 Minuten je Verbindung; jeder Nutzer mit Locator. |
 | Ergebnislisten / Archiv | Nur im **Betreuer-Modus** (`MAINTAINER=1` in `.env`): einzelne Listen oder das ganze Ergebnislisten-Archiv (DARC UKW/KW, IARU, siehe [Import](Import-Export.md#ergebnislisten-archiv-alle-conteste-alle-jahre)); enthält die Liste eine DOK-Spalte (DARC-Hub `result.csv`) oder einen DOK wie `G01` in der Zeile, wird er übernommen. |
@@ -85,7 +85,7 @@ erhöhen.
 ## Export
 
 - **Stationsdatenbank exportieren (CSV)**: alle Spalten (Call, Locator, Name, DOK, QSOs, Zuletzt, weitere Locator).
-- **Export im Repo-Format**: `Call;Locator;Zuletzt;DOK` – genau das Format der Startdatenbank im Repo.
+- **Export im Repo-Format**: `Call;Locator;Zuletzt;DOK` – genau das Format der Startdatenbank im Repo. Enthält nur Stationen **mit Locator**.
 
 ## Zentrale Pflege: wer importiert was?
 

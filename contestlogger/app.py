@@ -50,13 +50,14 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if db.callbook_count() or db.get_setting("seeded") or not SEED.exists():
             return 0
         res = importers.parse_callbook_csv(SEED.read_text(encoding="utf-8"))
-        import re as _re
-        with db.bulk():
-            for call, loc, name in res.callbook:
-                when = f"{name}T00:00:00Z" if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) else ""
-                db.learn_call(call, loc, source="seed", name="" if when else name, when=when, dok=res.doks.get(call, ""))
+        rows = []
+        for call, loc, _name in res.callbook:
+            core = prefixes.core_call(call)
+            when = res.seen.get(core, "")
+            rows.append((call, loc, f"{when}T00:00:00Z" if when else "", res.doks.get(core, "")))
+        n = db.seed_callbook_bulk(rows)
         db.set_setting("seeded", "1")
-        return len(res.callbook)
+        return n
 
     def demo_reset() -> None:
         demo.reset(db, seed_callbook)
@@ -1860,20 +1861,25 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         except Exception as e:  # noqa: BLE001
             hint = " – privates Repo? Dann in der Verwaltung ein GitHub-Token (Lesezugriff auf das Repo) eintragen." if "404" in str(e) or "401" in str(e) else ""
             raise HTTPException(502, f"Repo nicht erreichbar: {e}{hint}")
-        res = importers.parse_callbook_csv(text)
-        new = known = changed = 0
-        import re as _re
-        with db.bulk():
-            for call, loc, name in res.callbook:
-                when = f"{name}T00:00:00Z" if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) else ""
-                before = db.lookup_call(call)
-                r = db.learn_call(call, loc, source="repo", name="" if when else name, when=when, dok=res.doks.get(call, ""))
-                if r == "new":
-                    new += 1
-                elif r == "known":
-                    known += 1
-                    if before and loc and before.get("locator") != loc:
-                        changed += 1
+        res = await asyncio.to_thread(importers.parse_callbook_csv, text)
+
+        def apply() -> tuple[int, int, int]:
+            """Im Thread: über 100 000 Einträge – der Server bleibt währenddessen bedienbar."""
+            import re as _re
+            new = known = changed = 0
+            with db.bulk():
+                for call, loc, name in res.callbook:
+                    when = f"{name}T00:00:00Z" if _re.fullmatch(r"\d{4}-\d{2}-\d{2}", name) else ""
+                    before = db.row("SELECT locator FROM callbook WHERE call=?", (prefixes.core_call(call),))
+                    r = db.learn_call(call, loc, source="repo", name="" if when else name, when=when, dok=res.doks.get(call, ""))
+                    if r == "new":
+                        new += 1
+                    elif r == "known":
+                        known += 1
+                        if before and loc and before.get("locator") != loc:
+                            changed += 1
+            return new, known, changed
+        new, known, changed = await asyncio.to_thread(apply)
         db.add_audit("Stationsdatenbank aus dem Repo abgeglichen", details=f"{len(res.callbook)} Einträge, {new} neu, {changed} Locator geändert", nick="Admin", admin=True)
         return {"total": len(res.callbook), "new": new, "known": known, "changed": changed, "callbook_count": db.callbook_count(), "url": url}
 
@@ -1881,16 +1887,21 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
     async def callbook_import_list(file: UploadFile = File(...)):
         """Betreuer: Stationsliste eines anderen Nutzers (CSV-Export der Stationsdatenbank oder Repo-Format) in die zentrale Liste einpflegen."""
         text = (await file.read()).decode("utf-8-sig", "replace")
-        res = importers.parse_callbook_csv(text)
-        new = known = 0
-        for call, loc, name in res.callbook:
-            core = prefixes.core_call(call)
-            when = res.seen.get(core, "")
-            r = db.learn_call(call, loc, source="list", name=name, when=f"{when}T00:00:00Z" if when else "", dok=res.doks.get(core, ""))
-            if r == "new":
-                new += 1
-            elif r == "known":
-                known += 1
+        res = await asyncio.to_thread(importers.parse_callbook_csv, text)
+
+        def apply() -> tuple[int, int]:
+            new = known = 0
+            with db.bulk():
+                for call, loc, name in res.callbook:
+                    core = prefixes.core_call(call)
+                    when = res.seen.get(core, "")
+                    r = db.learn_call(call, loc, source="list", name=name, when=f"{when}T00:00:00Z" if when else "", dok=res.doks.get(core, ""))
+                    if r == "new":
+                        new += 1
+                    elif r == "known":
+                        known += 1
+            return new, known
+        new, known = await asyncio.to_thread(apply)
         db.add_audit("Stationsliste eingepflegt", details=f"{file.filename}: {len(res.callbook)} Einträge, {new} neu", nick="Admin", admin=True)
         return {"total": len(res.callbook), "new": new, "known": known, "warnings": res.warnings[:20], "callbook_count": db.callbook_count()}
 

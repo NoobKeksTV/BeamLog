@@ -940,6 +940,20 @@ class Database:
             )
         return "known"
 
+    def seed_callbook_bulk(self, rows: list[tuple[str, str, str, str]], source: str = "seed") -> int:
+        """Mitgelieferte Startdatenbank (Call, Locator, Zuletzt, DOK) in eine leere Stationsdatenbank – am Stück statt Eintrag
+        für Eintrag (127 000 Einträge in rund einer Sekunde). Gleiche Prüfung wie learn_call; doppelte Rufzeichen: der erste gewinnt."""
+        out = []
+        for call, loc, when, dok in rows:
+            core = prefixes.core_call((call or "").strip().upper())
+            loc = geo.normalize_locator(loc)
+            if not core or (loc and not geo.is_valid_locator(loc)):
+                continue
+            out.append((core, loc, "", source, 0, when, "", normalize_dok(dok)))
+        with self.bulk(), self.conn:
+            self.conn.executemany("INSERT OR IGNORE INTO callbook(call,locator,name,source,qso_count,last_seen,alt_locators,dok) VALUES(?,?,?,?,?,?,?,?)", out)
+        return len(out)
+
     def suggest(self, partial: str, limit: int = 12, station_id: int | None = None) -> list[dict]:
         partial = (partial or "").strip().upper()
         if len(partial) < 2:

@@ -40,7 +40,7 @@ def test_full_flow(client):
     q2 = client.post(f"/api/stations/{sid}/qsos", json={"call": "OL3Z", "locator": "JN79FX"}, headers=S).json()
     assert q2["serial_sent"] == 2
 
-    sug = client.get("/api/suggest", params={"q": "DL8N", "station": sid}).json()
+    sug = client.get("/api/suggest", params={"q": "DL8NAS", "station": sid}).json()  # DL8N, DL8NA … stehen auch in der Startdatenbank
     assert sug[0]["call"] == "DL8NAS" and sug[0]["km"] == 406
     assert client.get("/api/call", params={"call": "DL8NAS/P"}).json()["locator"] == "JN59LE"
     assert client.get("/api/calc", params={"my": "JO31AA", "loc": "JN59LE"}).json()["km"] == 406
@@ -230,7 +230,7 @@ def test_templates_and_callbook_repo(tmp_path):
         assert len(c.get("/api/contests").json()[0]["stations"]) == 3
         # Stationsdatenbank: Repo-Format exportieren und aus einer (lokalen) Repo-Datei abgleichen
         seed = c.get("/api/callbook/export_seed.csv").text
-        assert seed.startswith("Call;Locator;Zuletzt;DOK\n") and "DA2C;JO30XF" in seed
+        assert seed.startswith("Call;Locator;Zuletzt;DOK\n") and "\nDA2C;" in seed  # aus der Startdatenbank
         repo = tmp_path / "repo.csv"
         repo.write_text("Call;Locator;Zuletzt\nDA2C;JO30XF;2025-05-04\nOK9NEW;JN79XX;2026-01-01\n", encoding="utf-8")
         r = c.post("/api/callbook/sync_repo", json={"url": repo.as_uri()}, headers=H).json()
