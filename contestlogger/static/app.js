@@ -2152,14 +2152,14 @@
       const p = row.dataset.svc, sc = c[p], sv = r.services[p], js = j.services?.[p];
       if (!again) { row.querySelector(".fs-on").checked = sc.on; row.querySelector(".fs-par").value = sc.par; row.querySelector(".fs-pause").value = sc.pause; row.querySelector(".fs-daily").value = sc.daily; }
       row.classList.toggle("muted", !sv.enabled);
-      const today = `${t("heute")} ${n(r.used_today[p])}${sc.daily ? ` / ${n(sc.daily)}` : ""}`;
+      const today = sc.daily ? t("heute {n} von {d} abgefragt", { n: n(r.used_today[p]), d: n(sc.daily) }) : t("heute {n} abgefragt", { n: n(r.used_today[p]) });
       row.querySelector(".fs-state").textContent = !sv.enabled ? t("keine Zugangsdaten")
-        : js && (j.running || j.finished) ? [today, js.ms ? `${js.ms} ms` : "", js.count ? `${t("QRZ zählt")} ${n(js.count)}` : "", js.errors ? `${js.errors} ${t("Fehler")}` : "",
+        : js && (j.running || j.finished) ? [today, js.ms ? t("Antwort Ø {ms} ms", { ms: js.ms }) : "", js.count ? t("QRZ.com meldet {n} Abfragen in 24 h", { n: n(js.count) }) : "", js.errors ? `${js.errors} ${t("Fehler")}` : "",
           js.stopped && js.stopped !== "aus" ? (js.stopped.startsWith("gestoppt: ") ? `${t("gestoppt")}: ${js.stopped.slice(10)}` : t(js.stopped)) : (js.active ? "⟳" : "")].filter(Boolean).join(" · ")
         : today;
     });
     if (!again) { $("#fill-redo").value = c.redo_days; $("#fill-auto").checked = !!c.auto; }
-    $("#fill-info").textContent = anyOn ? t("Noch offen: {n} Stationen", { n: n(r.open) })
+    $("#fill-info").textContent = anyOn ? t("Noch offen: {n} Stationen", { n: n(r.open) }) + (r.split && !j.running ? ` (${t("{a} ohne Locator, {b} mit Locator, aber ohne DOK", { a: n(r.split.no_loc), b: n(r.split.dok_only) })})` : "")
       : t("Kein Dienst eingerichtet – erst unter Einstellungen → Externe Rufzeichen-Abfrage HamQTH und/oder QRZ.com eintragen.");
     $("#btn-fill-start").disabled = !anyOn || !!j.running;
     $("#btn-fill-cancel").classList.toggle("hidden", !j.running);

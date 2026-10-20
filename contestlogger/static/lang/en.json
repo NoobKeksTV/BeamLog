@@ -714,12 +714,17 @@
  "Beim Loggen und in der Log-Prüfung nachschlagen bei": "Look up while logging and in the log check at",
  "heute": "today",
  "keine Zugangsdaten": "no credentials",
- "QRZ zählt": "QRZ counts",
  "Noch offen: {n} Stationen": "Still open: {n} stations",
  "Kein Dienst eingerichtet – erst unter Einstellungen → Externe Rufzeichen-Abfrage HamQTH und/oder QRZ.com eintragen.": "No service configured – first set up HamQTH and/or QRZ.com under Settings → External callsign lookup.",
  "je Minute": "per minute",
  "noch etwa {m}": "about {m} left",
  "Puffer": "buffer",
  "Kennt die eigene Stationsdatenbank ein Rufzeichen nicht, wird es online bei HamQTH (kostenloser Account) oder QRZ.com (XML-Abo) nachgeschlagen – Locator, Name und QTH werden übernommen und gespeichert. Ohne Internet oder Zugangsdaten bleibt alles lokal.": "If the local station database does not know a callsign, it is looked up online at HamQTH (free account) or QRZ.com (XML subscription) – locator, name and QTH are taken over and stored. Without internet or credentials everything stays local.",
- "(auf hamqth.com registrieren, dann hier Benutzername und Passwort eintragen und „Testen“ drücken). QRZ.com braucht ein XML-Abo. Beide lassen sich eintragen – das Auffüllen der Stationsdatenbank (Betreuer-Modus) nutzt dann beide. Ohne Internet oder Zugangsdaten bleibt alles lokal.": "(register at hamqth.com, then enter username and password here and press “Test”). QRZ.com needs an XML subscription. Both can be entered – filling the station database (maintainer mode) then uses both. Without internet or credentials everything stays local."
+ "(auf hamqth.com registrieren, dann hier Benutzername und Passwort eintragen und „Testen“ drücken). QRZ.com braucht ein XML-Abo. Beide lassen sich eintragen – das Auffüllen der Stationsdatenbank (Betreuer-Modus) nutzt dann beide. Ohne Internet oder Zugangsdaten bleibt alles lokal.": "(register at hamqth.com, then enter username and password here and press “Test”). QRZ.com needs an XML subscription. Both can be entered – filling the station database (maintainer mode) then uses both. Without internet or credentials everything stays local.",
+ "heute {n} abgefragt": "{n} looked up today",
+ "heute {n} von {d} abgefragt": "{n} of {d} looked up today",
+ "Antwort Ø {ms} ms": "avg. response {ms} ms",
+ "QRZ.com meldet {n} Abfragen in 24 h": "QRZ.com reports {n} lookups in 24 h",
+ "Abfragen heute (UTC), mittlere Antwortzeit des Dienstes; bei QRZ.com zusätzlich der Zähler, den QRZ selbst für die letzten 24 Stunden meldet (zählt auch Abfragen anderer Programme mit diesem Account)": "Lookups today (UTC), average response time of the service; for QRZ.com also the counter QRZ itself reports for the last 24 hours (includes lookups by other programs using this account)",
+ "{a} ohne Locator, {b} mit Locator, aber ohne DOK": "{a} without locator, {b} with locator but without DOK"
 }

@@ -972,8 +972,11 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         if job and job["running"]:  # während des Laufs nicht jedes Mal die ganze Datenbank durchsehen
             n_open = max(0, job["total"] - job["done"])
         else:
-            n_open = fill["open"] = len(await asyncio.to_thread(fill_candidates, cfg, services or ["hamqth"]))
-        return {"cfg": cfg, "job": fill_public(job), "open": n_open, "used_today": fill_used(), "par_max": FILL_PAR_MAX,
+            cands = await asyncio.to_thread(fill_candidates, cfg, services or ["hamqth"])
+            n_open = fill["open"] = len(cands)
+            # Aufschlüsselung: fehlt der Locator (mit/ohne DOK) oder nur der DOK einer deutschen Station?
+            fill["split"] = {"no_loc": sum(1 for c in cands if c[1]), "dok_only": sum(1 for c in cands if not c[1])}
+        return {"cfg": cfg, "job": fill_public(job), "open": n_open, "split": fill.get("split"), "used_today": fill_used(), "par_max": FILL_PAR_MAX,
                 "services": {p: {"name": lookup.PROVIDERS[p], "enabled": service_client(p).enabled} for p in SERVICES}}
 
     @app.post("/api/callbook/fill/start", dependencies=[Depends(require_maintainer)])

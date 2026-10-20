@@ -247,7 +247,7 @@
         <div id="fill-info" class="small"></div>
         <form id="fill-form" class="stack fill-form">
           <div class="table-wrap"><table class="compact fill-svc">
-            <thead><tr><th>Dienst</th><th>nutzen</th><th>parallel</th><th>Pause (s)</th><th title="0 = ohne eigenes Limit – der Lauf hört auf, sobald der Dienst ein Limit meldet">Tageslimit</th><th>Stand</th></tr></thead>
+            <thead><tr><th>Dienst</th><th>nutzen</th><th>parallel</th><th>Pause (s)</th><th title="0 = ohne eigenes Limit – der Lauf hört auf, sobald der Dienst ein Limit meldet">Tageslimit</th><th title="Abfragen heute (UTC), mittlere Antwortzeit des Dienstes; bei QRZ.com zusätzlich der Zähler, den QRZ selbst für die letzten 24 Stunden meldet (zählt auch Abfragen anderer Programme mit diesem Account)">Stand</th></tr></thead>
             <tbody>
               <tr data-svc="hamqth"><td><b>HamQTH</b></td><td><input type="checkbox" class="fs-on"></td><td><input type="number" class="fs-par" min="1" max="8"></td><td><input type="number" class="fs-pause" min="0" max="60" step="0.1"></td><td><input type="number" class="fs-daily" min="0"></td><td class="fs-state muted small"></td></tr>
               <tr data-svc="qrz"><td><b>QRZ.com</b></td><td><input type="checkbox" class="fs-on"></td><td><input type="number" class="fs-par" min="1" max="8"></td><td><input type="number" class="fs-pause" min="0" max="60" step="0.1"></td><td><input type="number" class="fs-daily" min="0"></td><td class="fs-state muted small"></td></tr>
