@@ -2122,19 +2122,23 @@
     const pct = (v, of) => (of ? ` (${Math.round((100 * v) / of)} %)` : "");
     box.innerHTML = "";
     box.append(el("div", { class: "cb-kpis" },
-      ...[[t("Rufzeichen"), st.total, ""], [t("mit Locator"), st.locator, st.total], [t("mit DOK"), st.dok, st.total],
+      ...[[t("Rufzeichen"), st.total, ""], [t("mit Locator"), st.locator, st.total], [t("ohne Locator"), st.no_loc, st.total],
+        [t("mit DOK"), st.dok, st.total], [t("Deutschland ohne DOK"), st.de_no_dok, st.de_total],
         [t("Locator und DOK"), st.both, st.total], [t("ohne Locator und DOK"), st.none, st.total], [t("mit Name"), st.name, st.total]]
         .map(([label, v, of]) => el("div", { class: "cb-kpi" }, el("b", {}, n(v)), el("span", {}, label + pct(v, of))))));
     const rows = st.countries || [];
     const top = rows.slice(0, 12), rest = rows.slice(12);
     const cell = (v, of, cls = "") => el("td", { class: "num " + cls }, n(v), of ? el("span", { class: "muted small" }, pct(v, of)) : null);
-    const line = (c) => el("tr", { class: c.country === "Deutschland" ? "cb-home" : "" }, el("td", {}, c.country === "?" ? t("unbekannt") : c.country),
-      cell(c.total), cell(c.locator, c.total), cell(c.dok, c.total), cell(c.both, c.total), cell(c.none, c.total, c.none ? "warn" : ""));
+    // DOKs gibt es nur in Deutschland – „ohne DOK“ ist nur dort aussagekräftig, sonst „–“
+    const line = (c) => { const de = c.country === "Deutschland"; return el("tr", { class: de ? "cb-home" : "" }, el("td", {}, c.country === "?" ? t("unbekannt") : c.country),
+      cell(c.total), cell(c.locator, c.total), cell(c.no_loc, c.total, c.no_loc ? "warn" : ""), cell(c.dok, c.total),
+      de ? cell(c.no_dok, c.total, c.no_dok ? "warn" : "") : el("td", { class: "num muted" }, "–"),
+      cell(c.both, c.total), cell(c.none, c.total, c.none ? "warn" : "")); };
     const table = el("table", { class: "compact cb-country" },
-      el("thead", {}, el("tr", {}, ...[t("Land"), t("Stationen"), t("mit Locator"), t("mit DOK"), t("beides"), t("ohne beides")].map((h) => el("th", {}, h)))),
+      el("thead", {}, el("tr", {}, ...[t("Land"), t("Stationen"), t("mit Locator"), t("ohne Locator"), t("mit DOK"), t("ohne DOK"), t("beides"), t("ohne beides")].map((h) => el("th", {}, h)))),
       el("tbody", {}, ...top.map(line)));
     if (rest.length) {
-      const sum = rest.reduce((a, c) => { for (const k of ["total", "locator", "dok", "both", "none"]) a[k] += c[k]; return a; }, { country: t("{n} weitere Länder", { n: rest.length }), total: 0, locator: 0, dok: 0, both: 0, none: 0 });
+      const sum = rest.reduce((a, c) => { for (const k of ["total", "locator", "no_loc", "dok", "no_dok", "both", "none"]) a[k] += c[k]; return a; }, { country: t("{n} weitere Länder", { n: rest.length }), total: 0, locator: 0, no_loc: 0, dok: 0, no_dok: 0, both: 0, none: 0 });
       table.tBodies[0].append(line(sum));
     }
     box.append(el("details", { class: "cb-country-wrap", open: localStorage.getItem("cl.cbStats") === "1" ? 1 : null, ontoggle: (e) => localStorage.setItem("cl.cbStats", e.target.open ? "1" : "0") },
@@ -2154,7 +2158,7 @@
       row.classList.toggle("muted", !sv.enabled);
       const today = sc.daily ? t("heute {n} von {d} abgefragt", { n: n(r.used_today[p]), d: n(sc.daily) }) : t("heute {n} abgefragt", { n: n(r.used_today[p]) });
       row.querySelector(".fs-state").textContent = !sv.enabled ? t("keine Zugangsdaten")
-        : js && (j.running || j.finished) ? [today, js.ms ? t("Antwort Ø {ms} ms", { ms: js.ms }) : "", js.count ? t("QRZ.com meldet {n} Abfragen in 24 h", { n: n(js.count) }) : "", js.errors ? `${js.errors} ${t("Fehler")}` : "",
+        : js && (j.running || j.finished) ? [today, js.ms ? t("Antwort Ø {ms} ms", { ms: js.ms }) : "", t("24 h: BeamLog {n} Anfragen", { n: n(r.requests_24h?.[p]) }) + (js.count ? `, ${t("QRZ.com meldet {n}", { n: n(js.count) })}` : ""), js.errors ? `${js.errors} ${t("Fehler")}` : "",
           js.stopped && js.stopped !== "aus" ? (js.stopped.startsWith("gestoppt: ") ? `${t("gestoppt")}: ${js.stopped.slice(10)}` : t(js.stopped)) : (js.active ? "⟳" : "")].filter(Boolean).join(" · ")
         : today;
     });

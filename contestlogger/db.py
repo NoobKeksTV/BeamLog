@@ -998,20 +998,23 @@ class Database:
         if self._stats_cache and self._stats_cache[0] == key:
             return self._stats_cache[1]
         def empty() -> dict:
-            return {"total": 0, "locator": 0, "dok": 0, "both": 0, "none": 0, "name": 0}
+            return {"total": 0, "locator": 0, "no_loc": 0, "dok": 0, "no_dok": 0, "both": 0, "none": 0, "name": 0}
         tot, by_country = empty(), {}
         for call, loc, dok, name in self.conn.execute("SELECT call, locator, dok, name FROM callbook").fetchall():
             c = by_country.setdefault(prefixes.country(call), empty())
             for d in (tot, c):
                 d["total"] += 1
                 d["locator"] += bool(loc)
+                d["no_loc"] += not loc
                 d["dok"] += bool(dok)
+                d["no_dok"] += not dok
                 d["both"] += bool(loc and dok)
                 d["none"] += not (loc or dok)
                 d["name"] += bool(name)
         countries = sorted(({"country": k, **v} for k, v in by_country.items()),
                            key=lambda c: (c["country"] != "Deutschland", -c["total"], c["country"]))
-        out = {**tot, "countries": countries}
+        de = by_country.get("Deutschland", empty())
+        out = {**tot, "de_total": de["total"], "de_no_dok": de["no_dok"], "countries": countries}
         self._stats_cache = (key, out)
         return out
 

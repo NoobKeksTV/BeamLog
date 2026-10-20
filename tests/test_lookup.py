@@ -80,6 +80,7 @@ def test_callbook_stats_and_name_limit(tmp_path):
             db.conn.execute("UPDATE callbook SET locator='' WHERE call='DK3CCC'")
         s = c.get("/api/callbook/stats").json()
         assert (s["total"], s["locator"], s["dok"], s["both"], s["none"]) == (4, 3, 2, 1, 0)
+        assert (s["no_loc"], s["no_dok"], s["de_total"], s["de_no_dok"]) == (1, 2, 3, 1)
         de = s["countries"][0]
         assert de["country"] == "Deutschland" and (de["total"], de["locator"], de["dok"]) == (3, 2, 2)
         rows = c.get("/api/callbook").json()["rows"]
@@ -154,7 +155,10 @@ def test_callbook_fill_both_services(monkeypatch, tmp_path):
         assert not any("qrz.com" in u and "DL3DOK" in u for u in calls)                    # QRZ.com liefert keinen DOK
         assert sum("callsign=PA9NIX" in u for u in calls) == 2                             # bei beiden nachgefragt, dann gemerkt
         assert c.get("/api/callbook/fill", headers=H).json()["open"] == 0
-        assert c.get("/api/callbook/fill", headers=H).json()["used_today"]["hamqth"] >= 2
+        st = c.get("/api/callbook/fill", headers=H).json()
+        assert st["used_today"]["hamqth"] >= 2
+        # BeamLog zählt jede Anfrage selbst mit (Anmeldung eingeschlossen) – vergleichbar mit dem Zähler von QRZ.com
+        assert st["requests_24h"] == {"hamqth": sum("hamqth.com" in u for u in calls), "qrz": sum("qrz.com" in u for u in calls)}
 
 
 def test_callbook_fill_service_stops(monkeypatch, tmp_path):
@@ -185,3 +189,35 @@ def test_callbook_fill_maintainer_only(tmp_path, monkeypatch):
         assert c.post("/api/callbook/fill/start", headers=H).status_code == 403
         assert c.post("/api/callbook/fill/settings", json={"auto": True}, headers=H).status_code == 403
         assert c.post("/api/callbook/fill/cancel", headers=H).status_code == 403
+
+
+def test_callbook_fill_cancel_does_not_ask_twice(monkeypatch, tmp_path):
+    """Abbruch mitten im Lauf: was schon bei einem Dienst abgefragt wurde, wird gespeichert und beim nächsten Lauf nicht erneut gefragt."""
+    import threading
+    gate = threading.Event()
+    get, calls = fake_services({}, {})
+
+    def slow(url):
+        if "hamqth.com" in url and "&p=" not in url:
+            gate.wait(10)  # HamQTH hängt – QRZ.com-Fehlschläge warten auf die Nachfrage bei HamQTH
+        return get(url)
+    monkeypatch.setattr(lookup, "_get", slow)
+    monkeypatch.setenv("BEAMLOG_MAINTAINER", "1")
+    app = create_app(tmp_path / "t.db", backup_interval_min=0)
+    with TestClient(app) as c:
+        H = {"X-Admin-Token": c.post("/api/setup", json={"password": "admin1"}).json()["token"]}
+        fill_setup(c, H, tmp_path, [(f"OK{i}ABC", "", "") for i in range(1, 7)])
+        c.post("/api/callbook/fill/settings", json={"hamqth": {"par": 1, "pause": 0}, "qrz": {"par": 2, "pause": 0}}, headers=H)
+        c.post("/api/callbook/fill/start", headers=H)
+        end = time.time() + 10
+        while sum("qrz.com" in u and "callsign=" in u for u in calls) < 5 and time.time() < end:
+            time.sleep(0.05)
+        c.post("/api/callbook/fill/cancel", headers=H)
+        gate.set()
+        fill_wait(c, H)
+        asked = [u for u in calls if "qrz.com" in u and "callsign=" in u]
+        calls.clear()
+        c.post("/api/callbook/fill/start", headers=H)
+        fill_wait(c, H)
+        again = {u.split("callsign=")[1] for u in calls if "qrz.com" in u and "callsign=" in u}
+        assert not again & {u.split("callsign=")[1] for u in asked}   # keine Station zweimal bei QRZ.com

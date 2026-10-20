@@ -7,9 +7,14 @@ Die Stationsdatenbank ordnet Rufzeichen einem Locator, ggf. einem Namen (höchst
 ## Kennzahlen
 
 Über der Tabelle (Verwaltung → Stationsdatenbank & Import) steht, wie viele Rufzeichen die Datenbank kennt und wie viele davon
-einen Locator, einen DOK, beides, keins von beiden oder einen Namen haben (mit Anteil in Prozent). „Nach Ländern“ klappt eine
-Tabelle auf: je Land (Deutschland zuerst, dann die größten) die Zahl der Stationen und wie viele davon Locator, DOK, beides
-oder nichts haben – so sieht man sofort, wo noch Lücken sind.
+einen Locator haben oder nicht, einen DOK haben, wie vielen deutschen Stationen der DOK fehlt, wie viele beides, keins von
+beiden oder einen Namen haben (jeweils mit Anteil in Prozent). „Nach Ländern“ klappt eine Tabelle auf: je Land (Deutschland
+zuerst, dann die größten) die Zahl der Stationen und wie viele davon mit/ohne Locator, mit/ohne DOK, mit beidem oder ohne beides –
+so sieht man sofort, wo noch Lücken sind. „ohne DOK“ steht nur bei Deutschland, DOKs gibt es nur dort.
+
+„ohne Locator und DOK“ zählt nur Stationen, denen **beides** fehlt. Das Auffüllen (unten) fragt dagegen jede Station ab, der
+**eins von beiden** fehlt – deshalb ist „Noch offen“ dort größer; die Karte schlüsselt das auf („… ohne Locator, … mit Locator,
+aber ohne DOK“).
 
 ## Woher die Einträge kommen
 
@@ -58,8 +63,18 @@ So läuft es:
 
 Meldet ein Dienst ein Limit, ein abgelaufenes Abo, eine Sperre oder falsche Zugangsdaten, oder schlagen fünf Abfragen nacheinander
 fehl, hört **nur dieser Dienst** auf, der andere macht weiter. Bei einzelnen Fehlern wird kurz gewartet (2, 4, 8 … s). Die Karte
-zeigt je Dienst die Abfragen heute, die Antwortzeit und – bei QRZ.com – den Zähler, den QRZ selbst für die letzten 24 Stunden
-meldet; darunter Fortschritt, Abfragen je Minute, die geschätzte Restzeit und den Puffer.
+zeigt je Dienst unter „Stand“:
+
+- **heute … abgefragt**: Abfragen des Auffüllens heute (UTC) – dafür gilt das Tageslimit.
+- **Antwort Ø**: mittlere Antwortzeit des Dienstes.
+- **24 h: BeamLog … Anfragen**: *alle* Anfragen, die BeamLog in den letzten 24 Stunden an den Dienst geschickt hat – Auffüllen,
+  Nachschlagen beim Loggen, Online-Abgleich der Log-Prüfung, „Testen“, Anmeldungen und Wiederholungen nach Fehlern.
+- **QRZ.com meldet …**: der Zähler, den QRZ.com selbst für die letzten 24 Stunden zurückgibt. Er zählt auch Abfragen anderer
+  Programme mit demselben Account. Liegt er deutlich über BeamLogs eigener Zahl, fragt noch etwas anderes mit dem Account ab.
+
+Darunter Fortschritt, Abfragen je Minute, die geschätzte Restzeit und den Puffer. Wird der Lauf abgebrochen, speichert BeamLog
+auch die Stationen, die schon ein Dienst beantwortet hat und die nur noch auf die Nachfrage beim anderen warteten – sie werden
+nicht ein zweites Mal abgefragt.
 
 **Limits der Dienste:** HamQTH nennt für die XML-Abfrage kein Limit (nur ein Account ist nötig) – es ist aber ein kostenloser
 Dienst, deshalb die vorsichtigen Standardwerte. QRZ.com zählt die Abfragen je 24 Stunden und meldet bei Überschreitung

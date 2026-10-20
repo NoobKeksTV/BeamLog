@@ -724,7 +724,11 @@
  "heute {n} abgefragt": "{n} looked up today",
  "heute {n} von {d} abgefragt": "{n} of {d} looked up today",
  "Antwort Ø {ms} ms": "avg. response {ms} ms",
- "QRZ.com meldet {n} Abfragen in 24 h": "QRZ.com reports {n} lookups in 24 h",
- "Abfragen heute (UTC), mittlere Antwortzeit des Dienstes; bei QRZ.com zusätzlich der Zähler, den QRZ selbst für die letzten 24 Stunden meldet (zählt auch Abfragen anderer Programme mit diesem Account)": "Lookups today (UTC), average response time of the service; for QRZ.com also the counter QRZ itself reports for the last 24 hours (includes lookups by other programs using this account)",
- "{a} ohne Locator, {b} mit Locator, aber ohne DOK": "{a} without locator, {b} with locator but without DOK"
+ "{a} ohne Locator, {b} mit Locator, aber ohne DOK": "{a} without locator, {b} with locator but without DOK",
+ "„heute“: Abfragen des Auffüllens heute (UTC, dafür gilt das Tageslimit). „24 h“: alle Anfragen von BeamLog an den Dienst in den letzten 24 Stunden – Auffüllen, Loggen, Log-Prüfung, Test und Anmeldungen. Bei QRZ.com daneben der Zähler, den QRZ selbst meldet (zählt auch Abfragen anderer Programme mit diesem Account).": "“today”: lookups by the fill job today (UTC, the daily limit applies to these). “24 h”: all requests BeamLog sent to the service in the last 24 hours – filling, logging, log check, test and logins. For QRZ.com also the counter QRZ itself reports (includes lookups by other programs using this account).",
+ "24 h: BeamLog {n} Anfragen": "24 h: BeamLog {n} requests",
+ "QRZ.com meldet {n}": "QRZ.com reports {n}",
+ "ohne Locator": "without locator",
+ "Deutschland ohne DOK": "Germany without DOK",
+ "ohne DOK": "without DOK"
 }

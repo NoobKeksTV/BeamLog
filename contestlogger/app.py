@@ -92,6 +92,7 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                 pass
         yield
         db.add_audit("Server wird beendet", nick="Server")
+        usage_save()
         for c in list(kst_state.values()):
             await c.stop()
         if task:
@@ -214,12 +215,42 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
         db.set_setting(f"lookup_user_{_old}", db.get_setting("lookup_user", ""))
         db.set_setting(f"lookup_pass_{_old}", db.get_setting("lookup_pass", ""))
 
+    # Jede Anfrage an HamQTH/QRZ.com mitzählen (Auffüllen, Loggen, Log-Prüfung, Test, Anmeldung, Wiederholungen) – stundenweise,
+    # damit sich „letzte 24 h“ direkt mit dem Zähler von QRZ.com vergleichen lässt
+    import threading as _thr
+    usage_lock = _thr.Lock()
+    try:
+        usage: dict[str, dict[str, int]] = {p: dict(v) for p, v in json.loads(db.get_setting("lookup_usage", "") or "{}").items() if p in SERVICES}
+    except (ValueError, AttributeError):
+        usage = {}
+
+    def usage_add(provider: str) -> None:
+        hour = utcnow_iso()[:13]
+        with usage_lock:
+            h = usage.setdefault(provider, {})
+            h[hour] = h.get(hour, 0) + 1
+
+    def usage_24h() -> dict[str, int]:
+        since = (datetime.now(timezone.utc) - timedelta(hours=23)).strftime("%Y-%m-%dT%H")
+        with usage_lock:
+            return {p: sum(n for hr, n in usage.get(p, {}).items() if hr >= since) for p in SERVICES}
+
+    def usage_save() -> None:
+        since = (datetime.now(timezone.utc) - timedelta(hours=48)).strftime("%Y-%m-%dT%H")
+        with usage_lock:
+            for p in usage:
+                usage[p] = {hr: n for hr, n in usage[p].items() if hr >= since}
+            data = json.dumps(usage)
+        db.set_setting("lookup_usage", data)
+
     def service_client(provider: str) -> lookup.Lookup:
         """Abfrage-Client eines Dienstes (HamQTH oder QRZ.com) mit dessen Zugangsdaten – bleibt samt Session erhalten."""
         if provider not in SERVICES:
             return lookup.Lookup("none", "", "")
         if provider not in lookup_state:
-            lookup_state[provider] = lookup.Lookup(provider, db.get_setting(f"lookup_user_{provider}", "") or "", db.get_setting(f"lookup_pass_{provider}", "") or "")
+            c = lookup.Lookup(provider, db.get_setting(f"lookup_user_{provider}", "") or "", db.get_setting(f"lookup_pass_{provider}", "") or "")
+            c.on_request = lambda p=provider: usage_add(p)
+            lookup_state[provider] = c
         return lookup_state[provider]
 
     def lookup_client() -> lookup.Lookup:
@@ -845,7 +876,9 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                     """Fertig abgefragt: in den Puffer. Fehlt der Locator noch, fragt erst der andere Dienst nach."""
                     other = [o for o in services if o not in it.tried and job["services"][o]["active"]]
                     if it.need_loc and not it.res.get("locator") and other:
-                        own[other[0]].append(it)
+                        # vorn einreihen: Nachfragen sofort erledigen, statt hinter Zehntausenden zu warten – sonst gehen sie bei
+                        # Abbruch/Neustart verloren und der erste Dienst wird beim nächsten Lauf ein zweites Mal gefragt
+                        own[other[0]].appendleft(it)
                         return
                     buf.put_nowait((it.call, it.res, it.src or next(iter(it.tried))))
                     job["buffer"] = buf.qsize()
@@ -923,12 +956,18 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
                                 for k in ("locator", "dok", "name"):
                                     job[k] += g[k]
                             await asyncio.to_thread(fill_save_used, dict(used))
+                            await asyncio.to_thread(usage_save)
                         job["buffer"] = buf.qsize()
 
                 wtask = asyncio.create_task(writer())
                 try:
                     await asyncio.gather(*(worker(p) for p in services for _ in range(cfg[p]["par"])))
                 finally:
+                    # schon (bei einem Dienst) abgefragte, aber nicht fertige Einträge trotzdem speichern – nicht doppelt fragen
+                    for q in (*own.values(), shared):
+                        for it in q:
+                            if it.tried:
+                                buf.put_nowait((it.call, it.res, it.src or next(iter(it.tried))))
                     buf.put_nowait(None)
                     await wtask
                 stops = [f"{lookup.PROVIDERS[p]}: {job['services'][p]['stopped']}" for p in services if job["services"][p]["stopped"]]
@@ -976,7 +1015,8 @@ def create_app(db_path: str | os.PathLike | None = None, backup_interval_min: fl
             n_open = fill["open"] = len(cands)
             # Aufschlüsselung: fehlt der Locator (mit/ohne DOK) oder nur der DOK einer deutschen Station?
             fill["split"] = {"no_loc": sum(1 for c in cands if c[1]), "dok_only": sum(1 for c in cands if not c[1])}
-        return {"cfg": cfg, "job": fill_public(job), "open": n_open, "split": fill.get("split"), "used_today": fill_used(), "par_max": FILL_PAR_MAX,
+        await asyncio.to_thread(usage_save)
+        return {"cfg": cfg, "job": fill_public(job), "open": n_open, "split": fill.get("split"), "requests_24h": usage_24h(), "used_today": fill_used(), "par_max": FILL_PAR_MAX,
                 "services": {p: {"name": lookup.PROVIDERS[p], "enabled": service_client(p).enabled} for p in SERVICES}}
 
     @app.post("/api/callbook/fill/start", dependencies=[Depends(require_maintainer)])

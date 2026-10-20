@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 
 from . import geo, prefixes
 
-TIMEOUT = 5.0
+TIMEOUT = 15.0  # großzügig: eine abgebrochene Anfrage zählt beim Dienst trotzdem, und die Wiederholung zählt noch einmal
 PROVIDERS = {"none": "aus", "hamqth": "HamQTH", "qrz": "QRZ.com (XML-Abo)"}
 
 
@@ -47,6 +47,12 @@ class Lookup:
         self._session_ts = 0.0
         self._lock = threading.Lock()  # mehrere Abfragen gleichzeitig (Auffüllen) teilen sich eine Session
         self.count = 0  # QRZ.com: Abfragen dieses Accounts in den letzten 24 h (meldet der Server bei jeder Antwort)
+        self.on_request = None  # wird vor jeder Anfrage an den Dienst aufgerufen (Anmeldung, Abfrage, Wiederholung) – zum Mitzählen
+
+    def _fetch(self, url: str) -> bytes:
+        if self.on_request:
+            self.on_request()
+        return _get(url)
 
     def _drop(self, sid: str) -> None:
         """Abgelaufene Session vergessen – nur wenn nicht schon ein anderer Thread eine neue geholt hat."""
@@ -67,7 +73,7 @@ class Lookup:
         if self._session and time.time() - self._session_ts < 50 * 60:
             return self._session
         url = f"https://www.hamqth.com/xml.php?u={urllib.parse.quote(self.user)}&p={urllib.parse.quote(self.password)}"
-        root = ET.fromstring(_get(url))
+        root = ET.fromstring(self._fetch(url))
         sid = _text(root, "session_id")
         if not sid:
             raise LookupError_(_text(root, "error") or "HamQTH: Anmeldung fehlgeschlagen")
@@ -76,7 +82,7 @@ class Lookup:
 
     def _hamqth(self, call: str, retry: bool = True) -> dict:
         sid = self._hamqth_session()
-        root = ET.fromstring(_get(f"https://www.hamqth.com/xml.php?id={sid}&callsign={urllib.parse.quote(call)}&prg=BeamLog"))
+        root = ET.fromstring(self._fetch(f"https://www.hamqth.com/xml.php?id={sid}&callsign={urllib.parse.quote(call)}&prg=BeamLog"))
         err = _text(root, "error")
         if err:
             if "session" in err.lower() and retry:
@@ -97,7 +103,7 @@ class Lookup:
         if self._session and time.time() - self._session_ts < 50 * 60:
             return self._session
         url = f"https://xmldata.qrz.com/xml/current/?username={urllib.parse.quote(self.user)}&password={urllib.parse.quote(self.password)}&agent=BeamLog"
-        root = ET.fromstring(_get(url))
+        root = ET.fromstring(self._fetch(url))
         key = _text(root, "Key")
         if not key:
             raise LookupError_(_text(root, "Error") or "QRZ: Anmeldung fehlgeschlagen")
@@ -106,7 +112,7 @@ class Lookup:
 
     def _qrz(self, call: str, retry: bool = True) -> dict:
         key = self._qrz_session()
-        root = ET.fromstring(_get(f"https://xmldata.qrz.com/xml/current/?s={key}&callsign={urllib.parse.quote(call)}"))
+        root = ET.fromstring(self._fetch(f"https://xmldata.qrz.com/xml/current/?s={key}&callsign={urllib.parse.quote(call)}"))
         if _text(root, "Count").isdigit():
             self.count = int(_text(root, "Count"))
         err = _text(root, "Error")
